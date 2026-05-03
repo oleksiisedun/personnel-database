@@ -1,0 +1,389 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <style>
+    /* ── Column width constraints (edit here) ── */
+    :root { --col-min-width: 100px; --col-max-width: 200px; }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    html, body { height: 100%; overflow: hidden; font-family: Arial, sans-serif; font-size: 14px; color: #333; background: #fff; }
+
+    /* ── List view ── */
+    #view-list { height: 100%; display: flex; flex-direction: column; padding: 12px; overflow: hidden; }
+    #loading { padding: 40px; text-align: center; color: #888; }
+    #error-msg { padding: 16px; color: #c62828; background: #ffebee; border-radius: 4px; margin-bottom: 12px; flex-shrink: 0; }
+    #table-wrapper { flex: 1; overflow: auto; }
+
+    #data-table { width: 100%; border-collapse: collapse; }
+    #data-table th, #data-table td {
+      border: 1px solid #ddd; padding: 6px 10px; text-align: left; vertical-align: middle;
+    }
+    .cell-content {
+      min-width: var(--col-min-width); max-width: var(--col-max-width);
+      white-space: normal; word-break: break-word;
+    }
+    #data-table thead th { background: #f5f5f5; font-weight: 600; position: sticky; top: 0; z-index: 1; }
+    #data-table tbody tr:nth-child(even) { background: #fafafa; }
+    #data-table tbody tr:hover { background: #e8f0fe; }
+    #filter-row th { padding: 4px 6px; }
+    #filter-row input {
+      width: 100%; padding: 4px 6px; border: 1px solid #ccc; border-radius: 3px;
+      font-size: 13px; outline: none;
+    }
+    #filter-row input:focus { border-color: #4285f4; }
+
+    .name-link {
+      color: #1a73e8; text-decoration: none; cursor: pointer;
+    }
+    .name-link:hover { text-decoration: underline; }
+
+    .thumb {
+      width: 60px; height: 60px; object-fit: cover;
+      border-radius: 4px; cursor: pointer; display: block;
+    }
+    .no-image { color: #bbb; font-style: italic; }
+
+    /* ── Lightbox ── */
+    #lightbox {
+      position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+      background: rgba(0,0,0,0.82); display: flex;
+      align-items: center; justify-content: center; z-index: 9999; cursor: pointer;
+    }
+    #lightbox img {
+      max-width: 90vw; max-height: 90vh; border-radius: 8px;
+      box-shadow: 0 4px 32px rgba(0,0,0,0.5);
+    }
+
+    /* ── Edit view ── */
+    #view-edit { height: 100%; overflow-y: auto; padding: 16px; max-width: 640px; }
+    #edit-header { display: flex; align-items: center; gap: 12px; margin-bottom: 20px; }
+    #btn-back {
+      background: none; border: 1px solid #ccc; border-radius: 4px;
+      padding: 6px 14px; cursor: pointer; font-size: 14px; color: #555;
+    }
+    #btn-back:hover { background: #f5f5f5; }
+    #edit-title { font-size: 18px; font-weight: 600; }
+
+    .field-block { margin-bottom: 16px; }
+    .field-block label { display: block; font-weight: 600; margin-bottom: 4px; font-size: 13px; color: #555; }
+    .field-block input[type="text"] {
+      width: 100%; padding: 8px 10px; border: 1px solid #ccc; border-radius: 4px;
+      font-size: 14px; outline: none;
+    }
+    .field-block input[type="text"]:focus { border-color: #4285f4; box-shadow: 0 0 0 2px rgba(66,133,244,0.2); }
+    .field-hint { font-size: 12px; color: #888; margin-top: 3px; }
+    .edit-preview {
+      margin-top: 8px; width: 100px; height: 100px; object-fit: cover;
+      border-radius: 4px; border: 1px solid #ddd; display: block;
+    }
+
+    #edit-actions { display: flex; gap: 12px; margin-top: 24px; align-items: center; }
+    #btn-save {
+      background: #1a73e8; color: #fff; border: none; border-radius: 4px;
+      padding: 9px 24px; cursor: pointer; font-size: 14px; font-weight: 600;
+    }
+    #btn-save:hover:not(:disabled) { background: #1557b0; }
+    #btn-save:disabled { background: #aac4f0; cursor: default; }
+    #save-status { font-size: 13px; color: #555; }
+    #save-error { color: #c62828; font-size: 13px; }
+  </style>
+</head>
+<body>
+
+  <!-- List View -->
+  <div id="view-list">
+    <div id="loading">Loading…</div>
+    <div id="error-msg" style="display:none"></div>
+    <div id="table-wrapper">
+      <table id="data-table" style="display:none">
+        <thead>
+          <tr id="filter-row"></tr>
+          <tr id="header-row"></tr>
+        </thead>
+        <tbody id="table-body"></tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- Edit View -->
+  <div id="view-edit" style="display:none">
+    <div id="edit-header">
+      <button id="btn-back">← Back</button>
+      <div id="edit-title"></div>
+    </div>
+    <div id="edit-form"></div>
+    <div id="edit-actions">
+      <button id="btn-save">Save</button>
+      <span id="save-status"></span>
+    </div>
+    <div id="save-error" style="display:none"></div>
+  </div>
+
+  <!-- Lightbox -->
+  <div id="lightbox" style="display:none">
+    <img id="lightbox-img" alt="">
+  </div>
+
+  <script>
+    google.script.host.setWidth(screen.availWidth);
+    google.script.host.setHeight(screen.availHeight);
+
+    let schema = null;
+    let filteredRows = [];
+    let editingRow = null;
+
+    function init() {
+      document.getElementById('btn-back').addEventListener('click', function() {
+        showView('list');
+      });
+      document.getElementById('btn-save').addEventListener('click', saveRow);
+      document.getElementById('lightbox').addEventListener('click', function() {
+        document.getElementById('lightbox').style.display = 'none';
+      });
+
+      google.script.run
+        .withSuccessHandler(onDataLoaded)
+        .withFailureHandler(onLoadError)
+        .getSchemaAndData();
+    }
+
+    function onDataLoaded(data) {
+      schema = data;
+      document.getElementById('loading').style.display = 'none';
+      buildListView();
+      applyFilters();
+      document.getElementById('data-table').style.display = 'table';
+    }
+
+    function onLoadError(err) {
+      document.getElementById('loading').style.display = 'none';
+      var el = document.getElementById('error-msg');
+      el.textContent = 'Error loading data: ' + (err.message || err);
+      el.style.display = 'block';
+    }
+
+    function buildListView() {
+      var filterRow = document.getElementById('filter-row');
+      var headerRow = document.getElementById('header-row');
+      filterRow.innerHTML = '';
+      headerRow.innerHTML = '';
+
+      schema.columns.forEach(function(col, i) {
+        // Header
+        var th = document.createElement('th');
+        var hDiv = document.createElement('div');
+        hDiv.className = 'cell-content';
+        hDiv.textContent = col.name;
+        th.appendChild(hDiv);
+        headerRow.appendChild(th);
+
+        // Filter input (text columns only)
+        var fth = document.createElement('th');
+        var fDiv = document.createElement('div');
+        fDiv.className = 'cell-content';
+        if (col.type === 'text') {
+          var input = document.createElement('input');
+          input.type = 'text';
+          input.placeholder = 'Filter…';
+          input.dataset.colIndex = i;
+          input.addEventListener('input', applyFilters);
+          fDiv.appendChild(input);
+        }
+        fth.appendChild(fDiv);
+        filterRow.appendChild(fth);
+      });
+    }
+
+    function applyFilters() {
+      var inputs = document.querySelectorAll('#filter-row input');
+      var filters = {};
+      inputs.forEach(function(inp) {
+        var val = inp.value.trim().toLowerCase();
+        if (val) filters[inp.dataset.colIndex] = val;
+      });
+
+      filteredRows = schema.rows.filter(function(row) {
+        return Object.keys(filters).every(function(colIdx) {
+          return (row.values[colIdx] || '').toLowerCase().includes(filters[colIdx]);
+        });
+      });
+
+      renderList();
+    }
+
+    function renderList() {
+      var tbody = document.getElementById('table-body');
+      tbody.innerHTML = '';
+
+      filteredRows.forEach(function(row) {
+        var tr = document.createElement('tr');
+        row.values.forEach(function(val, i) {
+          var td = document.createElement('td');
+          var col = schema.columns[i];
+
+          var cell = document.createElement('div');
+          cell.className = 'cell-content';
+
+          if (col.type === 'image') {
+            var id = extractDriveId(val);
+            if (id) {
+              var img = document.createElement('img');
+              img.src = 'https://drive.google.com/thumbnail?id=' + id + '&sz=w80';
+              img.className = 'thumb';
+              img.alt = '';
+              (function(fileId) {
+                img.addEventListener('click', function() { openLightbox(fileId); });
+              })(id);
+              cell.appendChild(img);
+            } else {
+              var span = document.createElement('span');
+              span.className = 'no-image';
+              span.textContent = '—';
+              cell.appendChild(span);
+            }
+          } else if (i === 0) {
+            var a = document.createElement('a');
+            a.className = 'name-link';
+            a.href = '#';
+            a.textContent = val;
+            (function(r) {
+              a.addEventListener('click', function(e) {
+                e.preventDefault();
+                openEditView(r);
+              });
+            })(row);
+            cell.appendChild(a);
+          } else {
+            cell.textContent = val;
+          }
+
+          td.appendChild(cell);
+
+          tr.appendChild(td);
+        });
+        tbody.appendChild(tr);
+      });
+    }
+
+    function extractDriveId(url) {
+      if (!url) return null;
+      var m = url.match(/\/file\/d\/([a-zA-Z0-9_-]+)/);
+      if (m) return m[1];
+      m = url.match(/[?&]id=([a-zA-Z0-9_-]+)/);
+      if (m) return m[1];
+      // bare ID (no slashes or dots)
+      if (/^[a-zA-Z0-9_-]{10,}$/.test(url.trim())) return url.trim();
+      return null;
+    }
+
+    function openLightbox(fileId) {
+      document.getElementById('lightbox-img').src =
+        'https://drive.google.com/thumbnail?id=' + fileId + '&sz=w800';
+      document.getElementById('lightbox').style.display = 'flex';
+    }
+
+    function openEditView(row) {
+      editingRow = row;
+      var form = document.getElementById('edit-form');
+      form.innerHTML = '';
+
+      schema.columns.forEach(function(col, i) {
+        var block = document.createElement('div');
+        block.className = 'field-block';
+
+        var label = document.createElement('label');
+        label.textContent = col.name;
+        block.appendChild(label);
+
+        var input = document.createElement('input');
+        input.type = 'text';
+        input.value = row.values[i] || '';
+        input.dataset.colIndex = i;
+        block.appendChild(input);
+
+        if (col.type === 'image') {
+          var hint = document.createElement('div');
+          hint.className = 'field-hint';
+          hint.textContent = 'Paste a Google Drive sharing link';
+          block.appendChild(hint);
+
+          var preview = document.createElement('img');
+          preview.className = 'edit-preview';
+          preview.alt = '';
+          updatePreview(preview, input.value);
+          block.appendChild(preview);
+
+          (function(inp, prev) {
+            inp.addEventListener('input', function() {
+              updatePreview(prev, inp.value);
+            });
+          })(input, preview);
+        }
+
+        form.appendChild(block);
+      });
+
+      document.getElementById('edit-title').textContent =
+        row.values[0] || 'Edit record';
+      document.getElementById('save-error').style.display = 'none';
+      document.getElementById('save-status').textContent = '';
+      document.getElementById('btn-save').disabled = false;
+      showView('edit');
+    }
+
+    function updatePreview(imgEl, url) {
+      var id = extractDriveId(url);
+      if (id) {
+        imgEl.src = 'https://drive.google.com/thumbnail?id=' + id + '&sz=w100';
+        imgEl.style.display = 'block';
+      } else {
+        imgEl.src = '';
+        imgEl.style.display = 'none';
+      }
+    }
+
+    function saveRow() {
+      var inputs = document.querySelectorAll('#edit-form input[data-col-index]');
+      var newValues = [];
+      inputs.forEach(function(inp) {
+        newValues[parseInt(inp.dataset.colIndex)] = inp.value;
+      });
+
+      document.getElementById('btn-save').disabled = true;
+      document.getElementById('save-status').textContent = 'Saving…';
+      document.getElementById('save-error').style.display = 'none';
+
+      google.script.run
+        .withSuccessHandler(onSaveSuccess)
+        .withFailureHandler(onSaveError)
+        .updateRow(editingRow.rowIndex, newValues);
+    }
+
+    function onSaveSuccess() {
+      // Update in-memory data so list reflects changes without re-fetching
+      var inputs = document.querySelectorAll('#edit-form input[data-col-index]');
+      inputs.forEach(function(inp) {
+        editingRow.values[parseInt(inp.dataset.colIndex)] = inp.value;
+      });
+      applyFilters();
+      showView('list');
+    }
+
+    function onSaveError(err) {
+      document.getElementById('btn-save').disabled = false;
+      document.getElementById('save-status').textContent = '';
+      var el = document.getElementById('save-error');
+      el.textContent = 'Save failed: ' + (err.message || err);
+      el.style.display = 'block';
+    }
+
+    function showView(name) {
+      document.getElementById('view-list').style.display = name === 'list' ? 'block' : 'none';
+      document.getElementById('view-edit').style.display = name === 'edit' ? 'block' : 'none';
+    }
+
+    document.addEventListener('DOMContentLoaded', init);
+  </script>
+</body>
+</html>
