@@ -1,3 +1,7 @@
+/**
+ * Simple trigger that runs when the spreadsheet is opened.
+ * Adds the "WebEditor" custom menu to the Google Sheets toolbar.
+ */
 function onOpen() {
   SpreadsheetApp.getUi()
     .createMenu('WebEditor')
@@ -5,6 +9,11 @@ function onOpen() {
     .addToUi();
 }
 
+/**
+ * Opens the web editor as a full-screen modal dialog.
+ * Uses createTemplateFromFile so that <?!= ?> scriptlet includes in
+ * WebEditor.html are evaluated before the HTML is served to the client.
+ */
 function openWebEditor() {
   const html = HtmlService.createTemplateFromFile('WebEditor').evaluate()
     .setWidth(800)
@@ -12,6 +21,24 @@ function openWebEditor() {
   SpreadsheetApp.getUi().showModalDialog(html, 'WebEditor');
 }
 
+/**
+ * Returns the full schema and data from the "Database" sheet, plus sub-column
+ * headers for any *-table columns resolved from the "Handbook" sheet.
+ *
+ * Sheet layout:
+ *   Row 1 — column names
+ *   Row 2 — column types (text | image | *-table)
+ *   Row 3+ — data rows
+ *
+ * Handbook layout (row 1 is a header and is skipped):
+ *   Column A — data type name (e.g. relatives-table)
+ *   Column B+ — sub-column headers for that type
+ *
+ * @returns {{
+ *   columns: Array<{name: string, type: string, tableHeaders?: string[]}>,
+ *   rows: Array<{rowIndex: number, values: string[]}>
+ * }}
+ */
 function getSchemaAndData() {
   const ss = SpreadsheetApp.getActiveSpreadsheet();
   const sheet = ss.getSheetByName('Database');
@@ -47,6 +74,18 @@ function getSchemaAndData() {
   return { columns, rows };
 }
 
+/**
+ * Fetches Google Drive files by ID server-side and returns them as base64
+ * data URLs. Running server-side means the script owner's OAuth token is used,
+ * so all editor users can view images regardless of their own Drive session.
+ * Files that cannot be accessed (wrong ID, no permission) are returned as null.
+ *
+ * Called once per image from the client to keep individual response payloads
+ * small and avoid HtmlService JSON size limits.
+ *
+ * @param {string[]} fileIds - Array of Google Drive file IDs to fetch.
+ * @returns {Object.<string, string|null>} Map of fileId → data URL (or null on error).
+ */
 function getImagesDataUrls(fileIds) {
   const result = {};
   fileIds.forEach(fileId => {
@@ -61,8 +100,15 @@ function getImagesDataUrls(fileIds) {
   return result;
 }
 
+/**
+ * Writes new values for a single data row back to the "Database" sheet.
+ *
+ * @param {number} rowIndex - 1-based spreadsheet row number to update.
+ * @param {string[]} values - Array of cell values, one per column.
+ * @returns {boolean} Always true; thrown errors propagate to the client failure handler.
+ */
 function updateRow(rowIndex, values) {
-  const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName('Database');  // keep separate for simplicity
+  const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName('Database');
   if (!sheet) throw new Error('Sheet "Database" not found.');
   sheet.getRange(rowIndex, 1, 1, values.length).setValues([values]);
   return true;
