@@ -6,7 +6,7 @@ function onOpen() {
 }
 
 function openWebEditor() {
-  const html = HtmlService.createHtmlOutputFromFile('WebEditor')
+  const html = HtmlService.createTemplateFromFile('WebEditor').evaluate()
     .setWidth(800)
     .setHeight(600);
   SpreadsheetApp.getUi().showModalDialog(html, 'WebEditor');

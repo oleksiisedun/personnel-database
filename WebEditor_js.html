@@ -1,0 +1,675 @@
+<script>
+  google.script.host.setWidth(screen.availWidth);
+  google.script.host.setHeight(screen.availHeight);
+
+  let schema = null;       // { columns: [{name, type, tableHeaders?}], rows: [{rowIndex, values[]}] }
+  let filteredRows = [];   // subset of schema.rows currently shown after filters
+  let editingRow = null;   // row object open in the edit view
+  let pendingValues = null; // newValues[] staged by saveRow(), consumed by onSaveSuccess()
+  let hiddenColumns = new Set(); // column indices hidden by the user
+  let imageCache = {};     // fileId → base64 data URL (or null on error)
+  let pendingImages = new Set(); // fileIds currently being fetched to avoid duplicate requests
+
+  const FIELD_SEP = ' | ';
+  const ROW_SEP = '\n';
+
+  /**
+   * Decodes a pipe-delimited cell string into an array of row objects.
+   * Empty cell returns []. Each row object maps field names to string values.
+   * @param {string} cell - Raw encoded cell value from the sheet.
+   * @param {string[]} fields - Ordered list of field names (sub-column headers).
+   * @returns {Object[]}
+   */
+  const parseData = (cell, fields) => {
+    if (!cell) return [];
+    return cell.split(ROW_SEP).map(row => {
+      const values = row.split(FIELD_SEP);
+      return Object.fromEntries(fields.map((key, i) => [key, values[i] ?? '']));
+    });
+  };
+
+  /**
+   * Encodes an array of row objects back into the pipe-delimited cell string.
+   * Rows where the first field (filterKey) is empty are excluded.
+   * @param {Object[]} data - Array of row objects.
+   * @param {string[]} fields - Ordered list of field names.
+   * @param {string} filterKey - Field name used to filter out blank rows.
+   * @returns {string}
+   */
+  const mergeData = (data, fields, filterKey) => data
+    .filter(r => r[filterKey])
+    .map(r => fields.map(f => r[f] ?? '').join(FIELD_SEP))
+    .join(ROW_SEP);
+
+  /**
+   * Returns true if the column type is a *-table type (e.g. relatives-table).
+   * @param {{type: string}} col
+   * @returns {boolean}
+   */
+  function isTableType(col) { return col.type.endsWith('-table'); }
+
+  /**
+   * Entry point. Wires up all static event listeners and kicks off the
+   * initial data load from the server via google.script.run.
+   */
+  function init() {
+    document.getElementById('btn-back').addEventListener('click', function() {
+      showView('list');
+    });
+    document.getElementById('btn-save').addEventListener('click', saveRow);
+    document.getElementById('lightbox').addEventListener('click', function() {
+      document.getElementById('lightbox').style.display = 'none';
+    });
+    document.getElementById('btn-columns').addEventListener('click', function(e) {
+      e.stopPropagation();
+      var panel = document.getElementById('col-panel');
+      panel.style.display = panel.style.display === 'none' ? 'block' : 'none';
+    });
+    // Prevent clicks inside the panel from closing it via the document listener below.
+    document.getElementById('col-panel').addEventListener('click', function(e) {
+      e.stopPropagation();
+    });
+    document.addEventListener('click', function() {
+      document.getElementById('col-panel').style.display = 'none';
+    });
+
+    google.script.run
+      .withSuccessHandler(onDataLoaded)
+      .withFailureHandler(onLoadError)
+      .getSchemaAndData();
+  }
+
+  /**
+   * Success handler for the initial getSchemaAndData() call.
+   * Stores the schema, builds the table header/filter rows, renders data, and
+   * corrects sticky header offsets after the table becomes visible.
+   * @param {{columns: Object[], rows: Object[]}} data
+   */
+  function onDataLoaded(data) {
+    schema = data;
+    document.getElementById('loading').style.display = 'none';
+    buildListView();
+    applyFilters();
+    document.getElementById('data-table').style.display = 'table';
+    updateStickyOffsets();
+  }
+
+  /**
+   * Failure handler for the initial getSchemaAndData() call.
+   * Hides the loading indicator and shows the error message in the list view.
+   * @param {Error} err
+   */
+  function onLoadError(err) {
+    document.getElementById('loading').style.display = 'none';
+    var el = document.getElementById('error-msg');
+    el.textContent = 'Error loading data: ' + (err.message || err);
+    el.style.display = 'block';
+  }
+
+  /**
+   * Builds the static parts of the list view that depend on schema but not on data:
+   * the column header row and the filter input row. Also rebuilds the column
+   * visibility panel. Called once after schema is loaded.
+   */
+  function buildListView() {
+    var filterRow = document.getElementById('filter-row');
+    var headerRow = document.getElementById('header-row');
+    filterRow.innerHTML = '';
+    headerRow.innerHTML = '';
+
+    schema.columns.forEach(function(col, i) {
+      var th = document.createElement('th');
+      th.dataset.colIndex = i;
+      var hDiv = document.createElement('div');
+      hDiv.className = 'cell-content';
+      if (col.type === 'image') hDiv.classList.add('cell-content--image');
+      if (isTableType(col)) hDiv.classList.add('cell-content--table');
+      hDiv.textContent = col.name;
+      th.appendChild(hDiv);
+      headerRow.appendChild(th);
+
+      var fth = document.createElement('th');
+      fth.dataset.colIndex = i;
+      var fDiv = document.createElement('div');
+      fDiv.className = 'cell-content';
+      if (col.type === 'text') {
+        var input = document.createElement('input');
+        input.type = 'text';
+        input.placeholder = 'Filter…';
+        input.dataset.colIndex = i;
+        input.addEventListener('input', applyFilters);
+        fDiv.appendChild(input);
+      }
+      fth.appendChild(fDiv);
+      filterRow.appendChild(fth);
+    });
+    buildColumnPanel();
+  }
+
+  /**
+   * Reads all active filter inputs, filters schema.rows into filteredRows,
+   * and re-renders the table body. Called on every filter input change.
+   */
+  function applyFilters() {
+    var inputs = document.querySelectorAll('#filter-row input');
+    var filters = {};
+    inputs.forEach(function(inp) {
+      var val = inp.value.trim().toLowerCase();
+      if (val) filters[inp.dataset.colIndex] = val;
+    });
+
+    filteredRows = schema.rows.filter(function(row) {
+      return Object.keys(filters).every(function(colIdx) {
+        return (row.values[colIdx] || '').toLowerCase().includes(filters[colIdx]);
+      });
+    });
+
+    renderList();
+  }
+
+  /**
+   * Rebuilds the table body from filteredRows. Each cell is rendered according
+   * to its column type: *-table → mini-table, image → thumbnail, col 0 → edit
+   * link, otherwise plain text. Applies column visibility and queues image fetches
+   * after the DOM is updated.
+   */
+  function renderList() {
+    var tbody = document.getElementById('table-body');
+    tbody.innerHTML = '';
+
+    filteredRows.forEach(function(row) {
+      var tr = document.createElement('tr');
+      row.values.forEach(function(val, i) {
+        var td = document.createElement('td');
+        td.dataset.colIndex = i;
+        var col = schema.columns[i];
+
+        var cell = document.createElement('div');
+        cell.className = 'cell-content';
+
+        if (col.type === 'image') cell.classList.add('cell-content--image');
+        if (isTableType(col)) {
+          cell.classList.add('cell-content--table');
+          cell.appendChild(buildMiniTable(parseData(val, col.tableHeaders || []), col.tableHeaders || []));
+        } else if (col.type === 'image') {
+          var id = extractDriveId(val);
+          if (id) {
+            var img = document.createElement('img');
+            img.className = 'thumb';
+            img.alt = '';
+            if (imageCache[id]) {
+              img.src = imageCache[id];
+            } else {
+              img.dataset.fileId = id; // picked up by queueImageFetch()
+            }
+            (function(fileId) {
+              img.addEventListener('click', function() { openLightbox(fileId); });
+            })(id);
+            cell.appendChild(img);
+          } else {
+            var span = document.createElement('span');
+            span.className = 'no-image';
+            span.textContent = '—';
+            cell.appendChild(span);
+          }
+        } else if (i === 0) {
+          var a = document.createElement('a');
+          a.className = 'name-link';
+          a.href = '#';
+          a.textContent = val;
+          (function(r) {
+            a.addEventListener('click', function(e) {
+              e.preventDefault();
+              openEditView(r);
+            });
+          })(row);
+          cell.appendChild(a);
+        } else {
+          cell.textContent = val;
+        }
+
+        td.appendChild(cell);
+        tr.appendChild(td);
+      });
+      tbody.appendChild(tr);
+    });
+    applyColumnVisibility();
+    queueImageFetch();
+  }
+
+  /**
+   * Finds all img elements tagged with data-file-id (not yet loaded) and fires
+   * one google.script.run call per unique file ID. Results are stored in imageCache
+   * and the img src is updated when the response arrives. Uses pendingImages to
+   * prevent duplicate in-flight requests for the same file.
+   */
+  function queueImageFetch() {
+    document.querySelectorAll('img[data-file-id]').forEach(function(img) {
+      var id = img.dataset.fileId;
+      if (!id || pendingImages.has(id)) return;
+      pendingImages.add(id);
+      (function(fileId) {
+        google.script.run
+          .withSuccessHandler(function(dataUrls) {
+            pendingImages.delete(fileId);
+            imageCache[fileId] = dataUrls[fileId] || null;
+            if (dataUrls[fileId]) {
+              document.querySelectorAll('img[data-file-id="' + fileId + '"]').forEach(function(el) {
+                el.src = dataUrls[fileId];
+                el.removeAttribute('data-file-id');
+              });
+            }
+          })
+          .withFailureHandler(function() { pendingImages.delete(fileId); })
+          .getImagesDataUrls([fileId]);
+      })(id);
+    });
+  }
+
+  /**
+   * Populates the column visibility dropdown panel with a "Select all" checkbox
+   * and one checkbox per column. The first column's checkbox is always disabled.
+   * Rebuilds the panel from scratch each time schema changes.
+   */
+  function buildColumnPanel() {
+    var panel = document.getElementById('col-panel');
+    panel.innerHTML = '';
+
+    var allLabel = document.createElement('label');
+    allLabel.style.cssText = 'font-weight:600; padding-bottom:6px; margin-bottom:4px; border-bottom:1px solid #eee;';
+    var allCb = document.createElement('input');
+    allCb.type = 'checkbox';
+    allCb.id = 'col-select-all';
+    allCb.addEventListener('change', function() {
+      schema.columns.forEach(function(col, i) {
+        if (i === 0) return;
+        if (allCb.checked) hiddenColumns.delete(i);
+        else hiddenColumns.add(i);
+      });
+      panel.querySelectorAll('input[data-cb-col]').forEach(function(cb) {
+        if (parseInt(cb.dataset.cbCol) !== 0) cb.checked = allCb.checked;
+      });
+      applyColumnVisibility();
+    });
+    allLabel.appendChild(allCb);
+    allLabel.appendChild(document.createTextNode(' Select all'));
+    panel.appendChild(allLabel);
+
+    schema.columns.forEach(function(col, i) {
+      var label = document.createElement('label');
+      var cb = document.createElement('input');
+      cb.type = 'checkbox';
+      cb.checked = !hiddenColumns.has(i);
+      cb.dataset.cbCol = i;
+      if (i === 0) {
+        cb.disabled = true;
+      } else {
+        (function(idx) {
+          cb.addEventListener('change', function() {
+            if (this.checked) hiddenColumns.delete(idx);
+            else hiddenColumns.add(idx);
+            updateSelectAll();
+            applyColumnVisibility();
+          });
+        })(i);
+      }
+      label.appendChild(cb);
+      label.appendChild(document.createTextNode(' ' + col.name));
+      panel.appendChild(label);
+    });
+
+    updateSelectAll();
+  }
+
+  /**
+   * Syncs the "Select all" checkbox state (checked / unchecked / indeterminate)
+   * to reflect how many non-first columns are currently visible.
+   */
+  function updateSelectAll() {
+    var allCb = document.getElementById('col-select-all');
+    if (!allCb || schema.columns.length <= 1) return;
+    var hiddenCount = 0;
+    schema.columns.forEach(function(col, i) {
+      if (i !== 0 && hiddenColumns.has(i)) hiddenCount++;
+    });
+    var total = schema.columns.length - 1;
+    if (hiddenCount === 0) {
+      allCb.checked = true; allCb.indeterminate = false;
+    } else if (hiddenCount === total) {
+      allCb.checked = false; allCb.indeterminate = false;
+    } else {
+      allCb.indeterminate = true;
+    }
+  }
+
+  /**
+   * Shows or hides every th/td in the data table based on the hiddenColumns set.
+   * Targets cells by their data-col-index attribute so both header and body stay
+   * in sync.
+   */
+  function applyColumnVisibility() {
+    document.querySelectorAll('#data-table th[data-col-index], #data-table td[data-col-index]').forEach(function(el) {
+      el.style.display = hiddenColumns.has(parseInt(el.dataset.colIndex)) ? 'none' : '';
+    });
+  }
+
+  /**
+   * Measures the rendered height of the filter row and sets the CSS top offset
+   * of each header-row th so both sticky rows stack correctly without overlapping.
+   * Must be called after the table is visible (offsetHeight requires layout).
+   */
+  function updateStickyOffsets() {
+    var filterHeight = document.getElementById('filter-row').offsetHeight;
+    document.querySelectorAll('#header-row th').forEach(function(th) {
+      th.style.top = filterHeight + 'px';
+    });
+  }
+
+  /**
+   * Extracts the Google Drive file ID from a sharing URL or returns the input
+   * unchanged if it looks like a bare file ID already.
+   * Supported formats:
+   *   https://drive.google.com/file/d/FILE_ID/view
+   *   https://drive.google.com/open?id=FILE_ID
+   *   FILE_ID (bare alphanumeric string ≥ 10 chars)
+   * @param {string} url
+   * @returns {string|null} File ID, or null if not parseable.
+   */
+  function extractDriveId(url) {
+    if (!url) return null;
+    var m = url.match(/\/file\/d\/([a-zA-Z0-9_-]+)/);
+    if (m) return m[1];
+    m = url.match(/[?&]id=([a-zA-Z0-9_-]+)/);
+    if (m) return m[1];
+    if (/^[a-zA-Z0-9_-]{10,}$/.test(url.trim())) return url.trim();
+    return null;
+  }
+
+  /**
+   * Opens the lightbox overlay for a given Drive file ID. Uses the cached data
+   * URL if available; otherwise fetches it from the server and updates the
+   * lightbox image once the response arrives.
+   * @param {string} fileId - Google Drive file ID.
+   */
+  function openLightbox(fileId) {
+    var imgEl = document.getElementById('lightbox-img');
+    document.getElementById('lightbox').style.display = 'flex';
+    if (imageCache[fileId]) {
+      imgEl.src = imageCache[fileId];
+    } else {
+      imgEl.src = '';
+      google.script.run
+        .withSuccessHandler(function(dataUrls) {
+          if (dataUrls[fileId]) { imageCache[fileId] = dataUrls[fileId]; imgEl.src = dataUrls[fileId]; }
+        })
+        .withFailureHandler(function() {})
+        .getImagesDataUrls([fileId]);
+    }
+  }
+
+  /**
+   * Switches to the edit view for the given row. Dynamically builds a form field
+   * for each column: a table editor for *-table types, a text input with live
+   * image preview for image types, and a plain text input for text types.
+   * @param {{rowIndex: number, values: string[]}} row
+   */
+  function openEditView(row) {
+    editingRow = row;
+    var form = document.getElementById('edit-form');
+    form.innerHTML = '';
+
+    schema.columns.forEach(function(col, i) {
+      var block = document.createElement('div');
+      block.className = 'field-block';
+
+      var label = document.createElement('label');
+      label.textContent = col.name;
+      block.appendChild(label);
+
+      if (isTableType(col)) {
+        block.appendChild(buildTableEditor(i, parseData(row.values[i] || '', col.tableHeaders || []), col.tableHeaders || []));
+      } else {
+        var input = document.createElement('input');
+        input.type = 'text';
+        input.value = row.values[i] || '';
+        input.dataset.colIndex = i;
+        block.appendChild(input);
+
+        if (col.type === 'image') {
+          var hint = document.createElement('div');
+          hint.className = 'field-hint';
+          hint.textContent = 'Paste a Google Drive sharing link';
+          block.appendChild(hint);
+
+          var preview = document.createElement('img');
+          preview.className = 'edit-preview';
+          preview.alt = '';
+          updatePreview(preview, input.value);
+          block.appendChild(preview);
+
+          (function(inp, prev) {
+            inp.addEventListener('input', function() {
+              updatePreview(prev, inp.value);
+            });
+          })(input, preview);
+        }
+      }
+
+      form.appendChild(block);
+    });
+
+    document.getElementById('edit-title').textContent = row.values[0] || 'Edit record';
+    document.getElementById('save-error').style.display = 'none';
+    document.getElementById('save-status').textContent = '';
+    document.getElementById('btn-save').disabled = false;
+    showView('edit');
+  }
+
+  /**
+   * Updates the image preview element in the edit form for an image-type field.
+   * Extracts the file ID from the URL, shows a cached data URL immediately if
+   * available, or fetches it from the server asynchronously.
+   * @param {HTMLImageElement} imgEl - The preview img element to update.
+   * @param {string} url - The Google Drive URL or file ID entered by the user.
+   */
+  function updatePreview(imgEl, url) {
+    var id = extractDriveId(url);
+    if (!id) { imgEl.src = ''; imgEl.style.display = 'none'; return; }
+    imgEl.style.display = 'block';
+    if (imageCache[id]) {
+      imgEl.src = imageCache[id];
+    } else {
+      imgEl.src = '';
+      google.script.run
+        .withSuccessHandler(function(dataUrls) {
+          if (dataUrls[id]) { imageCache[id] = dataUrls[id]; imgEl.src = dataUrls[id]; }
+        })
+        .withFailureHandler(function() {})
+        .getImagesDataUrls([id]);
+    }
+  }
+
+  /**
+   * Builds a read-only HTML table element from decoded *-table row data.
+   * Used to display *-table column values in the list view.
+   * @param {Object[]} rows - Array of row objects (field name → value).
+   * @param {string[]} headers - Ordered sub-column header names.
+   * @returns {HTMLTableElement}
+   */
+  function buildMiniTable(rows, headers) {
+    var table = document.createElement('table');
+    table.className = 'mini-table';
+    var thead = document.createElement('thead');
+    var trHead = document.createElement('tr');
+    (headers || []).forEach(function(h) {
+      var th = document.createElement('th'); th.textContent = h; trHead.appendChild(th);
+    });
+    thead.appendChild(trHead);
+    table.appendChild(thead);
+    var tbody = document.createElement('tbody');
+    (rows || []).forEach(function(rowObj) {
+      var tr = document.createElement('tr');
+      (headers || []).forEach(function(h) {
+        var td = document.createElement('td'); td.textContent = rowObj[h] || ''; tr.appendChild(td);
+      });
+      tbody.appendChild(tr);
+    });
+    table.appendChild(tbody);
+    return table;
+  }
+
+  /**
+   * Builds an interactive table editor widget for a *-table column in the edit
+   * view. Pre-populates rows from decoded data. Includes an "Add row" button and
+   * a delete button per row. The wrapper div carries data-col-index so
+   * encodeTableEditor() can locate it during save.
+   * @param {number} colIndex - Index of the column in schema.columns.
+   * @param {Object[]} rows - Pre-decoded row objects.
+   * @param {string[]} headers - Sub-column header names.
+   * @returns {HTMLDivElement}
+   */
+  function buildTableEditor(colIndex, rows, headers) {
+    var wrapper = document.createElement('div');
+    wrapper.className = 'table-editor';
+    wrapper.dataset.colIndex = colIndex;
+    var table = document.createElement('table');
+    var thead = document.createElement('thead');
+    var trHead = document.createElement('tr');
+    (headers || []).forEach(function(h) {
+      var th = document.createElement('th'); th.textContent = h; trHead.appendChild(th);
+    });
+    trHead.appendChild(document.createElement('th')); // placeholder for delete column
+    thead.appendChild(trHead);
+    table.appendChild(thead);
+    var tbody = document.createElement('tbody');
+    (rows || []).forEach(function(rowObj) { addTableEditorRow(tbody, headers, rowObj); });
+    table.appendChild(tbody);
+    wrapper.appendChild(table);
+    var btnAdd = document.createElement('button');
+    btnAdd.type = 'button';
+    btnAdd.className = 'btn-add-row';
+    btnAdd.textContent = '+ Add row';
+    (function(tb, hdrs) {
+      btnAdd.addEventListener('click', function() { addTableEditorRow(tb, hdrs, null); });
+    })(tbody, headers);
+    wrapper.appendChild(btnAdd);
+    return wrapper;
+  }
+
+  /**
+   * Appends a new editable row to a table editor tbody. Each cell contains a
+   * text input tagged with data-field (the header name). The last cell contains
+   * a delete button that removes the row from the DOM.
+   * @param {HTMLTableSectionElement} tbody
+   * @param {string[]} headers - Sub-column header names.
+   * @param {Object|null} rowObj - Existing row data to pre-fill, or null for an empty row.
+   */
+  function addTableEditorRow(tbody, headers, rowObj) {
+    var tr = document.createElement('tr');
+    (headers || []).forEach(function(h) {
+      var td = document.createElement('td');
+      var inp = document.createElement('input');
+      inp.type = 'text';
+      inp.value = (rowObj && rowObj[h]) ? rowObj[h] : '';
+      inp.dataset.field = h;
+      td.appendChild(inp);
+      tr.appendChild(td);
+    });
+    var tdDel = document.createElement('td');
+    var btnDel = document.createElement('button');
+    btnDel.type = 'button';
+    btnDel.className = 'btn-delete-row';
+    btnDel.textContent = '×';
+    btnDel.addEventListener('click', function() { tr.parentNode.removeChild(tr); });
+    tdDel.appendChild(btnDel);
+    tr.appendChild(tdDel);
+    tbody.appendChild(tr);
+  }
+
+  /**
+   * Reads all input values from a table editor widget and encodes them back into
+   * the pipe-delimited cell string using mergeData(). Rows where the first field
+   * is empty are excluded (treated as blank/deleted).
+   * @param {number} colIndex - Index of the column whose editor to read.
+   * @param {{tableHeaders: string[]}} col - Column descriptor from schema.
+   * @returns {string} Encoded cell value ready to write to the sheet.
+   */
+  function encodeTableEditor(colIndex, col) {
+    var wrapper = document.querySelector('.table-editor[data-col-index="' + colIndex + '"]');
+    if (!wrapper) return '';
+    var rows = [];
+    wrapper.querySelectorAll('tbody tr').forEach(function(tr) {
+      var obj = {};
+      tr.querySelectorAll('input[data-field]').forEach(function(inp) {
+        obj[inp.dataset.field] = inp.value;
+      });
+      rows.push(obj);
+    });
+    return mergeData(rows, col.tableHeaders || [], (col.tableHeaders || [])[0] || '');
+  }
+
+  /**
+   * Collects new values for all columns from the edit form (plain inputs and table
+   * editors), stores them in pendingValues, and calls updateRow() on the server.
+   * Disables the Save button for the duration of the async call.
+   */
+  function saveRow() {
+    var newValues = new Array(schema.columns.length).fill('');
+    document.querySelectorAll('#edit-form input[data-col-index]').forEach(function(inp) {
+      newValues[parseInt(inp.dataset.colIndex)] = inp.value;
+    });
+    schema.columns.forEach(function(col, i) {
+      if (isTableType(col)) newValues[i] = encodeTableEditor(i, col);
+    });
+    pendingValues = newValues;
+
+    document.getElementById('btn-save').disabled = true;
+    document.getElementById('save-status').textContent = 'Saving…';
+    document.getElementById('save-error').style.display = 'none';
+
+    google.script.run
+      .withSuccessHandler(onSaveSuccess)
+      .withFailureHandler(onSaveError)
+      .updateRow(editingRow.rowIndex, newValues);
+  }
+
+  /**
+   * Success handler for saveRow(). Updates the in-memory row values from
+   * pendingValues so the list view reflects the change without a full reload,
+   * then returns to the list view.
+   */
+  function onSaveSuccess() {
+    if (pendingValues) {
+      pendingValues.forEach(function(val, i) { editingRow.values[i] = val; });
+      pendingValues = null;
+    }
+    applyFilters();
+    showView('list');
+  }
+
+  /**
+   * Failure handler for saveRow(). Re-enables the Save button and displays
+   * the error message inside the edit view.
+   * @param {Error} err
+   */
+  function onSaveError(err) {
+    document.getElementById('btn-save').disabled = false;
+    document.getElementById('save-status').textContent = '';
+    var el = document.getElementById('save-error');
+    el.textContent = 'Save failed: ' + (err.message || err);
+    el.style.display = 'block';
+  }
+
+  /**
+   * Switches between the list view and the edit view by toggling display styles.
+   * The list view uses display:flex (it is a flex column layout); the edit view
+   * uses display:block.
+   * @param {'list'|'edit'} name
+   */
+  function showView(name) {
+    document.getElementById('view-list').style.display = name === 'list' ? 'flex' : 'none';
+    document.getElementById('view-edit').style.display = name === 'edit' ? 'block' : 'none';
+  }
+
+  document.addEventListener('DOMContentLoaded', init);
+</script>
