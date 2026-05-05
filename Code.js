@@ -1,18 +1,14 @@
 /**
- * Controls whether the web editor allows data modifications.
- * Set to false to make the editor read-only: the "Add person" button is hidden
- * and the first-column link that opens the edit view is disabled.
- *
- * @type {boolean}
- */
-const EDIT_MODE = true;
-
-/**
- * Returns the edit mode setting for use in HTML template scriptlets.
+ * Reads the edit mode flag from Handbook!M2.
+ * When true, the "Add person" button and edit view are enabled; when false the editor is read-only.
  *
  * @returns {boolean}
  */
-function getEditMode() { return EDIT_MODE; }
+function getEditMode() {
+  const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName('Handbook');
+  if (!sheet) return false;
+  return sheet.getRange('M2').getValue() === true;
+}
 
 /**
  * Minimum column widths (px) injected into CSS variables at template render time.
@@ -102,7 +98,7 @@ function getSchemaAndData() {
     if (col.type.endsWith('-table')) col.tableHeaders = tableHeadersMap[col.type] || [];
   });
 
-  return { columns, rows, editMode: EDIT_MODE };
+  return { columns, rows, editMode: getEditMode() };
 }
 
 /**

@@ -6,7 +6,7 @@ A Google Sheets–based personnel database with a built-in web editor. Data live
 
 The project is a [Google Apps Script](https://developers.google.com/apps-script) bound to a Google Spreadsheet, deployed locally with [CLASP](https://github.com/google/clasp).
 
-- **`Code.js`** — server-side script (menu, data access, image proxy, config constants)
+- **`Code.js`** — server-side script (menu, data access, image proxy, config)
 - **`WebEditor.html`** — client app shell; includes CSS and JS via `<?!= HtmlService.createHtmlOutputFromFile(...) ?>`
 - **`WebEditor.css.html`** — styles for the web editor
 - **`WebEditor.js.html`** — client-side logic for the web editor
@@ -23,7 +23,7 @@ The project is a [Google Apps Script](https://developers.google.com/apps-script)
 
 ### `Handbook` sheet
 
-Defines sub-column headers for `*-table` column types.
+Defines sub-column headers for `*-table` column types, and holds spreadsheet-level configuration.
 
 | Column A | Column B onward |
 |----------|----------------|
@@ -31,6 +31,10 @@ Defines sub-column headers for `*-table` column types.
 | `service-table` | Sub-column headers for that table type |
 
 Row 1 is a header row (skipped). Each subsequent row maps a type name to its headers.
+
+| Cell | Purpose |
+|------|---------|
+| M2 | Edit mode flag (checkbox) — when checked, the editor allows adding and editing records |
 
 ## Column types
 
@@ -72,17 +76,9 @@ Images are fetched server-side (via `DriveApp`) and returned as base64 data URLs
 
 ## Configuration
 
-Both constants live at the top of `Code.js` and are injected into the client at render time.
-
-### `EDIT_MODE`
-
-```js
-const EDIT_MODE = true;
-```
-
-Set to `false` to make the editor read-only: the "Add person" button is hidden and the first-column link that opens the edit view is disabled.
-
 ### `COLUMN_MIN_WIDTHS`
+
+Defined at the top of `Code.js`:
 
 ```js
 const COLUMN_MIN_WIDTHS = { text: 150, image: 150, table: 900 };
