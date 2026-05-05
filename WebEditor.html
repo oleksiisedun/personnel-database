@@ -3,6 +3,14 @@
 <head>
   <meta charset="utf-8">
   <?!= HtmlService.createHtmlOutputFromFile('WebEditor_css').getContent(); ?>
+  <? var editMode = getEditMode(); var colMinWidths = getColumnMinWidths(); ?>
+  <style>
+    :root {
+      --text-min-width: <?= colMinWidths.text ?>px;
+      --col-image-min-width: <?= colMinWidths.image ?>px;
+      --col-table-min-width: <?= colMinWidths.table ?>px;
+    }
+  </style>
 </head>
 <body>
 
@@ -11,7 +19,7 @@
     <div id="loading">Loading…</div>
     <div id="error-msg" style="display:none"></div>
     <div id="toolbar">
-      <button id="btn-add-person">Add person</button>
+      <? if (editMode) { ?><button id="btn-add-person">Add person</button><? } else { ?><span id="readonly-label">Read-only view</span><? } ?>
       <div id="toolbar-right">
         <label id="regex-label"><input type="checkbox" id="chk-regex"> Search using REGEX</label>
         <div id="col-toggle-wrap">

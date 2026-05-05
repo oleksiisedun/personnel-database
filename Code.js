@@ -1,4 +1,35 @@
 /**
+ * Controls whether the web editor allows data modifications.
+ * Set to false to make the editor read-only: the "Add person" button is hidden
+ * and the first-column link that opens the edit view is disabled.
+ *
+ * @type {boolean}
+ */
+const EDIT_MODE = true;
+
+/**
+ * Returns the edit mode setting for use in HTML template scriptlets.
+ *
+ * @returns {boolean}
+ */
+function getEditMode() { return EDIT_MODE; }
+
+/**
+ * Minimum column widths (px) injected into CSS variables at template render time.
+ * Edit these values to control the minimum width of each column type in the web editor.
+ *
+ * @type {{ text: number, image: number, table: number }}
+ */
+const COLUMN_MIN_WIDTHS = { text: 150, image: 150, table: 900 };
+
+/**
+ * Returns the column minimum width config for use in HTML template scriptlets.
+ *
+ * @returns {{ text: number, image: number, table: number }}
+ */
+function getColumnMinWidths() { return COLUMN_MIN_WIDTHS; }
+
+/**
  * Simple trigger that runs when the spreadsheet is opened.
  * Adds the "More... ⭐️" custom menu to the Google Sheets toolbar.
  */
@@ -71,7 +102,7 @@ function getSchemaAndData() {
     if (col.type.endsWith('-table')) col.tableHeaders = tableHeadersMap[col.type] || [];
   });
 
-  return { columns, rows };
+  return { columns, rows, editMode: EDIT_MODE };
 }
 
 /**
