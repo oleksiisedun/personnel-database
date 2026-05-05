@@ -1,11 +1,11 @@
 /**
  * Simple trigger that runs when the spreadsheet is opened.
- * Adds the "WebEditor" custom menu to the Google Sheets toolbar.
+ * Adds the "More... ⭐️" custom menu to the Google Sheets toolbar.
  */
 function onOpen() {
   SpreadsheetApp.getUi()
-    .createMenu('WebEditor')
-    .addItem('Open Editor', 'openWebEditor')
+    .createMenu('More... ⭐️')
+    .addItem('Open Web Editor', 'openWebEditor')
     .addToUi();
 }
 
@@ -18,7 +18,7 @@ function openWebEditor() {
   const html = HtmlService.createTemplateFromFile('WebEditor').evaluate()
     .setWidth(800)
     .setHeight(600);
-  SpreadsheetApp.getUi().showModalDialog(html, 'WebEditor');
+  SpreadsheetApp.getUi().showModalDialog(html, 'Web Editor');
 }
 
 /**
