@@ -70,7 +70,7 @@
     });
     document.getElementById('chk-regex').addEventListener('change', function() {
       useRegex = this.checked;
-      applyFilters();
+      setTimeout(applyFilters, 0);
     });
     document.getElementById('btn-add-person').addEventListener('click', addPerson);
     document.getElementById('btn-columns').addEventListener('click', function(e) {
