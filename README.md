@@ -6,8 +6,10 @@ A Google Sheets–based personnel database with a built-in web editor. Data live
 
 The project is a [Google Apps Script](https://developers.google.com/apps-script) bound to a Google Spreadsheet, deployed locally with [CLASP](https://github.com/google/clasp).
 
-- **`Code.js`** — server-side script (menu, data access, image proxy)
-- **`WebEditor.html`** — single-file client app (list view + edit view)
+- **`Code.js`** — server-side script (menu, data access, image proxy, config constants)
+- **`WebEditor.html`** — client app shell; includes CSS and JS via `<?!= HtmlService.createHtmlOutputFromFile(...) ?>`
+- **`WebEditor.css.html`** — styles for the web editor
+- **`WebEditor.js.html`** — client-side logic for the web editor
 
 ## Spreadsheet structure
 
@@ -60,23 +62,33 @@ Images are fetched server-side (via `DriveApp`) and returned as base64 data URLs
 ## Web editor features
 
 - **List view** — full-screen table with all columns and data
-- **Filtering** — live filter input above each `text` column
+- **Filtering** — debounced live filter input above each `text` column; supports plain text and regular expressions (toggle per column)
+- **Empty-cell filter** — dropdown above each `*-table` column: All / Empty / Not empty
+- **Add person** — button to append a new empty row and open it in the edit view immediately
 - **Column visibility** — "Columns ▾" button to hide/show individual columns; first column is always visible
 - **Image thumbnails** — loaded asynchronously, cached for the session
 - **Lightbox** — click any thumbnail to view the full image
 - **Edit view** — click a name in the first column to open a per-record editor
 
-## Width constraints
+## Configuration
 
-Adjust these CSS variables at the top of `WebEditor.html`:
+Both constants live at the top of `Code.js` and are injected into the client at render time.
 
-```css
-:root {
-  --col-min-width: 150px;        /* minimum width for text columns */
-  --col-image-min-width: 150px;  /* minimum width for image columns */
-  --col-table-min-width: 900px;  /* minimum width for *-table columns */
-}
+### `EDIT_MODE`
+
+```js
+const EDIT_MODE = true;
 ```
+
+Set to `false` to make the editor read-only: the "Add person" button is hidden and the first-column link that opens the edit view is disabled.
+
+### `COLUMN_MIN_WIDTHS`
+
+```js
+const COLUMN_MIN_WIDTHS = { text: 150, image: 150, table: 900 };
+```
+
+Controls the minimum width (px) of each column type in the list view.
 
 ## Local development
 
@@ -87,7 +99,7 @@ npm install -g @google/clasp
 # Authenticate
 clasp login
 
-# Push changes to the script project
+# Push changes to the bound script project
 clasp push
 
 # Open the script editor in the browser
@@ -95,3 +107,22 @@ clasp open
 ```
 
 The `.clasp.json` file already contains the script ID linking this directory to the deployed project.
+
+### Deploying to multiple spreadsheets
+
+Script IDs for all target spreadsheets are listed in `clasp-targets.json`:
+
+```json
+{
+  "target1": "<script-id>",
+  "target2": "<script-id>"
+}
+```
+
+Run `clasp-push.sh` to push to all targets in sequence:
+
+```bash
+./clasp-push.sh
+```
+
+The script temporarily swaps the `scriptId` in `.clasp.json` for each target and restores the original on exit.

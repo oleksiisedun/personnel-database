@@ -2,7 +2,7 @@
 <html>
 <head>
   <meta charset="utf-8">
-  <?!= HtmlService.createHtmlOutputFromFile('WebEditor_css').getContent(); ?>
+  <?!= HtmlService.createHtmlOutputFromFile('WebEditor.css').getContent(); ?>
   <? var editMode = getEditMode(); var colMinWidths = getColumnMinWidths(); ?>
   <style>
     :root {
@@ -58,6 +58,6 @@
     <img id="lightbox-img" alt="">
   </div>
 
-  <?!= HtmlService.createHtmlOutputFromFile('WebEditor_js').getContent(); ?>
+  <?!= HtmlService.createHtmlOutputFromFile('WebEditor.js').getContent(); ?>
 </body>
 </html>
