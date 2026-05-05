@@ -9,9 +9,16 @@
   let hiddenColumns = new Set(); // column indices hidden by the user
   let imageCache = {};     // fileId → base64 data URL (or null on error)
   let pendingImages = new Set(); // fileIds currently being fetched to avoid duplicate requests
+  let isNewRow = false;    // true when the edit view holds a freshly appended row
+  let useRegex = false;    // true when filter inputs are treated as regular expressions
 
   const FIELD_SEP = ' | ';
   const ROW_SEP = '\n';
+
+  function debounce(fn, delay) {
+    var timer;
+    return function() { clearTimeout(timer); timer = setTimeout(fn, delay); };
+  }
 
   /**
    * Decodes a pipe-delimited cell string into an array of row objects.
@@ -54,12 +61,18 @@
    */
   function init() {
     document.getElementById('btn-back').addEventListener('click', function() {
+      isNewRow = false;
       showView('list');
     });
     document.getElementById('btn-save').addEventListener('click', saveRow);
     document.getElementById('lightbox').addEventListener('click', function() {
       document.getElementById('lightbox').style.display = 'none';
     });
+    document.getElementById('chk-regex').addEventListener('change', function() {
+      useRegex = this.checked;
+      applyFilters();
+    });
+    document.getElementById('btn-add-person').addEventListener('click', addPerson);
     document.getElementById('btn-columns').addEventListener('click', function(e) {
       e.stopPropagation();
       var panel = document.getElementById('col-panel');
@@ -135,10 +148,21 @@
       if (col.type === 'text') {
         var input = document.createElement('input');
         input.type = 'text';
-        input.placeholder = 'Filter…';
+        input.placeholder = 'Filter';
         input.dataset.colIndex = i;
-        input.addEventListener('input', applyFilters);
+        input.addEventListener('input', debounce(applyFilters, 250));
         fDiv.appendChild(input);
+      } else if (isTableType(col)) {
+        var label = document.createElement('label');
+        label.className = 'empty-filter-label';
+        var cb = document.createElement('input');
+        cb.type = 'checkbox';
+        cb.dataset.colIndex = i;
+        cb.dataset.emptyFilter = '1';
+        cb.addEventListener('change', applyFilters);
+        label.appendChild(cb);
+        label.appendChild(document.createTextNode(' Filter empty'));
+        fDiv.appendChild(label);
       }
       fth.appendChild(fDiv);
       filterRow.appendChild(fth);
@@ -151,16 +175,28 @@
    * and re-renders the table body. Called on every filter input change.
    */
   function applyFilters() {
-    var inputs = document.querySelectorAll('#filter-row input');
     var filters = {};
-    inputs.forEach(function(inp) {
-      var val = inp.value.trim().toLowerCase();
-      if (val) filters[inp.dataset.colIndex] = val;
+    document.querySelectorAll('#filter-row input[type=text]').forEach(function(inp) {
+      var val = inp.value.trim();
+      if (!val) return;
+      if (val === '""') {
+        filters[inp.dataset.colIndex] = { empty: true };
+      } else if (useRegex) {
+        try { filters[inp.dataset.colIndex] = new RegExp(val, 'i'); } catch (e) { /* invalid regex — skip */ }
+      } else {
+        filters[inp.dataset.colIndex] = val.toLowerCase();
+      }
+    });
+    document.querySelectorAll('#filter-row input[data-empty-filter]').forEach(function(cb) {
+      if (cb.checked) filters[cb.dataset.colIndex] = { empty: true };
     });
 
     filteredRows = schema.rows.filter(function(row) {
       return Object.keys(filters).every(function(colIdx) {
-        return (row.values[colIdx] || '').toLowerCase().includes(filters[colIdx]);
+        var cell = row.values[colIdx] || '';
+        var f = filters[colIdx];
+        if (f && f.empty) return !cell.trim();
+        return useRegex ? f.test(cell) : cell.toLowerCase().includes(f);
       });
     });
 
@@ -636,15 +672,41 @@
   /**
    * Success handler for saveRow(). Updates the in-memory row values from
    * pendingValues so the list view reflects the change without a full reload,
-   * then returns to the list view.
+   * then returns to the list view. For new rows, adds the row to schema.rows.
    */
   function onSaveSuccess() {
     if (pendingValues) {
       pendingValues.forEach(function(val, i) { editingRow.values[i] = val; });
       pendingValues = null;
     }
+    if (isNewRow) {
+      schema.rows.push(editingRow);
+      isNewRow = false;
+    }
     applyFilters();
     showView('list');
+  }
+
+  /**
+   * Appends a new empty row to the sheet via the server, then opens the edit
+   * view for it. The row is added to schema.rows only after a successful save.
+   */
+  function addPerson() {
+    var btn = document.getElementById('btn-add-person');
+    btn.disabled = true;
+    google.script.run
+      .withSuccessHandler(function(newRowIndex) {
+        var emptyValues = new Array(schema.columns.length).fill('');
+        var newRow = { rowIndex: newRowIndex, values: emptyValues };
+        isNewRow = true;
+        openEditView(newRow);
+        btn.disabled = false;
+      })
+      .withFailureHandler(function(err) {
+        btn.disabled = false;
+        alert('Failed to add person: ' + (err.message || err));
+      })
+      .addRow();
   }
 
   /**

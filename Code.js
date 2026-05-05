@@ -101,6 +101,20 @@ function getImagesDataUrls(fileIds) {
 }
 
 /**
+ * Appends a new empty row to the "Database" sheet and returns its 1-based row index.
+ *
+ * @returns {number} 1-based row index of the newly created row.
+ */
+function addRow() {
+  const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName('Database');
+  if (!sheet) throw new Error('Sheet "Database" not found.');
+  const newRowIndex = sheet.getLastRow() + 1;
+  const numCols = sheet.getLastColumn();
+  sheet.getRange(newRowIndex, 1, 1, numCols).setValues([new Array(numCols).fill('')]);
+  return newRowIndex;
+}
+
+/**
  * Writes new values for a single data row back to the "Database" sheet.
  *
  * @param {number} rowIndex - 1-based spreadsheet row number to update.
