@@ -153,16 +153,17 @@
         input.addEventListener('input', debounce(applyFilters, 250));
         fDiv.appendChild(input);
       } else if (isTableType(col)) {
-        var label = document.createElement('label');
-        label.className = 'empty-filter-label';
-        var cb = document.createElement('input');
-        cb.type = 'checkbox';
-        cb.dataset.colIndex = i;
-        cb.dataset.emptyFilter = '1';
-        cb.addEventListener('change', applyFilters);
-        label.appendChild(cb);
-        label.appendChild(document.createTextNode(' Filter empty'));
-        fDiv.appendChild(label);
+        var sel = document.createElement('select');
+        sel.dataset.colIndex = i;
+        sel.dataset.tableFilter = '1';
+        [['', 'All'], ['empty', 'Empty'], ['not-empty', 'Not empty']].forEach(function(opt) {
+          var o = document.createElement('option');
+          o.value = opt[0];
+          o.textContent = opt[1];
+          sel.appendChild(o);
+        });
+        sel.addEventListener('change', function() { setTimeout(applyFilters, 0); });
+        fDiv.appendChild(sel);
       }
       fth.appendChild(fDiv);
       filterRow.appendChild(fth);
@@ -179,7 +180,7 @@
     document.querySelectorAll('#filter-row input[type=text]').forEach(function(inp) {
       var val = inp.value.trim();
       if (!val) return;
-      if (val === '""') {
+      if (val === '""' || val === "''") {
         filters[inp.dataset.colIndex] = { empty: true };
       } else if (useRegex) {
         try { filters[inp.dataset.colIndex] = new RegExp(val, 'i'); } catch (e) { /* invalid regex — skip */ }
@@ -187,8 +188,9 @@
         filters[inp.dataset.colIndex] = val.toLowerCase();
       }
     });
-    document.querySelectorAll('#filter-row input[data-empty-filter]').forEach(function(cb) {
-      if (cb.checked) filters[cb.dataset.colIndex] = { empty: true };
+    document.querySelectorAll('#filter-row select[data-table-filter]').forEach(function(sel) {
+      if (sel.value === 'empty') filters[sel.dataset.colIndex] = { empty: true };
+      else if (sel.value === 'not-empty') filters[sel.dataset.colIndex] = { notEmpty: true };
     });
 
     filteredRows = schema.rows.filter(function(row) {
@@ -196,6 +198,7 @@
         var cell = row.values[colIdx] || '';
         var f = filters[colIdx];
         if (f && f.empty) return !cell.trim();
+        if (f && f.notEmpty) return !!cell.trim();
         return useRegex ? f.test(cell) : cell.toLowerCase().includes(f);
       });
     });
