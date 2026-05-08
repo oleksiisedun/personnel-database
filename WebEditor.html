@@ -19,7 +19,10 @@
     <div id="loading">Loading…</div>
     <div id="error-msg" style="display:none"></div>
     <div id="toolbar">
-      <? if (editMode) { ?><button id="btn-add-person">Add person</button><? } else { ?><span id="readonly-label">Read-only view</span><? } ?>
+      <div id="toolbar-left">
+        <? if (editMode) { ?><button id="btn-add-person">Add person</button><? } else { ?><span id="readonly-label">Read-only view</span><? } ?>
+        <button id="btn-export-f1">Export F-1</button>
+      </div>
       <div id="toolbar-right">
         <label id="regex-label"><input type="checkbox" id="chk-regex"> Search using REGEX</label>
         <div id="col-toggle-wrap">
@@ -28,6 +31,18 @@
         </div>
       </div>
     </div>
+
+    <!-- Export progress/result overlay -->
+    <div id="export-overlay" style="display:none">
+      <div id="export-dialog">
+        <div id="export-spinner"></div>
+        <div id="export-msg"></div>
+        <ul id="export-links" style="display:none"></ul>
+        <div id="export-error" style="display:none"></div>
+        <button id="btn-export-close" style="display:none">Close</button>
+      </div>
+    </div>
+
     <div id="table-wrapper">
       <table id="data-table" style="display:none">
         <thead>

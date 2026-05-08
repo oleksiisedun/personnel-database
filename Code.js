@@ -18,6 +18,12 @@ function getEditMode() {
  */
 const COLUMN_MIN_WIDTHS = { text: 150, image: 150, table: 900 };
 
+/** Google Docs template ID for the F-1 personnel form. */
+const F1_TEMPLATE_ID = '16yktSuOPgjNxQap-SCQZkmcISOftxWPZuSovVcAFkYI';
+
+/** Google Drive folder ID where exported F-1 documents are saved. */
+const EXPORT_FOLDER_ID = '1mG3vDgV9fCIYAt1S4Aj-IEUhKTw9O-Ki';
+
 /**
  * Returns the column minimum width config for use in HTML template scriptlets.
  *

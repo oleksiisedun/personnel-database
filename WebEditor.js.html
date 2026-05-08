@@ -74,6 +74,10 @@
     });
     var addBtn = document.getElementById('btn-add-person');
     if (addBtn) addBtn.addEventListener('click', addPerson);
+    document.getElementById('btn-export-f1').addEventListener('click', exportRows);
+    document.getElementById('btn-export-close').addEventListener('click', function() {
+      document.getElementById('export-overlay').style.display = 'none';
+    });
     document.getElementById('btn-columns').addEventListener('click', function(e) {
       e.stopPropagation();
       var panel = document.getElementById('col-panel');
@@ -735,6 +739,60 @@
   function showView(name) {
     document.getElementById('view-list').style.display = name === 'list' ? 'flex' : 'none';
     document.getElementById('view-edit').style.display = name === 'edit' ? 'block' : 'none';
+  }
+
+  /**
+   * Exports an F-1 document for every currently visible (filtered) row.
+   * Shows a progress overlay while the server-side export runs, then displays
+   * links to the created documents on success.
+   */
+  function exportRows() {
+    if (!filteredRows || filteredRows.length === 0) {
+      alert('No visible rows to export. Adjust your filters and try again.');
+      return;
+    }
+
+    var rowIndices = filteredRows.map(function(r) { return r.rowIndex; });
+    var count = rowIndices.length;
+
+    document.getElementById('export-spinner').classList.remove('hidden');
+    document.getElementById('export-msg').textContent = 'Exporting ' + count + ' document' + (count !== 1 ? 's' : '') + '…';
+    document.getElementById('export-links').style.display = 'none';
+    document.getElementById('export-links').innerHTML = '';
+    document.getElementById('export-error').style.display = 'none';
+    document.getElementById('btn-export-close').style.display = 'none';
+    document.getElementById('export-overlay').style.display = 'flex';
+    document.getElementById('btn-export-f1').disabled = true;
+
+    google.script.run
+      .withSuccessHandler(function(results) {
+        document.getElementById('btn-export-f1').disabled = false;
+        document.getElementById('export-spinner').classList.add('hidden');
+        document.getElementById('export-msg').textContent =
+          'Exported ' + results.length + ' document' + (results.length !== 1 ? 's' : '') + ':';
+        var ul = document.getElementById('export-links');
+        results.forEach(function(r) {
+          var li = document.createElement('li');
+          var a = document.createElement('a');
+          a.href = r.url;
+          a.target = '_blank';
+          a.textContent = r.name;
+          li.appendChild(a);
+          ul.appendChild(li);
+        });
+        ul.style.display = 'block';
+        document.getElementById('btn-export-close').style.display = 'inline-block';
+      })
+      .withFailureHandler(function(err) {
+        document.getElementById('btn-export-f1').disabled = false;
+        document.getElementById('export-spinner').classList.add('hidden');
+        document.getElementById('export-msg').textContent = '';
+        var el = document.getElementById('export-error');
+        el.textContent = 'Export failed: ' + (err.message || err);
+        el.style.display = 'block';
+        document.getElementById('btn-export-close').style.display = 'inline-block';
+      })
+      .exportF1(rowIndices);
   }
 
   document.addEventListener('DOMContentLoaded', init);
