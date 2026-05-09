@@ -1,15 +1,19 @@
 # Personnel Database
 
-A Google Sheets–based personnel database with a built-in web editor. Data lives in a Google Sheet; the web editor provides a richer UI for browsing and editing records.
+A Google Sheets–based personnel database with a built-in web editor. Data lives in a Google Sheet; the web editor provides a richer UI for browsing, editing, and exporting records.
 
 ## How it works
 
 The project is a [Google Apps Script](https://developers.google.com/apps-script) bound to a Google Spreadsheet, deployed locally with [CLASP](https://github.com/google/clasp).
 
-- **`Code.js`** — server-side script (menu, data access, image proxy, config)
-- **`WebEditor.html`** — client app shell; includes CSS and JS via `<?!= HtmlService.createHtmlOutputFromFile(...) ?>`
-- **`WebEditor.css.html`** — styles for the web editor
-- **`WebEditor.js.html`** — client-side logic for the web editor
+| File | Purpose |
+|------|---------|
+| `Config.js` | All constants — sheet names, column names, Drive IDs, export settings |
+| `Code.js` | Server-side script: menu, data access, image proxy |
+| `Export.js` | Server-side export logic for F-1 and Wanted Card documents |
+| `WebEditor.html` | Client app shell; includes CSS and JS via `<?!= HtmlService.createHtmlOutputFromFile(...) ?>` |
+| `WebEditor.css.html` | Styles for the web editor |
+| `WebEditor.js.html` | Client-side logic for the web editor |
 
 ## Spreadsheet structure
 
@@ -23,18 +27,21 @@ The project is a [Google Apps Script](https://developers.google.com/apps-script)
 
 ### `Handbook` sheet
 
-Defines sub-column headers for `*-table` column types, and holds spreadsheet-level configuration.
+| Range | Purpose |
+|-------|---------|
+| `A2:G10` (`HANDBOOK_TYPES_RANGE`) | Sub-column headers for each `*-table` type; col A = type name, col B onward = headers |
+| `M1` (`EDIT_MODE_CELL`) | Edit mode flag (checkbox) — when checked, the editor allows adding and editing records |
+| `A12:C40` (`HANDBOOK_CORR_RANGE`) | Placeholder correspondence table for document exports (data only, headers in rows 11–12) |
 
-| Column A | Column B onward |
-|----------|----------------|
-| `relatives-table` | Sub-column headers for that table type |
-| `service-table` | Sub-column headers for that table type |
+#### Correspondence table columns
 
-Row 1 is a header row (skipped). Each subsequent row maps a type name to its headers.
+| Column | Purpose |
+|--------|---------|
+| A | Placeholder name (used as `{placeholder}` in the template) |
+| B | Source Database column name (value is copied directly) |
+| C | Computed value key (see [Computed values](#computed-values) below) |
 
-| Cell | Purpose |
-|------|---------|
-| M2 | Edit mode flag (checkbox) — when checked, the editor allows adding and editing records |
+Exactly one of B or C should be filled per row.
 
 ## Column types
 
@@ -68,23 +75,79 @@ Images are fetched server-side (via `DriveApp`) and returned as base64 data URLs
 - **List view** — full-screen table with all columns and data
 - **Filtering** — debounced live filter input above each `text` column; supports plain text and regular expressions (toggle per column)
 - **Empty-cell filter** — dropdown above each `*-table` column: All / Empty / Not empty
-- **Add person** — button to append a new empty row and open it in the edit view immediately
+- **Add person** — appends a new empty row and opens it in the edit view immediately (edit mode only)
 - **Column visibility** — "Columns ▾" button to hide/show individual columns; first column is always visible
 - **Image thumbnails** — loaded asynchronously, cached for the session
 - **Lightbox** — click any thumbnail to view the full image
-- **Edit view** — click a name in the first column to open a per-record editor
+- **Edit view** — click a name in the first column to open a per-record editor (edit mode only)
 
-## Configuration
+## Document export
 
-### `COLUMN_MIN_WIDTHS`
+Two export types are available from the toolbar. Both operate on the currently visible (filtered) rows.
 
-Defined at the top of `Code.js`:
+| Button | Template | Output prefix |
+|--------|----------|---------------|
+| Export F-1 | `F1_TEMPLATE_ID` | `Ф-1 ` |
+| Export WC | `WC_TEMPLATE_ID` | `Розшукова картка ` |
 
-```js
-const COLUMN_MIN_WIDTHS = { text: 150, image: 150, table: 900 };
-```
+Exported files are saved to the Google Drive folder defined by `EXPORT_FOLDER_ID`.
 
-Controls the minimum width (px) of each column type in the list view.
+### How export works
+
+Placeholders in the template use the format `{Column Name}`. Four passes run per document:
+
+1. **Images** — `image`-type column placeholders are replaced with the actual image blob
+2. **Service history table** — `{Проходження служби}` is expanded into one table row per entry
+3. **Direct text** — remaining `{Column Name}` placeholders are replaced with cell values
+4. **Correspondence table** — Handbook-defined aliases and computed values fill any remaining placeholders
+
+After all passes, the marital status line is underlined based on the `Сімейний стан` value.
+
+### Computed values
+
+These keys can be placed in column C of the correspondence table:
+
+| Key | Description |
+|-----|-------------|
+| `totalServiceLength` | Duration from last date in `Дата призову` to today, e.g. `3 роки, 8 місяців, 17 днів (станом на 09.05.2026)` |
+| `contractSignDate` | First date in `Дата призову` + unit number from first service entry, e.g. `07.05.2015 з в/ч 3011` |
+| `currentPosition` | Position title from the last entry in `Проходження служби` |
+| `currentPositionStartDate` | Start date of the last entry in `Проходження служби` |
+| `motherFullName` | Full name of relative with relation `мати` |
+| `fatherFullName` | Full name of relative with relation `батько` |
+| `spouseFullName` | Full name of relative with relation `дружина` or `чоловік` |
+| `motherActualAddress` | Address of relative with relation `мати` |
+| `fatherActualAddress` | Address of relative with relation `батько` |
+| `spouseActualAddress` | Address of relative with relation `дружина` or `чоловік` |
+| `motherPhoneNumber` | Phone of relative with relation `мати` |
+| `fatherPhoneNumber` | Phone of relative with relation `батько` |
+| `spousePhoneNumber` | Phone of relative with relation `дружина` or `чоловік` |
+| `childrenNamesBirthDates` | Numbered list of children's names and birth dates |
+| `childrenPhoneNumbers` | Comma-separated phone numbers of all children |
+| `relativesWithPhoneNumbers` | Semicolon-separated list of all relatives with a phone number, formatted as `relation, name, address, phone` |
+
+### Large exports
+
+Exports run in automatic batches capped at `EXPORT_TIME_LIMIT_MS` (5 minutes) to stay within the Google Apps Script execution limit. The client automatically fires the next batch until all rows are done — no user interaction required. The progress bar in the export dialog shows real-time progress across batches.
+
+## Configuration (`Config.js`)
+
+| Constant | Default | Purpose |
+|----------|---------|---------|
+| `SHEET_DATABASE` | `'Database'` | Name of the data sheet |
+| `SHEET_HANDBOOK` | `'Handbook'` | Name of the handbook sheet |
+| `EDIT_MODE_CELL` | `'M1'` | Cell that holds the edit mode checkbox |
+| `HANDBOOK_TYPES_RANGE` | `'A2:G10'` | Range of table-type definitions in Handbook |
+| `HANDBOOK_CORR_RANGE` | `'A12:C40'` | Range of the placeholder correspondence table |
+| `F1_TEMPLATE_ID` | — | Google Docs template ID for F-1 export |
+| `WC_TEMPLATE_ID` | — | Google Docs template ID for Wanted Card export |
+| `EXPORT_FOLDER_ID` | — | Google Drive folder ID for exported documents |
+| `EXPORT_TIME_LIMIT_MS` | `300000` | Max server execution time per batch (ms) |
+| `F1_DOC_PREFIX` | `'Ф-1 '` | Filename prefix for F-1 exports |
+| `WC_DOC_PREFIX` | `'Розшукова картка '` | Filename prefix for Wanted Card exports |
+| `DEFAULT_UNIT_NUMBER` | `'3102'` | Fallback military unit number for `contractSignDate` |
+| `IMAGE_MAX_HEIGHT` | `500` | Max image height (px) when inserting into a document |
+| `COLUMN_MIN_WIDTHS` | `{ text: 150, image: 150, table: 900 }` | Minimum column widths (px) in the list view |
 
 ## Local development
 
