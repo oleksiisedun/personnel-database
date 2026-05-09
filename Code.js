@@ -5,24 +5,10 @@
  * @returns {boolean}
  */
 function getEditMode() {
-  const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName('Handbook');
+  const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(SHEET_HANDBOOK);
   if (!sheet) return false;
-  return sheet.getRange('M1').getValue() === true;
+  return sheet.getRange(EDIT_MODE_CELL).getValue() === true;
 }
-
-/**
- * Minimum column widths (px) injected into CSS variables at template render time.
- * Edit these values to control the minimum width of each column type in the web editor.
- *
- * @type {{ text: number, image: number, table: number }}
- */
-const COLUMN_MIN_WIDTHS = { text: 150, image: 150, table: 900 };
-
-/** Google Docs template ID for the F-1 personnel form. */
-const F1_TEMPLATE_ID = '16yktSuOPgjNxQap-SCQZkmcISOftxWPZuSovVcAFkYI';
-
-/** Google Drive folder ID where exported F-1 documents are saved. */
-const EXPORT_FOLDER_ID = '1mG3vDgV9fCIYAt1S4Aj-IEUhKTw9O-Ki';
 
 /**
  * Returns the column minimum width config for use in HTML template scriptlets.
@@ -49,8 +35,8 @@ function onOpen() {
  */
 function openWebEditor() {
   const html = HtmlService.createTemplateFromFile('WebEditor').evaluate()
-    .setWidth(800)
-    .setHeight(600);
+    .setWidth(WEB_EDITOR_WIDTH)
+    .setHeight(WEB_EDITOR_HEIGHT);
   SpreadsheetApp.getUi().showModalDialog(html, 'Web Editor');
 }
 
@@ -74,7 +60,7 @@ function openWebEditor() {
  */
 function getSchemaAndData() {
   const ss = SpreadsheetApp.getActiveSpreadsheet();
-  const sheet = ss.getSheetByName('Database');
+  const sheet = ss.getSheetByName(SHEET_DATABASE);
   if (!sheet) throw new Error('Sheet "Database" not found.');
   const all = sheet.getDataRange().getValues();
   if (all.length < 2) throw new Error('Sheet must have at least 2 rows (names + types).');
@@ -90,10 +76,10 @@ function getSchemaAndData() {
   }
 
   const tableHeadersMap = {};
-  const handbookSheet = ss.getSheetByName('Handbook');
+  const handbookSheet = ss.getSheetByName(SHEET_HANDBOOK);
   if (handbookSheet) {
     const hbLastCol = Math.max(1, handbookSheet.getLastColumn());
-    const hbData = handbookSheet.getRange(2, 1, 9, hbLastCol).getValues();
+    const hbData = handbookSheet.getRange(HANDBOOK_TYPES_ROW_START, 1, HANDBOOK_TYPES_ROW_COUNT, hbLastCol).getValues();
     for (let r = 0; r < hbData.length; r++) {
       const dataType = String(hbData[r][0]).trim().toLowerCase();
       if (!dataType) continue;
@@ -140,7 +126,7 @@ function getImagesDataUrls(fileIds) {
  * @returns {number} 1-based row index of the newly created row.
  */
 function addRow() {
-  const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName('Database');
+  const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(SHEET_DATABASE);
   if (!sheet) throw new Error('Sheet "Database" not found.');
   const newRowIndex = sheet.getLastRow() + 1;
   const numCols = sheet.getLastColumn();
@@ -156,7 +142,7 @@ function addRow() {
  * @returns {boolean} Always true; thrown errors propagate to the client failure handler.
  */
 function updateRow(rowIndex, values) {
-  const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName('Database');
+  const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(SHEET_DATABASE);
   if (!sheet) throw new Error('Sheet "Database" not found.');
   sheet.getRange(rowIndex, 1, 1, values.length).setValues([values]);
   return true;

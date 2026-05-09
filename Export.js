@@ -10,7 +10,7 @@
  */
 function exportF1(rowIndices) {
   const ss = SpreadsheetApp.getActiveSpreadsheet();
-  const sheet = ss.getSheetByName('Database');
+  const sheet = ss.getSheetByName(SHEET_DATABASE);
   if (!sheet) throw new Error('Sheet "Database" not found.');
   const all = sheet.getDataRange().getValues();
   const columns = all[0].map((name, i) => ({
@@ -19,7 +19,7 @@ function exportF1(rowIndices) {
   }));
   const exportFolder = DriveApp.getFolderById(EXPORT_FOLDER_ID);
 
-  const handbookSheet = ss.getSheetByName('Handbook');
+  const handbookSheet = ss.getSheetByName(SHEET_HANDBOOK);
   const mappings = handbookSheet ? _loadCorrespondenceTable(handbookSheet) : [];
 
   const results = [];
@@ -29,7 +29,7 @@ function exportF1(rowIndices) {
     const data = {};
     columns.forEach((col, i) => { data[col.name] = String(rowValues[i] == null ? '' : rowValues[i]); });
 
-    const docName = 'F-1 ' + (data[columns[0].name] || 'Unknown');
+    const docName = EXPORT_DOC_PREFIX + (data[columns[0].name] || 'Unknown');
     const copy = DriveApp.getFileById(F1_TEMPLATE_ID).makeCopy(docName, exportFolder);
     const doc = DocumentApp.openById(copy.getId());
     const body = doc.getBody();
@@ -87,7 +87,7 @@ function exportF1(rowIndices) {
  * @returns {Array<{placeholder: string, sourceCol: string, computedKey: string}>}
  */
 function _loadCorrespondenceTable(handbookSheet) {
-  const rows = handbookSheet.getRange(11, 2, 40, 3).getValues();
+  const rows = handbookSheet.getRange(HANDBOOK_CORR_ROW_START, HANDBOOK_CORR_COL_START, HANDBOOK_CORR_ROW_COUNT, HANDBOOK_CORR_COL_COUNT).getValues();
   const mappings = [];
   for (let i = 2; i < rows.length; i++) { // skip 2 header rows
     const placeholder = String(rows[i][0]).trim();
@@ -137,7 +137,7 @@ function _computeValue(name, data) {
  *                   or empty string if no valid date is found.
  */
 function _computeTotalServiceLength(data) {
-  const raw = data['Дата призову'] || '';
+  const raw = data[COL_DRAFT_DATE] || '';
   const matches = raw.match(/\d{2}\.\d{2}\.\d{4}/g);
   if (!matches) return '';
 
@@ -183,14 +183,14 @@ function _computeTotalServiceLength(data) {
  * @returns {string} e.g. "07.05.2015 з в/ч 3011", or empty string.
  */
 function _computeContractSignDate(data) {
-  const contractField = (data['Контракт укладено до'] || '').toLowerCase();
+  const contractField = (data[COL_CONTRACT_UNTIL] || '').toLowerCase();
   if (contractField.includes('мобілізований') || contractField.includes('мобілізована')) return '';
 
-  const dateMatch = (data['Дата призову'] || '').match(/\d{2}\.\d{2}\.\d{4}/);
+  const dateMatch = (data[COL_DRAFT_DATE] || '').match(/\d{2}\.\d{2}\.\d{4}/);
   if (!dateMatch) return '';
 
-  const rows = _parseSubTable(data['Проходження служби'] || '');
-  let unitNumber = '3102';
+  const rows = _parseSubTable(data[COL_SERVICE_HISTORY] || '');
+  let unitNumber = DEFAULT_UNIT_NUMBER;
   if (rows.length) {
     const unitMatch = (rows[0][1] || '').match(/\b(\d{4})\b/);
     if (unitMatch) unitNumber = unitMatch[1];
@@ -207,7 +207,7 @@ function _computeContractSignDate(data) {
  * @returns {string} Date string e.g. "01.01.2025", or empty string if not found.
  */
 function _computeCurrentPositionStartDate(data) {
-  const rows = _parseSubTable(data['Проходження служби'] || '');
+  const rows = _parseSubTable(data[COL_SERVICE_HISTORY] || '');
   if (!rows.length) return '';
   const period = rows[rows.length - 1][0] || '';
   const m = period.match(/\d{2}\.\d{2}\.\d{4}/);
@@ -223,7 +223,7 @@ function _computeCurrentPositionStartDate(data) {
  * @returns {string} Trimmed position title, or empty string if not found.
  */
 function _computeCurrentPosition(data) {
-  const rows = _parseSubTable(data['Проходження служби'] || '');
+  const rows = _parseSubTable(data[COL_SERVICE_HISTORY] || '');
   if (!rows.length) return '';
   return (rows[rows.length - 1][1] || '').trim();
 }
@@ -236,7 +236,7 @@ function _computeCurrentPosition(data) {
  * @returns {string} e.g. "0671234567, 0991234567", or empty string if none.
  */
 function _computeChildrenPhoneNumbers(data) {
-  const rows = _parseSubTable(data['Близькі родичі'] || '');
+  const rows = _parseSubTable(data[COL_CLOSE_RELATIVES] || '');
   return rows
     .filter(fields => (fields[0] || '').trim().toLowerCase().startsWith('дитина'))
     .map(fields => (fields[3] || '').trim())
@@ -254,7 +254,7 @@ function _computeChildrenPhoneNumbers(data) {
  *                   or empty string if no children found.
  */
 function _computeChildrenNamesBirthDates(data) {
-  const rows = _parseSubTable(data['Близькі родичі'] || '');
+  const rows = _parseSubTable(data[COL_CLOSE_RELATIVES] || '');
   const children = rows.filter(fields => (fields[0] || '').trim().toLowerCase().startsWith('дитина'));
   if (!children.length) return '';
   return children.map((fields, i) => {
@@ -274,7 +274,7 @@ function _computeChildrenNamesBirthDates(data) {
  * @param {Object.<string, string>} data - Row data map.
  */
 function _underlineMaritalStatus(body, data) {
-  const status = (data['Сімейний стан'] || '').toLowerCase().trim();
+  const status = (data[COL_MARITAL_STATUS] || '').toLowerCase().trim();
   let pattern;
   if (status.includes('неодружен') || status.includes('незаміжн')) {
     pattern = 'неодружений \\(незаміжня\\)';
@@ -299,9 +299,9 @@ function _underlineMaritalStatus(body, data) {
  * @param {Object.<string, string>} data - Row data map.
  */
 function _fillServiceHistoryTable(body, data) {
-  const entries = _parseSubTable(data['Проходження служби'] || '');
+  const entries = _parseSubTable(data[COL_SERVICE_HISTORY] || '');
 
-  const found = body.findText(_escapeRegex('{Проходження служби}'));
+  const found = body.findText(_escapeRegex('{' + COL_SERVICE_HISTORY + '}'));
   if (!found) return;
 
   // Navigate up: Text → Paragraph → TableCell → TableRow → Table
@@ -354,7 +354,7 @@ function _parseSubTable(rawValue) {
  * @returns {string} Trimmed field value, or empty string if not found.
  */
 function _findRelativeField(data, relationType, fieldIndex) {
-  const rows = _parseSubTable(data['Близькі родичі'] || '');
+  const rows = _parseSubTable(data[COL_CLOSE_RELATIVES] || '');
   const row = rows.find(fields => (fields[0] || '').trim().toLowerCase() === relationType.toLowerCase());
   return row ? (row[fieldIndex] || '').trim() : '';
 }
@@ -448,8 +448,8 @@ function _replacePlaceholderWithImage(body, placeholder, blob) {
   para.clear();
   const img = para.appendInlineImage(blob);
   const h = img.getHeight();
-  if (h > 600) {
-    img.setWidth(Math.round(img.getWidth() * 600 / h));
-    img.setHeight(600);
+  if (h > IMAGE_MAX_HEIGHT) {
+    img.setWidth(Math.round(img.getWidth() * IMAGE_MAX_HEIGHT / h));
+    img.setHeight(IMAGE_MAX_HEIGHT);
   }
 }
