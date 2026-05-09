@@ -5,15 +5,11 @@ const SHEET_HANDBOOK = 'Handbook';
 // Named cell / range addresses
 const EDIT_MODE_CELL = 'M1';
 
-// Handbook layout — table-type definitions (rows 2–10, col A, all columns)
-const HANDBOOK_TYPES_ROW_START = 2;
-const HANDBOOK_TYPES_ROW_COUNT = 9;
+// Handbook layout — table-type definitions
+const HANDBOOK_TYPES_RANGE = 'A2:G10';
 
-// Handbook layout — placeholder correspondence table (B11:D50, first two rows are headers)
-const HANDBOOK_CORR_ROW_START = 11;
-const HANDBOOK_CORR_COL_START = 2;
-const HANDBOOK_CORR_ROW_COUNT = 40;
-const HANDBOOK_CORR_COL_COUNT = 3;
+// Handbook layout — placeholder correspondence table
+const HANDBOOK_CORR_RANGE = 'A12:C40';
 
 // Database column names
 const COL_DRAFT_DATE = 'Дата призову';

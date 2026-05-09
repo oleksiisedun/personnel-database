@@ -106,8 +106,8 @@ function _exportDoc(rowIndices, templateId, docPrefix) {
 }
 
 /**
- * Reads the placeholder correspondence table from Handbook!B11:D50.
- * The first two rows (B11:D12) are headers and are skipped.
+ * Reads the placeholder correspondence table from Handbook (range defined by
+ * HANDBOOK_CORR_RANGE, data only — header rows are excluded from the range).
  * Each data row maps a template placeholder to either a source Database column
  * header (column C) or a computed value key (column D).
  *
@@ -115,9 +115,9 @@ function _exportDoc(rowIndices, templateId, docPrefix) {
  * @returns {Array<{placeholder: string, sourceCol: string, computedKey: string}>}
  */
 function _loadCorrespondenceTable(handbookSheet) {
-  const rows = handbookSheet.getRange(HANDBOOK_CORR_ROW_START, HANDBOOK_CORR_COL_START, HANDBOOK_CORR_ROW_COUNT, HANDBOOK_CORR_COL_COUNT).getValues();
+  const rows = handbookSheet.getRange(HANDBOOK_CORR_RANGE).getValues();
   const mappings = [];
-  for (let i = 2; i < rows.length; i++) { // skip 2 header rows
+  for (let i = 0; i < rows.length; i++) {
     const placeholder = String(rows[i][0]).trim();
     if (!placeholder) continue;
     mappings.push({

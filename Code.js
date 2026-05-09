@@ -76,8 +76,7 @@ function getSchemaAndData() {
   const tableHeadersMap = {};
   const handbookSheet = ss.getSheetByName(SHEET_HANDBOOK);
   if (handbookSheet) {
-    const hbLastCol = Math.max(1, handbookSheet.getLastColumn());
-    const hbData = handbookSheet.getRange(HANDBOOK_TYPES_ROW_START, 1, HANDBOOK_TYPES_ROW_COUNT, hbLastCol).getValues();
+    const hbData = handbookSheet.getRange(HANDBOOK_TYPES_RANGE).getValues();
     for (let r = 0; r < hbData.length; r++) {
       const dataType = String(hbData[r][0]).trim().toLowerCase();
       if (!dataType) continue;
