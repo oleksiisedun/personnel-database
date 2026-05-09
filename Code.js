@@ -34,9 +34,7 @@ function onOpen() {
  * WebEditor.html are evaluated before the HTML is served to the client.
  */
 function openWebEditor() {
-  const html = HtmlService.createTemplateFromFile('WebEditor').evaluate()
-    .setWidth(WEB_EDITOR_WIDTH)
-    .setHeight(WEB_EDITOR_HEIGHT);
+  const html = HtmlService.createTemplateFromFile('WebEditor').evaluate();
   SpreadsheetApp.getUi().showModalDialog(html, 'Web Editor');
 }
 

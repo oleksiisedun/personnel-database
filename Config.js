@@ -24,14 +24,14 @@ const COL_CONTRACT_UNTIL = 'Контракт укладено до';
 
 // Google Drive IDs
 const F1_TEMPLATE_ID = '16yktSuOPgjNxQap-SCQZkmcISOftxWPZuSovVcAFkYI';
+const WC_TEMPLATE_ID = '10WKfn_cUP-T_C_TWr3pPeR3sELLVgUFFDan8VFpCoPo';
 const EXPORT_FOLDER_ID = '1mG3vDgV9fCIYAt1S4Aj-IEUhKTw9O-Ki';
 
 // Export / document settings
-const EXPORT_DOC_PREFIX = 'Ф-1 ';
+const F1_DOC_PREFIX = 'Ф-1 ';
+const WC_DOC_PREFIX = 'Розшукова картка ';
 const DEFAULT_UNIT_NUMBER = '3102';
-const IMAGE_MAX_HEIGHT = 600;
+const IMAGE_MAX_HEIGHT = 500;
 
 // Web editor UI settings
 const COLUMN_MIN_WIDTHS = { text: 150, image: 150, table: 900 };
-const WEB_EDITOR_WIDTH = 800;
-const WEB_EDITOR_HEIGHT = 600;

@@ -1,14 +1,42 @@
 /**
- * Exports an F-1 document for each given row index by copying the template,
- * replacing {column name} placeholders with row data, and saving to the export
- * folder. Image-type columns have their placeholder replaced with the actual image.
- * Placeholders mapped via the Handbook correspondence table are resolved before
- * the direct-column pass. Placeholders with no match are left untouched.
+ * Exports an F-1 document for each given row index.
  *
  * @param {number[]} rowIndices - 1-based sheet row numbers to export.
- * @returns {Array<{name: string, url: string}>} Names and URLs of created documents.
+ * @returns {Array<{name: string, url: string}>}
  */
 function exportF1(rowIndices) {
+  return _exportDoc(rowIndices, F1_TEMPLATE_ID, F1_DOC_PREFIX);
+}
+
+/**
+ * Exports a Wanted Card document for each given row index.
+ *
+ * @param {number[]} rowIndices - 1-based sheet row numbers to export.
+ * @returns {Array<{name: string, url: string}>}
+ */
+function exportWC(rowIndices) {
+  return _exportDoc(rowIndices, WC_TEMPLATE_ID, WC_DOC_PREFIX);
+}
+
+/**
+ * Copies a Google Docs template for each given row, fills all placeholders
+ * with row data, and saves the result to the export folder.
+ *
+ * Four passes run in order:
+ *   1. Image-type columns — placeholder replaced with the actual image blob.
+ *   2. Service history table — {COL_SERVICE_HISTORY} row expanded into table rows.
+ *   3. Direct text columns — {column name} replaced with the cell value.
+ *   4. Correspondence table — Handbook-defined aliases and computed values.
+ *
+ * Placeholders with no match are left untouched. The marital status line is
+ * underlined based on the COL_MARITAL_STATUS value.
+ *
+ * @param {number[]} rowIndices - 1-based sheet row numbers to export.
+ * @param {string} templateId - Google Drive file ID of the Docs template.
+ * @param {string} docPrefix - Prefix prepended to the first-column value to form the document name.
+ * @returns {Array<{name: string, url: string}>} Names and URLs of created documents.
+ */
+function _exportDoc(rowIndices, templateId, docPrefix) {
   const ss = SpreadsheetApp.getActiveSpreadsheet();
   const sheet = ss.getSheetByName(SHEET_DATABASE);
   if (!sheet) throw new Error('Sheet "Database" not found.');
@@ -29,8 +57,8 @@ function exportF1(rowIndices) {
     const data = {};
     columns.forEach((col, i) => { data[col.name] = String(rowValues[i] == null ? '' : rowValues[i]); });
 
-    const docName = EXPORT_DOC_PREFIX + (data[columns[0].name] || 'Unknown');
-    const copy = DriveApp.getFileById(F1_TEMPLATE_ID).makeCopy(docName, exportFolder);
+    const docName = docPrefix + (data[columns[0].name] || 'Unknown');
+    const copy = DriveApp.getFileById(templateId).makeCopy(docName, exportFolder);
     const doc = DocumentApp.openById(copy.getId());
     const body = doc.getBody();
 
@@ -124,6 +152,7 @@ function _computeValue(name, data) {
   if (name === 'currentPosition') return _computeCurrentPosition(data);
   if (name === 'currentPositionStartDate') return _computeCurrentPositionStartDate(data);
   if (name === 'contractSignDate') return _computeContractSignDate(data);
+  if (name === 'relativesWithPhoneNumbers') return _computeRelativesWithPhoneNumbers(data);
   return '';
 }
 
@@ -262,6 +291,22 @@ function _computeChildrenNamesBirthDates(data) {
     const birthDate = (fields[4] || '').trim();
     return (i + 1) + ' дитина: ' + name + (birthDate ? ' ' + birthDate : '');
   }).join('\n');
+}
+
+/**
+ * Returns a semicolon-separated list of all relatives who have a phone number.
+ * Each entry is formatted as: "relation, full name, address, phone".
+ *
+ * @param {Object.<string, string>} data - Row data map.
+ * @returns {string} e.g. "мати, Іванова Марія, Київ, 0671234567; батько, Іванов Петро, Львів, 0991234567"
+ *                   or empty string if no relatives have a phone number.
+ */
+function _computeRelativesWithPhoneNumbers(data) {
+  const rows = _parseSubTable(data[COL_CLOSE_RELATIVES] || '');
+  return rows
+    .filter(fields => (fields[3] || '').trim())
+    .map(fields => [fields[0], fields[1], fields[2], fields[3]].map(f => (f || '').trim()).join(', '))
+    .join('; ');
 }
 
 /**
