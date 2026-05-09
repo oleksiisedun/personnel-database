@@ -7,7 +7,7 @@
 function getEditMode() {
   const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName('Handbook');
   if (!sheet) return false;
-  return sheet.getRange('M2').getValue() === true;
+  return sheet.getRange('M1').getValue() === true;
 }
 
 /**
@@ -92,8 +92,9 @@ function getSchemaAndData() {
   const tableHeadersMap = {};
   const handbookSheet = ss.getSheetByName('Handbook');
   if (handbookSheet) {
-    const hbData = handbookSheet.getDataRange().getValues();
-    for (let r = 1; r < hbData.length; r++) {
+    const hbLastCol = Math.max(1, handbookSheet.getLastColumn());
+    const hbData = handbookSheet.getRange(2, 1, 9, hbLastCol).getValues();
+    for (let r = 0; r < hbData.length; r++) {
       const dataType = String(hbData[r][0]).trim().toLowerCase();
       if (!dataType) continue;
       const headers = hbData[r].slice(1).map(h => String(h)).filter(h => h !== '');
