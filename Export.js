@@ -51,11 +51,20 @@ function _exportDoc(rowIndices, templateId, docPrefix) {
   const mappings = handbookSheet ? _loadCorrespondenceTable(handbookSheet) : [];
 
   const results = [];
+  const startTime = new Date();
+  let remaining = [];
 
-  rowIndices.forEach(rowIndex => {
+  for (let i = 0; i < rowIndices.length; i++) {
+    const now = new Date();
+    if (now - startTime > EXPORT_TIME_LIMIT_MS) {
+      remaining = rowIndices.slice(i);
+      break;
+    }
+
+    const rowIndex = rowIndices[i];
     const rowValues = all[rowIndex - 1];
     const data = {};
-    columns.forEach((col, i) => { data[col.name] = String(rowValues[i] == null ? '' : rowValues[i]); });
+    columns.forEach((col, j) => { data[col.name] = String(rowValues[j] == null ? '' : rowValues[j]); });
 
     const docName = docPrefix + (data[columns[0].name] || 'Unknown');
     const copy = DriveApp.getFileById(templateId).makeCopy(docName, exportFolder);
@@ -100,9 +109,9 @@ function _exportDoc(rowIndices, templateId, docPrefix) {
 
     doc.saveAndClose();
     results.push({ name: docName, url: copy.getUrl() });
-  });
+  }
 
-  return results;
+  return { results, remaining };
 }
 
 /**

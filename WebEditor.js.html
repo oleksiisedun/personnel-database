@@ -744,9 +744,9 @@
 
   /**
    * Exports documents for every currently visible (filtered) row using the
-   * given server-side function. Shows a progress overlay while the export runs,
-   * then displays links to the created documents on success.
-   * @param {string} btnId - ID of the button that triggered the export (disabled while running).
+   * given server-side function. Automatically continues in subsequent batches
+   * if the server hits its time limit before finishing all rows.
+   * @param {string} btnId - ID of the button that triggered the export (disabled for the full run).
    * @param {string} serverFnName - Name of the Apps Script function to call ('exportF1' or 'exportWC').
    */
   function runExport(btnId, serverFnName) {
@@ -755,48 +755,69 @@
       return;
     }
 
-    var rowIndices = filteredRows.map(function(r) { return r.rowIndex; });
-    var count = rowIndices.length;
+    var total = filteredRows.length;
     var btn = document.getElementById(btnId);
+    var ul = document.getElementById('export-links');
 
-    document.getElementById('export-spinner').classList.remove('hidden');
-    document.getElementById('export-msg').textContent = 'Exporting ' + count + ' document' + (count !== 1 ? 's' : '') + '…';
-    document.getElementById('export-links').style.display = 'none';
-    document.getElementById('export-links').innerHTML = '';
+    document.getElementById('export-msg').textContent = 'Exporting ' + total + ' document' + (total !== 1 ? 's' : '') + '…';
+    ul.style.display = 'none';
+    ul.innerHTML = '';
     document.getElementById('export-error').style.display = 'none';
     document.getElementById('btn-export-close').style.display = 'none';
+    document.getElementById('export-progress-wrap').style.display = 'block';
     document.getElementById('export-overlay').style.display = 'flex';
     btn.disabled = true;
 
-    google.script.run
-      .withSuccessHandler(function(results) {
-        btn.disabled = false;
-        document.getElementById('export-spinner').classList.add('hidden');
-        document.getElementById('export-msg').textContent =
-          'Exported ' + results.length + ' document' + (results.length !== 1 ? 's' : '') + ':';
-        var ul = document.getElementById('export-links');
-        results.forEach(function(r) {
-          var li = document.createElement('li');
-          var a = document.createElement('a');
-          a.href = r.url;
-          a.target = '_blank';
-          a.textContent = r.name;
-          li.appendChild(a);
-          ul.appendChild(li);
-        });
-        ul.style.display = 'block';
-        document.getElementById('btn-export-close').style.display = 'inline-block';
-      })
-      .withFailureHandler(function(err) {
-        btn.disabled = false;
-        document.getElementById('export-spinner').classList.add('hidden');
-        document.getElementById('export-msg').textContent = '';
-        var el = document.getElementById('export-error');
-        el.textContent = 'Export failed: ' + (err.message || err);
-        el.style.display = 'block';
-        document.getElementById('btn-export-close').style.display = 'inline-block';
-      })
-      [serverFnName](rowIndices);
+    var doneCount = 0;
+    var progressBar = document.getElementById('export-progress-bar');
+
+    function setProgress(pct) {
+      progressBar.classList.remove('indeterminate');
+      progressBar.style.width = pct + '%';
+    }
+
+    function fire(indices) {
+      progressBar.classList.add('indeterminate');
+      google.script.run
+        .withSuccessHandler(function(response) {
+          response.results.forEach(function(r) {
+            var li = document.createElement('li');
+            var a = document.createElement('a');
+            a.href = r.url;
+            a.target = '_blank';
+            a.textContent = r.name;
+            li.appendChild(a);
+            ul.appendChild(li);
+          });
+          ul.style.display = 'block';
+          doneCount += response.results.length;
+          setProgress(Math.round(doneCount / total * 100));
+
+          if (response.remaining.length > 0) {
+            document.getElementById('export-msg').textContent =
+              'Exported ' + doneCount + ' of ' + total + ', continuing…';
+            fire(response.remaining);
+          } else {
+            btn.disabled = false;
+            document.getElementById('export-msg').textContent =
+              'Exported ' + doneCount + ' document' + (doneCount !== 1 ? 's' : '') + ':';
+            document.getElementById('btn-export-close').style.display = 'inline-block';
+          }
+        })
+        .withFailureHandler(function(err) {
+          btn.disabled = false;
+          progressBar.classList.remove('indeterminate');
+          document.getElementById('export-msg').textContent =
+            doneCount > 0 ? 'Exported ' + doneCount + ' before error:' : '';
+          var el = document.getElementById('export-error');
+          el.textContent = 'Export failed: ' + (err.message || err);
+          el.style.display = 'block';
+          document.getElementById('btn-export-close').style.display = 'inline-block';
+        })
+        [serverFnName](indices);
+    }
+
+    fire(filteredRows.map(function(r) { return r.rowIndex; }));
   }
 
   document.addEventListener('DOMContentLoaded', init);

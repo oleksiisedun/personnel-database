@@ -24,6 +24,7 @@ const WC_TEMPLATE_ID = '10WKfn_cUP-T_C_TWr3pPeR3sELLVgUFFDan8VFpCoPo';
 const EXPORT_FOLDER_ID = '1mG3vDgV9fCIYAt1S4Aj-IEUhKTw9O-Ki';
 
 // Export / document settings
+const EXPORT_TIME_LIMIT_MS = 5 * 60 * 1000; // 5 min — 1 min safety margin before GAS 6-min hard limit
 const F1_DOC_PREFIX = 'Ф-1 ';
 const WC_DOC_PREFIX = 'Розшукова картка ';
 const DEFAULT_UNIT_NUMBER = '3102';
