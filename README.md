@@ -31,7 +31,7 @@ The project is a [Google Apps Script](https://developers.google.com/apps-script)
 |-------|---------|
 | `A2:G10` (`HANDBOOK_TYPES_RANGE`) | Sub-column headers for each `*-table` type; col A = type name, col B onward = headers |
 | `M1` (`EDIT_MODE_CELL`) | Edit mode flag (checkbox) — when checked, the editor allows adding and editing records |
-| `A12:C40` (`HANDBOOK_CORR_RANGE`) | Placeholder correspondence table for document exports (data only, headers in rows 11–12) |
+| `A12:C40` (`HANDBOOK_CORR_RANGE`) | Placeholder correspondence table for document exports |
 
 #### Correspondence table columns
 
