@@ -50,19 +50,25 @@ function exportF1(rowIndices) {
       }
     });
 
-    // Pass 2: direct text column placeholders.
+    // Pass 2: service history table — must run before direct text replacement
+    // so the {Проходження служби} placeholder is still intact.
+    _fillServiceHistoryTable(body, data);
+
+    // Pass 3: direct text column placeholders.
     columns.forEach(col => {
       if (col.type === 'image') return;
       body.replaceText(_escapeRegex('{' + col.name + '}'), _escapeReplacement(data[col.name] || ''));
     });
 
-    // Pass 3: correspondence table mappings (source column aliases and computed values).
+    // Pass 4: correspondence table mappings (source column aliases and computed values).
     mappings.forEach(({ placeholder, sourceCol, computedKey }) => {
       const value = sourceCol
         ? (data[sourceCol] || '')
         : _computeValue(computedKey, data);
       body.replaceText(_escapeRegex('{' + placeholder + '}'), _escapeReplacement(value));
     });
+
+    _underlineMaritalStatus(body, data);
 
     doc.saveAndClose();
     results.push({ name: docName, url: copy.getUrl() });
@@ -256,6 +262,69 @@ function _computeChildrenNamesBirthDates(data) {
     const birthDate = (fields[4] || '').trim();
     return (i + 1) + ' дитина: ' + name + (birthDate ? ' ' + birthDate : '');
   }).join('\n');
+}
+
+/**
+ * Underlines the appropriate part of the marital status line
+ * "одружений (заміжня)/ неодружений (незаміжня)" based on the "Сімейний стан"
+ * column value. Married values (одружений/а, заміжня) underline the first part;
+ * unmarried values (неодружений/а, незаміжня) underline the second part.
+ *
+ * @param {GoogleAppsScript.Document.Body} body - Document body to search.
+ * @param {Object.<string, string>} data - Row data map.
+ */
+function _underlineMaritalStatus(body, data) {
+  const status = (data['Сімейний стан'] || '').toLowerCase().trim();
+  let pattern;
+  if (status.includes('неодружен') || status.includes('незаміжн')) {
+    pattern = 'неодружений \\(незаміжня\\)';
+  } else if (status.includes('одружен') || status.includes('заміжн')) {
+    pattern = 'одружений \\(заміжня\\)';
+  } else {
+    return;
+  }
+  const found = body.findText(pattern);
+  if (!found) return;
+  found.getElement().asText().setUnderline(found.getStartOffset(), found.getEndOffsetInclusive(), true);
+}
+
+/**
+ * Fills the "ПРОХОДЖЕННЯ СЛУЖБИ" table in the document by expanding the single
+ * {Проходження служби} placeholder row into one row per service entry.
+ * The placeholder row is reused for the first entry; additional rows are
+ * inserted after it. Each row gets the period (field 0) in column 1 and the
+ * position title (field 1) in column 2.
+ *
+ * @param {GoogleAppsScript.Document.Body} body - Document body to search.
+ * @param {Object.<string, string>} data - Row data map.
+ */
+function _fillServiceHistoryTable(body, data) {
+  const entries = _parseSubTable(data['Проходження служби'] || '');
+
+  const found = body.findText(_escapeRegex('{Проходження служби}'));
+  if (!found) return;
+
+  // Navigate up: Text → Paragraph → TableCell → TableRow → Table
+  const placeholderRow = found.getElement().getParent().getParent().getParent();
+  const table = placeholderRow.getParent();
+  const rowIndex = table.getChildIndex(placeholderRow);
+
+  if (entries.length === 0) {
+    placeholderRow.getCell(0).setText('');
+    placeholderRow.getCell(1).setText('');
+    return;
+  }
+
+  // Fill the placeholder row with the first entry.
+  placeholderRow.getCell(0).setText((entries[0][0] || '').trim());
+  placeholderRow.getCell(1).setText((entries[0][1] || '').trim());
+
+  // Insert remaining entries in reverse order at rowIndex+1 to preserve order.
+  for (let i = entries.length - 1; i >= 1; i--) {
+    const newRow = table.insertTableRow(rowIndex + 1);
+    newRow.appendTableCell().setText((entries[i][0] || '').trim());
+    newRow.appendTableCell().setText((entries[i][1] || '').trim());
+  }
 }
 
 /**
