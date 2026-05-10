@@ -151,7 +151,7 @@
       fth.dataset.colIndex = i;
       var fDiv = document.createElement('div');
       fDiv.className = 'cell-content';
-      if (col.type === 'text') {
+      if (col.type === 'text' || col.type === 'unit' || col.type === 'date') {
         var input = document.createElement('input');
         input.type = 'text';
         input.placeholder = 'Filter';
@@ -473,6 +473,50 @@
 
       if (isTableType(col)) {
         block.appendChild(buildTableEditor(i, parseData(row.values[i] || '', col.tableHeaders || []), col.tableHeaders || []));
+      } else if (col.type === 'unit') {
+        var currentVal = row.values[i] || '';
+        var sel = document.createElement('select');
+        sel.dataset.colIndex = i;
+        var emptyOpt = document.createElement('option');
+        emptyOpt.value = '';
+        emptyOpt.textContent = '—';
+        sel.appendChild(emptyOpt);
+        (col.unitOptions || []).forEach(function(opt) {
+          var o = document.createElement('option');
+          o.value = opt;
+          o.textContent = opt;
+          sel.appendChild(o);
+        });
+        if (currentVal && (col.unitOptions || []).indexOf(currentVal) === -1) {
+          var o = document.createElement('option');
+          o.value = currentVal;
+          o.textContent = currentVal;
+          sel.appendChild(o);
+        }
+        sel.value = currentVal;
+        block.appendChild(sel);
+      } else if (col.type === 'date') {
+        var input = document.createElement('input');
+        input.type = 'text';
+        input.value = row.values[i] || '';
+        input.dataset.colIndex = i;
+        input.placeholder = 'DD.MM.YYYY';
+        block.appendChild(input);
+
+        var errHint = document.createElement('div');
+        errHint.className = 'field-hint field-error';
+        errHint.style.display = 'none';
+        errHint.textContent = 'Format: DD.MM.YYYY';
+        block.appendChild(errHint);
+
+        (function(inp, hint) {
+          inp.addEventListener('input', function() {
+            var val = inp.value.trim();
+            var valid = !val || /^\d{2}\.\d{2}\.\d{4}$/.test(val);
+            inp.classList.toggle('input-error', !valid);
+            hint.style.display = valid ? 'none' : 'block';
+          });
+        })(input, errHint);
       } else {
         var input = document.createElement('input');
         input.type = 'text';
@@ -659,9 +703,29 @@
    * Disables the Save button for the duration of the async call.
    */
   function saveRow() {
+    var hasDateError = false;
+    schema.columns.forEach(function(col, i) {
+      if (col.type !== 'date') return;
+      var inp = document.querySelector('#edit-form input[data-col-index="' + i + '"]');
+      if (!inp) return;
+      var val = inp.value.trim();
+      var valid = !val || /^\d{2}\.\d{2}\.\d{4}$/.test(val);
+      inp.classList.toggle('input-error', !valid);
+      if (!valid) hasDateError = true;
+    });
+    if (hasDateError) {
+      var el = document.getElementById('save-error');
+      el.textContent = 'Fix date fields (expected format: DD.MM.YYYY) before saving.';
+      el.style.display = 'block';
+      return;
+    }
+
     var newValues = new Array(schema.columns.length).fill('');
     document.querySelectorAll('#edit-form input[data-col-index]').forEach(function(inp) {
       newValues[parseInt(inp.dataset.colIndex)] = inp.value;
+    });
+    document.querySelectorAll('#edit-form select[data-col-index]').forEach(function(sel) {
+      newValues[parseInt(sel.dataset.colIndex)] = sel.value;
     });
     schema.columns.forEach(function(col, i) {
       if (isTableType(col)) newValues[i] = encodeTableEditor(i, col);

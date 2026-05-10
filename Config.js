@@ -3,13 +3,16 @@ const SHEET_DATABASE = 'Database';
 const SHEET_HANDBOOK = 'Handbook';
 
 // Named cell / range addresses
-const EDIT_MODE_CELL = 'M1';
+const EDIT_MODE_CELL = 'I2';
 
 // Handbook layout — table-type definitions
 const HANDBOOK_TYPES_RANGE = 'A2:G10';
 
 // Handbook layout — placeholder correspondence table
 const HANDBOOK_CORR_RANGE = 'A12:C40';
+
+// Handbook layout — allowed values for "unit" type columns
+const HANDBOOK_UNIT_RANGE = 'D12:D40';
 
 // Database column names
 const COL_DRAFT_DATE = 'Дата призову';

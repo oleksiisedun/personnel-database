@@ -22,7 +22,7 @@ The project is a [Google Apps Script](https://developers.google.com/apps-script)
 | Row | Purpose |
 |-----|---------|
 | 1 | Column names |
-| 2 | Column types (`text`, `image`, `relatives-table`, `service-table`, …) |
+| 2 | Column types (`text`, `image`, `date`, `unit`, `relatives-table`, `service-table`, …) |
 | 3+ | Data rows |
 
 ### `Handbook` sheet
@@ -30,8 +30,9 @@ The project is a [Google Apps Script](https://developers.google.com/apps-script)
 | Range | Purpose |
 |-------|---------|
 | `A2:G10` (`HANDBOOK_TYPES_RANGE`) | Sub-column headers for each `*-table` type; col A = type name, col B onward = headers |
-| `M1` (`EDIT_MODE_CELL`) | Edit mode flag (checkbox) — when checked, the editor allows adding and editing records |
+| `I2` (`EDIT_MODE_CELL`) | Edit mode flag (checkbox) — when checked, the editor allows adding and editing records |
 | `A12:C40` (`HANDBOOK_CORR_RANGE`) | Placeholder correspondence table for document exports |
+| `D12:D40` (`HANDBOOK_UNIT_RANGE`) | Allowed values for `unit`-type columns |
 
 #### Correspondence table columns
 
@@ -49,6 +50,8 @@ Exactly one of B or C should be filled per row.
 |------|-----------|-----------|
 | `text` | Plain text | Text input |
 | `image` | Thumbnail (click to enlarge) | Google Drive link input with live preview |
+| `date` | Plain text | Text input with `DD.MM.YYYY` format validation |
+| `unit` | Plain text | Dropdown of allowed values from Handbook |
 | `*-table` | Decoded mini-table | Row/column editor with add & delete |
 
 ### `*-table` encoding format
@@ -70,10 +73,20 @@ Images are stored as Google Drive sharing links. Supported URL formats:
 
 Images are fetched server-side (via `DriveApp`) and returned as base64 data URLs, so all users with access to the spreadsheet can view images regardless of their personal Drive session.
 
+### Date columns
+
+Values are stored as plain text in `DD.MM.YYYY` format. In the edit view, the input validates the format on every keystroke and highlights the field in red with an error hint if the format is wrong. The Save button is blocked until all date fields are valid (empty values are allowed).
+
+Values entered directly in the sheet that do not match the format are displayed as-is; no validation is applied outside the web editor.
+
+### Unit columns
+
+Allowed values are read from Handbook `D12:D40` at page load and served to the client as part of the schema. In the edit view the field renders as a dropdown containing only those values. Values entered directly in the sheet that are not in the allowed list are appended to the dropdown as an extra option and shown selected, so no data is lost.
+
 ## Web editor features
 
 - **List view** — full-screen table with all columns and data
-- **Filtering** — debounced live filter input above each `text` column; supports plain text and regular expressions (toggle per column)
+- **Filtering** — debounced live filter input above each `text`, `date`, and `unit` column; supports plain text and regular expressions (toggle per column)
 - **Empty-cell filter** — dropdown above each `*-table` column: All / Empty / Not empty
 - **Add person** — appends a new empty row and opens it in the edit view immediately (edit mode only)
 - **Column visibility** — "Columns ▾" button to hide/show individual columns; first column is always visible
@@ -136,9 +149,10 @@ Exports run in automatic batches capped at `EXPORT_TIME_LIMIT_MS` (5 minutes) to
 |----------|---------|---------|
 | `SHEET_DATABASE` | `'Database'` | Name of the data sheet |
 | `SHEET_HANDBOOK` | `'Handbook'` | Name of the handbook sheet |
-| `EDIT_MODE_CELL` | `'M1'` | Cell that holds the edit mode checkbox |
+| `EDIT_MODE_CELL` | `'I2'` | Cell that holds the edit mode checkbox |
 | `HANDBOOK_TYPES_RANGE` | `'A2:G10'` | Range of table-type definitions in Handbook |
 | `HANDBOOK_CORR_RANGE` | `'A12:C40'` | Range of the placeholder correspondence table |
+| `HANDBOOK_UNIT_RANGE` | `'D12:D40'` | Range of allowed values for `unit`-type columns |
 | `F1_TEMPLATE_ID` | — | Google Docs template ID for F-1 export |
 | `WC_TEMPLATE_ID` | — | Google Docs template ID for Wanted Card export |
 | `EXPORT_FOLDER_ID` | — | Google Drive folder ID for exported documents |

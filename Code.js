@@ -88,6 +88,15 @@ function getSchemaAndData() {
     if (col.type.endsWith('-table')) col.tableHeaders = tableHeadersMap[col.type] || [];
   });
 
+  let unitOptions = [];
+  if (handbookSheet) {
+    unitOptions = handbookSheet.getRange(HANDBOOK_UNIT_RANGE).getValues()
+      .map(r => String(r[0])).filter(v => v !== '');
+  }
+  columns.forEach(col => {
+    if (col.type === 'unit') col.unitOptions = unitOptions;
+  });
+
   return { columns, rows, editMode: getEditMode() };
 }
 
