@@ -97,6 +97,15 @@ function getSchemaAndData() {
     if (col.type === 'unit') col.unitOptions = unitOptions;
   });
 
+  let originOptions = [];
+  if (handbookSheet) {
+    originOptions = handbookSheet.getRange(HANDBOOK_ORIGIN_RANGE).getValues()
+      .map(r => String(r[0])).filter(v => v !== '');
+  }
+  columns.forEach(col => {
+    if (col.type === 'origin') col.originOptions = originOptions;
+  });
+
   return { columns, rows, editMode: getEditMode() };
 }
 

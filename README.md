@@ -33,6 +33,7 @@ The project is a [Google Apps Script](https://developers.google.com/apps-script)
 | `I2` (`EDIT_MODE_CELL`) | Edit mode flag (checkbox) — when checked, the editor allows adding and editing records |
 | `A12:C40` (`HANDBOOK_CORR_RANGE`) | Placeholder correspondence table for document exports |
 | `D12:D40` (`HANDBOOK_UNIT_RANGE`) | Allowed values for `unit`-type columns |
+| `E12:E40` (`HANDBOOK_ORIGIN_RANGE`) | Allowed values for `origin`-type columns |
 
 #### Correspondence table columns
 
@@ -51,7 +52,8 @@ Exactly one of B or C should be filled per row.
 | `text` | Plain text | Text input |
 | `image` | Thumbnail (click to enlarge) | Google Drive link input with live preview |
 | `date` | Plain text | Text input with `DD.MM.YYYY` format validation |
-| `unit` | Plain text | Dropdown of allowed values from Handbook |
+| `unit` | Plain text | Dropdown of allowed values from Handbook `D12:D40` |
+| `origin` | Plain text | Dropdown of allowed values from Handbook `E12:E40` |
 | `*-table` | Decoded mini-table | Row/column editor with add & delete |
 
 ### `*-table` encoding format
@@ -82,6 +84,10 @@ Values entered directly in the sheet that do not match the format are displayed 
 ### Unit columns
 
 Allowed values are read from Handbook `D12:D40` at page load and served to the client as part of the schema. In the edit view the field renders as a dropdown containing only those values. Values entered directly in the sheet that are not in the allowed list are appended to the dropdown as an extra option and shown selected, so no data is lost.
+
+### Origin columns
+
+Same behaviour as `unit`, but the allowed values come from Handbook `E12:E40`.
 
 ## Web editor features
 
@@ -153,6 +159,7 @@ Exports run in automatic batches capped at `EXPORT_TIME_LIMIT_MS` (5 minutes) to
 | `HANDBOOK_TYPES_RANGE` | `'A2:G10'` | Range of table-type definitions in Handbook |
 | `HANDBOOK_CORR_RANGE` | `'A12:C40'` | Range of the placeholder correspondence table |
 | `HANDBOOK_UNIT_RANGE` | `'D12:D40'` | Range of allowed values for `unit`-type columns |
+| `HANDBOOK_ORIGIN_RANGE` | `'E12:E40'` | Range of allowed values for `origin`-type columns |
 | `F1_TEMPLATE_ID` | — | Google Docs template ID for F-1 export |
 | `WC_TEMPLATE_ID` | — | Google Docs template ID for Wanted Card export |
 | `EXPORT_FOLDER_ID` | — | Google Drive folder ID for exported documents |

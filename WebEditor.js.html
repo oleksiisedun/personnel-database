@@ -151,7 +151,7 @@
       fth.dataset.colIndex = i;
       var fDiv = document.createElement('div');
       fDiv.className = 'cell-content';
-      if (col.type === 'text' || col.type === 'unit' || col.type === 'date') {
+      if (col.type === 'text' || col.type === 'unit' || col.type === 'origin' || col.type === 'date') {
         var input = document.createElement('input');
         input.type = 'text';
         input.placeholder = 'Filter';
@@ -488,6 +488,28 @@
           sel.appendChild(o);
         });
         if (currentVal && (col.unitOptions || []).indexOf(currentVal) === -1) {
+          var o = document.createElement('option');
+          o.value = currentVal;
+          o.textContent = currentVal;
+          sel.appendChild(o);
+        }
+        sel.value = currentVal;
+        block.appendChild(sel);
+      } else if (col.type === 'origin') {
+        var currentVal = row.values[i] || '';
+        var sel = document.createElement('select');
+        sel.dataset.colIndex = i;
+        var emptyOpt = document.createElement('option');
+        emptyOpt.value = '';
+        emptyOpt.textContent = '—';
+        sel.appendChild(emptyOpt);
+        (col.originOptions || []).forEach(function(opt) {
+          var o = document.createElement('option');
+          o.value = opt;
+          o.textContent = opt;
+          sel.appendChild(o);
+        });
+        if (currentVal && (col.originOptions || []).indexOf(currentVal) === -1) {
           var o = document.createElement('option');
           o.value = currentVal;
           o.textContent = currentVal;
