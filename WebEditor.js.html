@@ -628,7 +628,7 @@
       form.appendChild(block);
     });
 
-    document.getElementById('edit-title').textContent = row.values[0] || 'Edit record';
+    document.getElementById('edit-title').textContent = isNewRow ? '' : (row.values[0] || 'Edit record');
     document.getElementById('save-error').style.display = 'none';
     document.getElementById('save-status').textContent = '';
     document.getElementById('btn-save').disabled = false;
