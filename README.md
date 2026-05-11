@@ -38,6 +38,7 @@ Same structure as `Database` (row 1 = column names, row 2 = column types, row 3+
 | `A12:C40` (`HANDBOOK_CORR_RANGE`) | Placeholder correspondence table for document exports |
 | `D12:D40` (`HANDBOOK_UNIT_RANGE`) | Allowed values for `unit`-type columns |
 | `E12:E40` (`HANDBOOK_ORIGIN_RANGE`) | Allowed values for `origin`-type columns |
+| `F12:F40` (`HANDBOOK_MARITAL_STATUS_RANGE`) | Allowed values for `marital-status`-type columns |
 
 #### Correspondence table columns
 
@@ -75,10 +76,13 @@ value1 | value2 | value3
 Images are stored as Google Drive sharing links. Supported URL formats:
 
 - `https://drive.google.com/file/d/FILE_ID/view`
+- `https://drive.google.com/drive/folders/FOLDER_ID`
 - `https://drive.google.com/open?id=FILE_ID`
 - Bare file ID
 
 Images are fetched server-side (via `DriveApp`) and returned as base64 data URLs, so all users with access to the spreadsheet can view images regardless of their personal Drive session.
+
+If the linked file is a **PDF**, the cell shows a red "PDF" badge instead of a thumbnail; clicking it opens the file in Drive in a new tab. If the link points to a **Drive folder**, a blue "Folder" badge is shown instead.
 
 ### Date columns
 
@@ -93,6 +97,10 @@ Allowed values are read from Handbook `D12:D40` at page load and served to the c
 ### Origin columns
 
 Same behaviour as `unit`, but the allowed values come from Handbook `E12:E40`.
+
+### Marital-status columns
+
+Same behaviour as `unit`, but the allowed values come from Handbook `F12:F40`.
 
 ## Web editor features
 
@@ -176,8 +184,8 @@ Exports run in automatic batches capped at `EXPORT_TIME_LIMIT_MS` (5 minutes) to
 | `DEFAULT_UNIT_NUMBER` | `'3102'` | Fallback military unit number for `contractSignDate` |
 | `IMAGE_MAX_HEIGHT` | `500` | Max image height (px) when inserting into a document |
 | `COLUMN_MIN_WIDTHS` | `{ text: 150, image: 150, table: 900 }` | Minimum column widths (px) in the list view |
-| `COLUMN_MAX_WIDTHS` | `{ image: 200 }` | Maximum column widths (px) in the list view |
-| `FILTER_DEBOUNCE_MS` | `250` | Debounce delay (ms) for filter text inputs |
+| `COLUMN_MAX_WIDTHS` | `{ image: 250 }` | Maximum column widths (px) in the list view |
+| `FILTER_DEBOUNCE_MS` | `500` | Debounce delay (ms) for filter text inputs |
 
 ## Local development
 
