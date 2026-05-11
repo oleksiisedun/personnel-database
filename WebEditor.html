@@ -3,11 +3,12 @@
 <head>
   <meta charset="utf-8">
   <?!= HtmlService.createHtmlOutputFromFile('WebEditor.css').getContent(); ?>
-  <? var editMode = getEditMode(); var colMinWidths = getColumnMinWidths(); ?>
+  <? var editMode = getEditMode(); var colMinWidths = getColumnMinWidths(); var colMaxWidths = getColumnMaxWidths(); ?>
   <style>
     :root {
       --text-min-width: <?= colMinWidths.text ?>px;
       --col-image-min-width: <?= colMinWidths.image ?>px;
+      --col-image-max-width: <?= colMaxWidths.image ?>px;
       --col-table-min-width: <?= colMinWidths.table ?>px;
     }
   </style>

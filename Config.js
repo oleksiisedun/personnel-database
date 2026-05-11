@@ -39,4 +39,5 @@ const IMAGE_MAX_HEIGHT = 500;
 
 // Web editor UI settings
 const COLUMN_MIN_WIDTHS = { text: 150, image: 150, table: 900 };
+const COLUMN_MAX_WIDTHS = { image: 250 };
 const FILTER_DEBOUNCE_MS = 500;

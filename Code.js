@@ -18,6 +18,13 @@ function getEditMode() {
 function getColumnMinWidths() { return COLUMN_MIN_WIDTHS; }
 
 /**
+ * Returns the column maximum width config for use in HTML template scriptlets.
+ *
+ * @returns {{ image: number }}
+ */
+function getColumnMaxWidths() { return COLUMN_MAX_WIDTHS; }
+
+/**
  * Simple trigger that runs when the spreadsheet is opened.
  * Adds the "More... ⭐️" custom menu to the Google Sheets toolbar.
  */
