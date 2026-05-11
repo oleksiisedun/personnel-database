@@ -1,6 +1,7 @@
 // Sheet names
 const SHEET_DATABASE = 'Database';
 const SHEET_HANDBOOK = 'Handbook';
+const SHEET_TRASH = 'Trash';
 
 // Named cell / range addresses
 const EDIT_MODE_CELL = 'I2';

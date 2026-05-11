@@ -65,6 +65,7 @@
       showView('list');
     });
     document.getElementById('btn-save').addEventListener('click', saveRow);
+    document.getElementById('btn-delete').addEventListener('click', deletePerson);
     document.getElementById('lightbox').addEventListener('click', function() {
       document.getElementById('lightbox').style.display = 'none';
     });
@@ -573,6 +574,9 @@
     document.getElementById('save-error').style.display = 'none';
     document.getElementById('save-status').textContent = '';
     document.getElementById('btn-save').disabled = false;
+    var deleteBtn = document.getElementById('btn-delete');
+    deleteBtn.style.display = isNewRow ? 'none' : 'inline-block';
+    deleteBtn.disabled = false;
     showView('edit');
   }
 
@@ -814,6 +818,48 @@
     document.getElementById('save-status').textContent = '';
     var el = document.getElementById('save-error');
     el.textContent = 'Save failed: ' + (err.message || err);
+    el.style.display = 'block';
+  }
+
+  /**
+   * Asks for confirmation then moves the current row to the Trash sheet via the server.
+   */
+  function deletePerson() {
+    if (!confirm('Move this person to Trash?')) return;
+    document.getElementById('btn-delete').disabled = true;
+    document.getElementById('btn-save').disabled = true;
+    document.getElementById('save-error').style.display = 'none';
+    google.script.run
+      .withSuccessHandler(onDeleteSuccess)
+      .withFailureHandler(onDeleteError)
+      .deleteRow(editingRow.rowIndex);
+  }
+
+  /**
+   * Success handler for deletePerson(). Removes the row from the in-memory schema,
+   * adjusts rowIndexes for all subsequent rows (the sheet row numbers shifted up by 1),
+   * and returns to the list view.
+   */
+  function onDeleteSuccess() {
+    var deletedIndex = editingRow.rowIndex;
+    schema.rows = schema.rows.filter(function(r) { return r !== editingRow; });
+    schema.rows.forEach(function(r) {
+      if (r.rowIndex > deletedIndex) r.rowIndex--;
+    });
+    editingRow = null;
+    applyFilters();
+    showView('list');
+  }
+
+  /**
+   * Failure handler for deletePerson(). Re-enables buttons and shows the error.
+   * @param {Error} err
+   */
+  function onDeleteError(err) {
+    document.getElementById('btn-delete').disabled = false;
+    document.getElementById('btn-save').disabled = false;
+    var el = document.getElementById('save-error');
+    el.textContent = 'Delete failed: ' + (err.message || err);
     el.style.display = 'block';
   }
 

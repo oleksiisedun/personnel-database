@@ -162,3 +162,33 @@ function updateRow(rowIndex, values) {
   sheet.getRange(rowIndex, 1, 1, values.length).setValues([values]);
   return true;
 }
+
+/**
+ * Moves a row from the "Database" sheet to the "Trash" sheet.
+ * If the Trash sheet does not yet exist it is created with the same
+ * header rows (rows 1 and 2) as the Database sheet.
+ *
+ * @param {number} rowIndex - 1-based spreadsheet row number to delete.
+ * @returns {boolean} Always true; thrown errors propagate to the client failure handler.
+ */
+function deleteRow(rowIndex) {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const dbSheet = ss.getSheetByName(SHEET_DATABASE);
+  if (!dbSheet) throw new Error('Sheet "Database" not found.');
+
+  const numCols = dbSheet.getLastColumn();
+  const rowData = dbSheet.getRange(rowIndex, 1, 1, numCols).getValues()[0];
+
+  let trashSheet = ss.getSheetByName(SHEET_TRASH);
+  if (!trashSheet) {
+    trashSheet = ss.insertSheet(SHEET_TRASH);
+    const headers = dbSheet.getRange(1, 1, 2, numCols).getValues();
+    trashSheet.getRange(1, 1, 2, numCols).setValues(headers);
+  }
+
+  const trashLastRow = Math.max(trashSheet.getLastRow(), 2);
+  trashSheet.getRange(trashLastRow + 1, 1, 1, numCols).setValues([rowData]);
+
+  dbSheet.deleteRow(rowIndex);
+  return true;
+}

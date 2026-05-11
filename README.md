@@ -25,6 +25,10 @@ The project is a [Google Apps Script](https://developers.google.com/apps-script)
 | 2 | Column types (`text`, `image`, `date`, `unit`, `relatives-table`, `service-table`, …) |
 | 3+ | Data rows |
 
+### `Trash` sheet
+
+Same structure as `Database` (row 1 = column names, row 2 = column types, row 3+ = data rows). Deleted records are appended here instead of being permanently removed. The sheet is created automatically on first delete if it does not exist.
+
 ### `Handbook` sheet
 
 | Range | Purpose |
@@ -95,6 +99,7 @@ Same behaviour as `unit`, but the allowed values come from Handbook `E12:E40`.
 - **Filtering** — debounced live filter input above each `text`, `date`, and `unit` column; supports plain text and regular expressions (toggle per column)
 - **Empty-cell filter** — dropdown above each `*-table` column: All / Empty / Not empty
 - **Add person** — appends a new empty row and opens it in the edit view immediately (edit mode only)
+- **Delete** — red "Delete" button in the edit view moves the record to the `Trash` sheet (edit mode only; not available for unsaved new rows)
 - **Column visibility** — "Columns ▾" button to hide/show individual columns; first column is always visible
 - **Image thumbnails** — loaded asynchronously, cached for the session
 - **Lightbox** — click any thumbnail to view the full image
@@ -155,6 +160,7 @@ Exports run in automatic batches capped at `EXPORT_TIME_LIMIT_MS` (5 minutes) to
 |----------|---------|---------|
 | `SHEET_DATABASE` | `'Database'` | Name of the data sheet |
 | `SHEET_HANDBOOK` | `'Handbook'` | Name of the handbook sheet |
+| `SHEET_TRASH` | `'Trash'` | Name of the trash sheet (created automatically on first delete) |
 | `EDIT_MODE_CELL` | `'I2'` | Cell that holds the edit mode checkbox |
 | `HANDBOOK_TYPES_RANGE` | `'A2:G10'` | Range of table-type definitions in Handbook |
 | `HANDBOOK_CORR_RANGE` | `'A12:C40'` | Range of the placeholder correspondence table |
