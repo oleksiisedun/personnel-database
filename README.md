@@ -175,6 +175,7 @@ Exports run in automatic batches capped at `EXPORT_TIME_LIMIT_MS` (5 minutes) to
 | `DEFAULT_UNIT_NUMBER` | `'3102'` | Fallback military unit number for `contractSignDate` |
 | `IMAGE_MAX_HEIGHT` | `500` | Max image height (px) when inserting into a document |
 | `COLUMN_MIN_WIDTHS` | `{ text: 150, image: 150, table: 900 }` | Minimum column widths (px) in the list view |
+| `FILTER_DEBOUNCE_MS` | `250` | Debounce delay (ms) for filter text inputs |
 
 ## Local development
 

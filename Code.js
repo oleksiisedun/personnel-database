@@ -106,7 +106,7 @@ function getSchemaAndData() {
     if (col.type === 'origin') col.originOptions = originOptions;
   });
 
-  return { columns, rows, editMode: getEditMode() };
+  return { columns, rows, editMode: getEditMode(), filterDebounceMs: FILTER_DEBOUNCE_MS };
 }
 
 /**

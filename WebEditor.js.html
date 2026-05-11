@@ -157,7 +157,7 @@
         input.type = 'text';
         input.placeholder = 'Filter';
         input.dataset.colIndex = i;
-        input.addEventListener('input', debounce(applyFilters, 250));
+        input.addEventListener('input', debounce(applyFilters, schema.filterDebounceMs));
         fDiv.appendChild(input);
       } else if (isTableType(col)) {
         var sel = document.createElement('select');
