@@ -22,7 +22,7 @@ The project is a [Google Apps Script](https://developers.google.com/apps-script)
 | Row | Purpose |
 |-----|---------|
 | 1 | Column names |
-| 2 | Column types (`text`, `image`, `date`, `unit`, `relatives-table`, `service-table`, …) |
+| 2 | Column types (`text`, `image`, `date`, `unit`, `tin`, `relatives-table`, `service-table`, …) |
 | 3+ | Data rows |
 
 ### `Trash` sheet
@@ -57,6 +57,7 @@ Exactly one of B or C should be filled per row.
 | `text` | Plain text | Text input |
 | `image` | Thumbnail (click to enlarge) | Google Drive link input with live preview |
 | `date` | Plain text | Text input with `DD.MM.YYYY` format validation |
+| `tin` | Plain text | Text input validated as exactly 10 digits |
 | `unit` | Plain text | Dropdown of allowed values from Handbook `D12:D40` |
 | `origin` | Plain text | Dropdown of allowed values from Handbook `E12:E40` |
 | `marital-status` | Plain text | Dropdown of allowed values from Handbook `F12:F40` |
@@ -87,6 +88,12 @@ If the linked file is a **PDF**, the cell shows a red "PDF" badge instead of a t
 ### Date columns
 
 Values are stored as plain text in `DD.MM.YYYY` format. In the edit view, the input validates the format on every keystroke and highlights the field in red with an error hint if the format is wrong. The Save button is blocked until all date fields are valid (empty values are allowed).
+
+Values entered directly in the sheet that do not match the format are displayed as-is; no validation is applied outside the web editor.
+
+### TIN columns
+
+Values are stored as plain text. In the edit view, the input validates on every keystroke that the value is exactly 10 digits (digits only, no spaces or other characters). The Save button is blocked until all TIN fields are valid (empty values are allowed).
 
 Values entered directly in the sheet that do not match the format are displayed as-is; no validation is applied outside the web editor.
 

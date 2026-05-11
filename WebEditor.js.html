@@ -152,7 +152,7 @@
       fth.dataset.colIndex = i;
       var fDiv = document.createElement('div');
       fDiv.className = 'cell-content';
-      if (col.type === 'text' || col.type === 'unit' || col.type === 'origin' || col.type === 'date' || col.type === 'marital-status' || col.type === 'image' || isTableType(col)) {
+      if (col.type === 'text' || col.type === 'unit' || col.type === 'origin' || col.type === 'date' || col.type === 'tin' || col.type === 'marital-status' || col.type === 'image' || isTableType(col)) {
         var input = document.createElement('input');
         input.type = 'text';
         input.placeholder = 'Filter';
@@ -565,6 +565,28 @@
         }
         sel.value = currentVal;
         block.appendChild(sel);
+      } else if (col.type === 'tin') {
+        var input = document.createElement('input');
+        input.type = 'text';
+        input.value = row.values[i] || '';
+        input.dataset.colIndex = i;
+        input.placeholder = '1234567890';
+        block.appendChild(input);
+
+        var errHint = document.createElement('div');
+        errHint.className = 'field-hint field-error';
+        errHint.style.display = 'none';
+        errHint.textContent = 'Must be exactly 10 digits';
+        block.appendChild(errHint);
+
+        (function(inp, hint) {
+          inp.addEventListener('input', function() {
+            var val = inp.value.trim();
+            var valid = !val || /^\d{10}$/.test(val);
+            inp.classList.toggle('input-error', !valid);
+            hint.style.display = valid ? 'none' : 'block';
+          });
+        })(input, errHint);
       } else if (col.type === 'date') {
         var input = document.createElement('input');
         input.type = 'text';
@@ -829,6 +851,23 @@
     if (hasDateError) {
       var el = document.getElementById('save-error');
       el.textContent = 'Fix date fields (expected format: DD.MM.YYYY) before saving.';
+      el.style.display = 'block';
+      return;
+    }
+
+    var hasTinError = false;
+    schema.columns.forEach(function(col, i) {
+      if (col.type !== 'tin') return;
+      var inp = document.querySelector('#edit-form input[data-col-index="' + i + '"]');
+      if (!inp) return;
+      var val = inp.value.trim();
+      var valid = !val || /^\d{10}$/.test(val);
+      inp.classList.toggle('input-error', !valid);
+      if (!valid) hasTinError = true;
+    });
+    if (hasTinError) {
+      var el = document.getElementById('save-error');
+      el.textContent = 'TIN must be exactly 10 digits.';
       el.style.display = 'block';
       return;
     }
