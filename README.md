@@ -58,6 +58,7 @@ Exactly one of B or C should be filled per row.
 | `date` | Plain text | Text input with `DD.MM.YYYY` format validation |
 | `unit` | Plain text | Dropdown of allowed values from Handbook `D12:D40` |
 | `origin` | Plain text | Dropdown of allowed values from Handbook `E12:E40` |
+| `marital-status` | Plain text | Dropdown of allowed values from Handbook `F12:F40` |
 | `*-table` | Decoded mini-table | Row/column editor with add & delete |
 
 ### `*-table` encoding format
@@ -96,8 +97,7 @@ Same behaviour as `unit`, but the allowed values come from Handbook `E12:E40`.
 ## Web editor features
 
 - **List view** — full-screen table with all columns and data
-- **Filtering** — debounced live filter input above each `text`, `date`, and `unit` column; supports plain text and regular expressions (toggle per column)
-- **Empty-cell filter** — dropdown above each `*-table` column: All / Empty / Not empty
+- **Filtering** — debounced live filter input above every column; supports plain text and regular expressions (toggle per session); for `image` columns the search matches the raw Drive URL/ID (`""` to filter empty); for `*-table` columns the search runs against the raw encoded cell content, so any sub-field value is matched
 - **Add person** — appends a new empty row and opens it in the edit view immediately (edit mode only)
 - **Delete** — red "Delete" button in the edit view moves the record to the `Trash` sheet (edit mode only; not available for unsaved new rows)
 - **Column visibility** — "Columns ▾" button to hide/show individual columns; first column is always visible
@@ -166,6 +166,7 @@ Exports run in automatic batches capped at `EXPORT_TIME_LIMIT_MS` (5 minutes) to
 | `HANDBOOK_CORR_RANGE` | `'A12:C40'` | Range of the placeholder correspondence table |
 | `HANDBOOK_UNIT_RANGE` | `'D12:D40'` | Range of allowed values for `unit`-type columns |
 | `HANDBOOK_ORIGIN_RANGE` | `'E12:E40'` | Range of allowed values for `origin`-type columns |
+| `HANDBOOK_MARITAL_STATUS_RANGE` | `'F12:F40'` | Range of allowed values for `marital-status`-type columns |
 | `F1_TEMPLATE_ID` | — | Google Docs template ID for F-1 export |
 | `WC_TEMPLATE_ID` | — | Google Docs template ID for Wanted Card export |
 | `EXPORT_FOLDER_ID` | — | Google Drive folder ID for exported documents |

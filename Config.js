@@ -18,6 +18,9 @@ const HANDBOOK_UNIT_RANGE = 'D12:D40';
 // Handbook layout — allowed values for "origin" type columns
 const HANDBOOK_ORIGIN_RANGE = 'E12:E40';
 
+// Handbook layout — allowed values for "marital-status" type columns
+const HANDBOOK_MARITAL_STATUS_RANGE = 'F12:F40';
+
 // Database column names
 const COL_DRAFT_DATE = 'Дата призову';
 const COL_SERVICE_HISTORY = 'Проходження служби';

@@ -7,7 +7,7 @@
   let editingRow = null;   // row object open in the edit view
   let pendingValues = null; // newValues[] staged by saveRow(), consumed by onSaveSuccess()
   let hiddenColumns = new Set(); // column indices hidden by the user
-  let imageCache = {};     // fileId → base64 data URL (or null on error)
+  let imageCache = {};     // fileId → { type:'image', dataUrl } | { type:'pdf', viewUrl } | null
   let pendingImages = new Set(); // fileIds currently being fetched to avoid duplicate requests
   let isNewRow = false;    // true when the edit view holds a freshly appended row
   let useRegex = false;    // true when filter inputs are treated as regular expressions
@@ -152,25 +152,13 @@
       fth.dataset.colIndex = i;
       var fDiv = document.createElement('div');
       fDiv.className = 'cell-content';
-      if (col.type === 'text' || col.type === 'unit' || col.type === 'origin' || col.type === 'date') {
+      if (col.type === 'text' || col.type === 'unit' || col.type === 'origin' || col.type === 'date' || col.type === 'marital-status' || col.type === 'image' || isTableType(col)) {
         var input = document.createElement('input');
         input.type = 'text';
         input.placeholder = 'Filter';
         input.dataset.colIndex = i;
         input.addEventListener('input', debounce(applyFilters, schema.filterDebounceMs));
         fDiv.appendChild(input);
-      } else if (isTableType(col)) {
-        var sel = document.createElement('select');
-        sel.dataset.colIndex = i;
-        sel.dataset.tableFilter = '1';
-        [['', 'All'], ['empty', 'Empty'], ['not-empty', 'Not empty']].forEach(function(opt) {
-          var o = document.createElement('option');
-          o.value = opt[0];
-          o.textContent = opt[1];
-          sel.appendChild(o);
-        });
-        sel.addEventListener('change', function() { setTimeout(applyFilters, 0); });
-        fDiv.appendChild(sel);
       }
       fth.appendChild(fDiv);
       filterRow.appendChild(fth);
@@ -195,11 +183,6 @@
         filters[inp.dataset.colIndex] = val.toLowerCase();
       }
     });
-    document.querySelectorAll('#filter-row select[data-table-filter]').forEach(function(sel) {
-      if (sel.value === 'empty') filters[sel.dataset.colIndex] = { empty: true };
-      else if (sel.value === 'not-empty') filters[sel.dataset.colIndex] = { notEmpty: true };
-    });
-
     filteredRows = schema.rows.filter(function(row) {
       return Object.keys(filters).every(function(colIdx) {
         var cell = row.values[colIdx] || '';
@@ -240,18 +223,23 @@
         } else if (col.type === 'image') {
           var id = extractDriveId(val);
           if (id) {
-            var img = document.createElement('img');
-            img.className = 'thumb';
-            img.alt = '';
-            if (imageCache[id]) {
-              img.src = imageCache[id];
+            var cached = imageCache[id];
+            if (cached && cached.type !== 'image') {
+              cell.appendChild(buildFileBadge(cached.type, cached.viewUrl));
             } else {
-              img.dataset.fileId = id; // picked up by queueImageFetch()
+              var img = document.createElement('img');
+              img.className = 'thumb';
+              img.alt = '';
+              if (cached && cached.type === 'image') {
+                img.src = cached.dataUrl;
+              } else {
+                img.dataset.fileId = id; // picked up by queueImageFetch()
+              }
+              (function(fileId) {
+                img.addEventListener('click', function() { openLightbox(fileId); });
+              })(id);
+              cell.appendChild(img);
             }
-            (function(fileId) {
-              img.addEventListener('click', function() { openLightbox(fileId); });
-            })(id);
-            cell.appendChild(img);
           } else {
             var span = document.createElement('span');
             span.className = 'no-image';
@@ -284,6 +272,21 @@
   }
 
   /**
+   * Creates a styled PDF badge anchor element that opens the given Drive URL.
+   * @param {string} viewUrl
+   * @returns {HTMLAnchorElement}
+   */
+  function buildFileBadge(type, viewUrl) {
+    var a = document.createElement('a');
+    a.href = viewUrl;
+    a.target = '_blank';
+    a.rel = 'noopener noreferrer';
+    a.className = 'pdf-link' + (type === 'folder' ? ' pdf-link--folder' : '');
+    a.textContent = type === 'folder' ? 'Folder' : 'PDF';
+    return a;
+  }
+
+  /**
    * Finds all img elements tagged with data-file-id (not yet loaded) and fires
    * one google.script.run call per unique file ID. Results are stored in imageCache
    * and the img src is updated when the response arrives. Uses pendingImages to
@@ -296,15 +299,18 @@
       pendingImages.add(id);
       (function(fileId) {
         google.script.run
-          .withSuccessHandler(function(dataUrls) {
+          .withSuccessHandler(function(results) {
             pendingImages.delete(fileId);
-            imageCache[fileId] = dataUrls[fileId] || null;
-            if (dataUrls[fileId]) {
-              document.querySelectorAll('img[data-file-id="' + fileId + '"]').forEach(function(el) {
-                el.src = dataUrls[fileId];
-                el.removeAttribute('data-file-id');
-              });
-            }
+            var result = results[fileId] || null;
+            imageCache[fileId] = result;
+            document.querySelectorAll('img[data-file-id="' + fileId + '"]').forEach(function(el) {
+              el.removeAttribute('data-file-id');
+              if (result && result.type === 'image') {
+                el.src = result.dataUrl;
+              } else if (result && result.type !== 'image') {
+                el.parentNode.replaceChild(buildFileBadge(result.type, result.viewUrl), el);
+              }
+            });
           })
           .withFailureHandler(function() { pendingImages.delete(fileId); })
           .getImagesDataUrls([fileId]);
@@ -405,7 +411,7 @@
    * Must be called after the table is visible (offsetHeight requires layout).
    */
   function updateStickyOffsets() {
-    var filterHeight = document.getElementById('filter-row').offsetHeight;
+    var filterHeight = document.getElementById('filter-row').getBoundingClientRect().height;
     document.querySelectorAll('#header-row th').forEach(function(th) {
       th.style.top = filterHeight + 'px';
     });
@@ -425,6 +431,8 @@
     if (!url) return null;
     var m = url.match(/\/file\/d\/([a-zA-Z0-9_-]+)/);
     if (m) return m[1];
+    m = url.match(/\/drive\/folders\/([a-zA-Z0-9_-]+)/);
+    if (m) return m[1];
     m = url.match(/[?&]id=([a-zA-Z0-9_-]+)/);
     if (m) return m[1];
     if (/^[a-zA-Z0-9_-]{10,}$/.test(url.trim())) return url.trim();
@@ -438,15 +446,32 @@
    * @param {string} fileId - Google Drive file ID.
    */
   function openLightbox(fileId) {
+    var cached = imageCache[fileId];
+    if (cached && cached.type !== 'image') {
+      window.open(cached.viewUrl, '_blank', 'noopener,noreferrer');
+      return;
+    }
+    var lightbox = document.getElementById('lightbox');
     var imgEl = document.getElementById('lightbox-img');
-    document.getElementById('lightbox').style.display = 'flex';
-    if (imageCache[fileId]) {
-      imgEl.src = imageCache[fileId];
+    var pdfMsg = lightbox.querySelector('.lightbox-pdf-msg');
+    lightbox.style.display = 'flex';
+    pdfMsg.style.display = 'none';
+    imgEl.style.display = '';
+    if (cached && cached.type === 'image') {
+      imgEl.src = cached.dataUrl;
     } else {
       imgEl.src = '';
       google.script.run
-        .withSuccessHandler(function(dataUrls) {
-          if (dataUrls[fileId]) { imageCache[fileId] = dataUrls[fileId]; imgEl.src = dataUrls[fileId]; }
+        .withSuccessHandler(function(results) {
+          var result = results[fileId] || null;
+          imageCache[fileId] = result;
+          if (result && result.type === 'image') {
+            imgEl.src = result.dataUrl;
+          } else if (result && result.type !== 'image') {
+            imgEl.style.display = 'none';
+            pdfMsg.querySelector('a').href = result.viewUrl;
+            pdfMsg.style.display = 'flex';
+          }
         })
         .withFailureHandler(function() {})
         .getImagesDataUrls([fileId]);
@@ -518,6 +543,28 @@
         }
         sel.value = currentVal;
         block.appendChild(sel);
+      } else if (col.type === 'marital-status') {
+        var currentVal = row.values[i] || '';
+        var sel = document.createElement('select');
+        sel.dataset.colIndex = i;
+        var emptyOpt = document.createElement('option');
+        emptyOpt.value = '';
+        emptyOpt.textContent = '—';
+        sel.appendChild(emptyOpt);
+        (col.maritalStatusOptions || []).forEach(function(opt) {
+          var o = document.createElement('option');
+          o.value = opt;
+          o.textContent = opt;
+          sel.appendChild(o);
+        });
+        if (currentVal && (col.maritalStatusOptions || []).indexOf(currentVal) === -1) {
+          var o = document.createElement('option');
+          o.value = currentVal;
+          o.textContent = currentVal;
+          sel.appendChild(o);
+        }
+        sel.value = currentVal;
+        block.appendChild(sel);
       } else if (col.type === 'date') {
         var input = document.createElement('input');
         input.type = 'text';
@@ -556,14 +603,25 @@
           var preview = document.createElement('img');
           preview.className = 'edit-preview';
           preview.alt = '';
-          updatePreview(preview, input.value);
-          block.appendChild(preview);
 
-          (function(inp, prev) {
+          var pdfPreview = document.createElement('div');
+          pdfPreview.className = 'edit-preview-pdf';
+          pdfPreview.style.display = 'none';
+          var pdfA = document.createElement('a');
+          pdfA.target = '_blank';
+          pdfA.rel = 'noopener noreferrer';
+          pdfA.textContent = 'Open PDF in Drive';
+          pdfPreview.appendChild(pdfA);
+
+          block.appendChild(preview);
+          block.appendChild(pdfPreview);
+          updatePreview(preview, pdfPreview, input.value);
+
+          (function(inp, prev, pdfPrev) {
             inp.addEventListener('input', function() {
-              updatePreview(prev, inp.value);
+              updatePreview(prev, pdfPrev, inp.value);
             });
-          })(input, preview);
+          })(input, preview, pdfPreview);
         }
       }
 
@@ -587,21 +645,50 @@
    * @param {HTMLImageElement} imgEl - The preview img element to update.
    * @param {string} url - The Google Drive URL or file ID entered by the user.
    */
-  function updatePreview(imgEl, url) {
+  function updatePreview(imgEl, pdfEl, url) {
     var id = extractDriveId(url);
-    if (!id) { imgEl.src = ''; imgEl.style.display = 'none'; return; }
-    imgEl.style.display = 'block';
-    if (imageCache[id]) {
-      imgEl.src = imageCache[id];
-    } else {
-      imgEl.src = '';
-      google.script.run
-        .withSuccessHandler(function(dataUrls) {
-          if (dataUrls[id]) { imageCache[id] = dataUrls[id]; imgEl.src = dataUrls[id]; }
-        })
-        .withFailureHandler(function() {})
-        .getImagesDataUrls([id]);
+    if (!id) {
+      imgEl.src = ''; imgEl.style.display = 'none';
+      pdfEl.style.display = 'none';
+      return;
     }
+    var cached = imageCache[id];
+    if (cached) {
+      if (cached.type === 'image') {
+        pdfEl.style.display = 'none';
+        imgEl.style.display = 'block';
+        imgEl.src = cached.dataUrl;
+      } else {
+        imgEl.src = ''; imgEl.style.display = 'none';
+        var link = pdfEl.querySelector('a');
+        link.href = cached.viewUrl;
+        link.textContent = cached.type === 'folder' ? 'Open Folder in Drive' : 'Open PDF in Drive';
+        pdfEl.style.display = 'block';
+      }
+      return;
+    }
+    imgEl.src = ''; imgEl.style.display = 'block';
+    pdfEl.style.display = 'none';
+    google.script.run
+      .withSuccessHandler(function(results) {
+        var result = results[id] || null;
+        imageCache[id] = result;
+        if (result && result.type === 'image') {
+          imgEl.src = result.dataUrl;
+          imgEl.style.display = 'block';
+          pdfEl.style.display = 'none';
+        } else if (result) {
+          imgEl.src = ''; imgEl.style.display = 'none';
+          var link = pdfEl.querySelector('a');
+          link.href = result.viewUrl;
+          link.textContent = result.type === 'folder' ? 'Open Folder in Drive' : 'Open PDF in Drive';
+          pdfEl.style.display = 'block';
+        } else {
+          imgEl.style.display = 'none';
+        }
+      })
+      .withFailureHandler(function() { imgEl.style.display = 'none'; })
+      .getImagesDataUrls([id]);
   }
 
   /**

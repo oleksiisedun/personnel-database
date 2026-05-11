@@ -113,28 +113,43 @@ function getSchemaAndData() {
     if (col.type === 'origin') col.originOptions = originOptions;
   });
 
+  let maritalStatusOptions = [];
+  if (handbookSheet) {
+    maritalStatusOptions = handbookSheet.getRange(HANDBOOK_MARITAL_STATUS_RANGE).getValues()
+      .map(r => String(r[0])).filter(v => v !== '');
+  }
+  columns.forEach(col => {
+    if (col.type === 'marital-status') col.maritalStatusOptions = maritalStatusOptions;
+  });
+
   return { columns, rows, editMode: getEditMode(), filterDebounceMs: FILTER_DEBOUNCE_MS };
 }
 
 /**
- * Fetches Google Drive files by ID server-side and returns them as base64
- * data URLs. Running server-side means the script owner's OAuth token is used,
- * so all editor users can view images regardless of their own Drive session.
- * Files that cannot be accessed (wrong ID, no permission) are returned as null.
- *
- * Called once per image from the client to keep individual response payloads
- * small and avoid HtmlService JSON size limits.
+ * Fetches Google Drive files by ID server-side. Images are returned as base64
+ * data URLs; PDFs are returned as view URLs (no blob download). Running
+ * server-side means the script owner's OAuth token is used, so all editor
+ * users can view files regardless of their own Drive session.
  *
  * @param {string[]} fileIds - Array of Google Drive file IDs to fetch.
- * @returns {Object.<string, string|null>} Map of fileId → data URL (or null on error).
+ * @returns {Object.<string, {type:string, dataUrl?:string, viewUrl?:string}|null>}
+ *   Map of fileId → { type:'image', dataUrl } | { type:'pdf', viewUrl } | null on error.
  */
 function getImagesDataUrls(fileIds) {
   const result = {};
   fileIds.forEach(fileId => {
     if (!fileId) return;
     try {
-      const blob = DriveApp.getFileById(fileId).getBlob();
-      result[fileId] = `data:${blob.getContentType() || 'image/jpeg'};base64,${Utilities.base64Encode(blob.getBytes())}`;
+      const file = DriveApp.getFileById(fileId);
+      const mimeType = file.getMimeType();
+      if (mimeType === 'application/pdf') {
+        result[fileId] = { type: 'pdf', viewUrl: 'https://drive.google.com/file/d/' + fileId + '/view' };
+      } else if (mimeType === 'application/vnd.google-apps.folder') {
+        result[fileId] = { type: 'folder', viewUrl: 'https://drive.google.com/drive/folders/' + fileId };
+      } else {
+        const blob = file.getBlob();
+        result[fileId] = { type: 'image', dataUrl: 'data:' + (mimeType || 'image/jpeg') + ';base64,' + Utilities.base64Encode(blob.getBytes()) };
+      }
     } catch (e) {
       result[fileId] = null;
     }
