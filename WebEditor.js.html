@@ -16,8 +16,8 @@
   const ROW_SEP = '\n';
 
   function debounce(fn, delay) {
-    var timer;
-    return function() { clearTimeout(timer); timer = setTimeout(fn, delay); };
+    let timer;
+    return () => { clearTimeout(timer); timer = setTimeout(fn, delay); };
   }
 
   /**
@@ -60,36 +60,35 @@
    * initial data load from the server via google.script.run.
    */
   function init() {
-    document.getElementById('btn-back').addEventListener('click', function() {
+    document.getElementById('btn-back').addEventListener('click', () => {
       isNewRow = false;
       showView('list');
     });
     document.getElementById('btn-save').addEventListener('click', saveRow);
     document.getElementById('btn-delete').addEventListener('click', deletePerson);
-    document.getElementById('lightbox').addEventListener('click', function() {
+    document.getElementById('lightbox').addEventListener('click', () => {
       document.getElementById('lightbox').style.display = 'none';
     });
-    document.getElementById('chk-regex').addEventListener('change', function() {
-      useRegex = this.checked;
+    const chkRegex = document.getElementById('chk-regex');
+    chkRegex.addEventListener('change', () => {
+      useRegex = chkRegex.checked;
       setTimeout(applyFilters, 0);
     });
-    var addBtn = document.getElementById('btn-add-person');
+    const addBtn = document.getElementById('btn-add-person');
     if (addBtn) addBtn.addEventListener('click', addPerson);
-    document.getElementById('btn-export-f1').addEventListener('click', function() { runExport('btn-export-f1', 'exportF1'); });
-    document.getElementById('btn-export-wc').addEventListener('click', function() { runExport('btn-export-wc', 'exportWC'); });
-    document.getElementById('btn-export-close').addEventListener('click', function() {
+    document.getElementById('btn-export-f1').addEventListener('click', () => runExport('btn-export-f1', 'exportF1'));
+    document.getElementById('btn-export-wc').addEventListener('click', () => runExport('btn-export-wc', 'exportWC'));
+    document.getElementById('btn-export-close').addEventListener('click', () => {
       document.getElementById('export-overlay').style.display = 'none';
     });
-    document.getElementById('btn-columns').addEventListener('click', function(e) {
+    document.getElementById('btn-columns').addEventListener('click', e => {
       e.stopPropagation();
-      var panel = document.getElementById('col-panel');
+      const panel = document.getElementById('col-panel');
       panel.style.display = panel.style.display === 'none' ? 'block' : 'none';
     });
     // Prevent clicks inside the panel from closing it via the document listener below.
-    document.getElementById('col-panel').addEventListener('click', function(e) {
-      e.stopPropagation();
-    });
-    document.addEventListener('click', function() {
+    document.getElementById('col-panel').addEventListener('click', e => e.stopPropagation());
+    document.addEventListener('click', () => {
       document.getElementById('col-panel').style.display = 'none';
     });
 
@@ -121,8 +120,8 @@
    */
   function onLoadError(err) {
     document.getElementById('loading').style.display = 'none';
-    var el = document.getElementById('error-msg');
-    el.textContent = 'Error loading data: ' + (err.message || err);
+    const el = document.getElementById('error-msg');
+    el.textContent = `Error loading data: ${err.message || err}`;
     el.style.display = 'block';
   }
 
@@ -132,15 +131,15 @@
    * visibility panel. Called once after schema is loaded.
    */
   function buildListView() {
-    var filterRow = document.getElementById('filter-row');
-    var headerRow = document.getElementById('header-row');
+    const filterRow = document.getElementById('filter-row');
+    const headerRow = document.getElementById('header-row');
     filterRow.innerHTML = '';
     headerRow.innerHTML = '';
 
-    schema.columns.forEach(function(col, i) {
-      var th = document.createElement('th');
+    schema.columns.forEach((col, i) => {
+      const th = document.createElement('th');
       th.dataset.colIndex = i;
-      var hDiv = document.createElement('div');
+      const hDiv = document.createElement('div');
       hDiv.className = 'cell-content';
       if (col.type === 'image') hDiv.classList.add('cell-content--image');
       if (isTableType(col)) hDiv.classList.add('cell-content--table');
@@ -148,12 +147,12 @@
       th.appendChild(hDiv);
       headerRow.appendChild(th);
 
-      var fth = document.createElement('th');
+      const fth = document.createElement('th');
       fth.dataset.colIndex = i;
-      var fDiv = document.createElement('div');
+      const fDiv = document.createElement('div');
       fDiv.className = 'cell-content';
       if (col.type === 'text' || col.type === 'unit' || col.type === 'origin' || col.type === 'date' || col.type === 'tin' || col.type === 'marital-status' || col.type === 'image' || isTableType(col)) {
-        var input = document.createElement('input');
+        const input = document.createElement('input');
         input.type = 'text';
         input.placeholder = 'Filter';
         input.dataset.colIndex = i;
@@ -171,9 +170,9 @@
    * and re-renders the table body. Called on every filter input change.
    */
   function applyFilters() {
-    var filters = {};
-    document.querySelectorAll('#filter-row input[type=text]').forEach(function(inp) {
-      var val = inp.value.trim();
+    const filters = {};
+    document.querySelectorAll('#filter-row input[type=text]').forEach(inp => {
+      const val = inp.value.trim();
       if (!val) return;
       if (val === '""' || val === "''") {
         filters[inp.dataset.colIndex] = { empty: true };
@@ -183,15 +182,15 @@
         filters[inp.dataset.colIndex] = val.toLowerCase();
       }
     });
-    filteredRows = schema.rows.filter(function(row) {
-      return Object.keys(filters).every(function(colIdx) {
-        var cell = row.values[colIdx] || '';
-        var f = filters[colIdx];
-        if (f && f.empty) return !cell.trim();
-        if (f && f.notEmpty) return !!cell.trim();
+    filteredRows = schema.rows.filter(row =>
+      Object.keys(filters).every(colIdx => {
+        const cell = row.values[colIdx] || '';
+        const f = filters[colIdx];
+        if (f?.empty) return !cell.trim();
+        if (f?.notEmpty) return !!cell.trim();
         return useRegex ? f.test(cell) : cell.toLowerCase().includes(f);
-      });
-    });
+      })
+    );
 
     renderList();
   }
@@ -203,17 +202,17 @@
    * after the DOM is updated.
    */
   function renderList() {
-    var tbody = document.getElementById('table-body');
+    const tbody = document.getElementById('table-body');
     tbody.innerHTML = '';
 
-    filteredRows.forEach(function(row) {
-      var tr = document.createElement('tr');
-      row.values.forEach(function(val, i) {
-        var td = document.createElement('td');
+    filteredRows.forEach(row => {
+      const tr = document.createElement('tr');
+      row.values.forEach((val, i) => {
+        const td = document.createElement('td');
         td.dataset.colIndex = i;
-        var col = schema.columns[i];
+        const col = schema.columns[i];
 
-        var cell = document.createElement('div');
+        const cell = document.createElement('div');
         cell.className = 'cell-content';
 
         if (col.type === 'image') cell.classList.add('cell-content--image');
@@ -221,42 +220,38 @@
           cell.classList.add('cell-content--table');
           cell.appendChild(buildMiniTable(parseData(val, col.tableHeaders || []), col.tableHeaders || []));
         } else if (col.type === 'image') {
-          var id = extractDriveId(val);
+          const id = extractDriveId(val);
           if (id) {
-            var cached = imageCache[id];
+            const cached = imageCache[id];
             if (cached && cached.type !== 'image') {
               cell.appendChild(buildFileBadge(cached.type, cached.viewUrl));
             } else {
-              var img = document.createElement('img');
+              const img = document.createElement('img');
               img.className = 'thumb';
               img.alt = '';
-              if (cached && cached.type === 'image') {
+              if (cached?.type === 'image') {
                 img.src = cached.dataUrl;
               } else {
                 img.dataset.fileId = id; // picked up by queueImageFetch()
               }
-              (function(fileId) {
-                img.addEventListener('click', function() { openLightbox(fileId); });
-              })(id);
+              img.addEventListener('click', () => openLightbox(id));
               cell.appendChild(img);
             }
           } else {
-            var span = document.createElement('span');
+            const span = document.createElement('span');
             span.className = 'no-image';
             span.textContent = '—';
             cell.appendChild(span);
           }
         } else if (i === 0 && schema.editMode) {
-          var a = document.createElement('a');
+          const a = document.createElement('a');
           a.className = 'name-link';
           a.href = '#';
           a.textContent = val;
-          (function(r) {
-            a.addEventListener('click', function(e) {
-              e.preventDefault();
-              openEditView(r);
-            });
-          })(row);
+          a.addEventListener('click', e => {
+            e.preventDefault();
+            openEditView(row);
+          });
           cell.appendChild(a);
         } else {
           cell.textContent = val;
@@ -272,12 +267,19 @@
   }
 
   /**
-   * Creates a styled PDF badge anchor element that opens the given Drive URL.
-   * @param {string} viewUrl
-   * @returns {HTMLAnchorElement}
+   * Creates a badge element for non-image Drive files (PDF, folder, no-access).
+   * @param {string} type - 'pdf' | 'folder' | 'no-access'
+   * @param {string} [viewUrl]
+   * @returns {HTMLElement}
    */
   function buildFileBadge(type, viewUrl) {
-    var a = document.createElement('a');
+    if (type === 'no-access') {
+      const span = document.createElement('span');
+      span.className = 'pdf-link pdf-link--no-access';
+      span.textContent = 'No access';
+      return span;
+    }
+    const a = document.createElement('a');
     a.href = viewUrl;
     a.target = '_blank';
     a.rel = 'noopener noreferrer';
@@ -293,29 +295,46 @@
    * prevent duplicate in-flight requests for the same file.
    */
   function queueImageFetch() {
-    document.querySelectorAll('img[data-file-id]').forEach(function(img) {
-      var id = img.dataset.fileId;
+    const ids = [];
+    document.querySelectorAll('img[data-file-id]').forEach(img => {
+      const id = img.dataset.fileId;
       if (!id || pendingImages.has(id)) return;
       pendingImages.add(id);
-      (function(fileId) {
-        google.script.run
-          .withSuccessHandler(function(results) {
+      ids.push(id);
+    });
+    if (!ids.length) return;
+    const batchSize = schema.imageFetchBatchSize;
+    const concurrency = schema.imageFetchConcurrency;
+    let offset = 0;
+    const fetchNext = () => {
+      if (offset >= ids.length) return;
+      const batch = ids.slice(offset, offset + batchSize);
+      offset += batchSize;
+      google.script.run
+        .withSuccessHandler(results => {
+          batch.forEach(fileId => {
             pendingImages.delete(fileId);
-            var result = results[fileId] || null;
+            const result = results[fileId] ?? null;
             imageCache[fileId] = result;
-            document.querySelectorAll('img[data-file-id="' + fileId + '"]').forEach(function(el) {
+            document.querySelectorAll(`img[data-file-id="${fileId}"]`).forEach(el => {
               el.removeAttribute('data-file-id');
-              if (result && result.type === 'image') {
+              if (result?.type === 'image') {
                 el.src = result.dataUrl;
-              } else if (result && result.type !== 'image') {
+              } else if (result) {
                 el.parentNode.replaceChild(buildFileBadge(result.type, result.viewUrl), el);
               }
             });
-          })
-          .withFailureHandler(function() { pendingImages.delete(fileId); })
-          .getImagesDataUrls([fileId]);
-      })(id);
-    });
+          });
+          fetchNext();
+        })
+        .withFailureHandler(() => {
+          batch.forEach(fileId => pendingImages.delete(fileId));
+          fetchNext();
+        })
+        .getImagesDataUrls(batch);
+    };
+    const workers = Math.min(concurrency, Math.ceil(ids.length / batchSize));
+    for (let i = 0; i < workers; i++) fetchNext();
   }
 
   /**
@@ -324,21 +343,21 @@
    * Rebuilds the panel from scratch each time schema changes.
    */
   function buildColumnPanel() {
-    var panel = document.getElementById('col-panel');
+    const panel = document.getElementById('col-panel');
     panel.innerHTML = '';
 
-    var allLabel = document.createElement('label');
+    const allLabel = document.createElement('label');
     allLabel.style.cssText = 'font-weight:600; padding-bottom:6px; margin-bottom:4px; border-bottom:1px solid #eee;';
-    var allCb = document.createElement('input');
+    const allCb = document.createElement('input');
     allCb.type = 'checkbox';
     allCb.id = 'col-select-all';
-    allCb.addEventListener('change', function() {
-      schema.columns.forEach(function(col, i) {
+    allCb.addEventListener('change', () => {
+      schema.columns.forEach((col, i) => {
         if (i === 0) return;
         if (allCb.checked) hiddenColumns.delete(i);
         else hiddenColumns.add(i);
       });
-      panel.querySelectorAll('input[data-cb-col]').forEach(function(cb) {
+      panel.querySelectorAll('input[data-cb-col]').forEach(cb => {
         if (parseInt(cb.dataset.cbCol) !== 0) cb.checked = allCb.checked;
       });
       applyColumnVisibility();
@@ -347,26 +366,24 @@
     allLabel.appendChild(document.createTextNode(' Select all'));
     panel.appendChild(allLabel);
 
-    schema.columns.forEach(function(col, i) {
-      var label = document.createElement('label');
-      var cb = document.createElement('input');
+    schema.columns.forEach((col, i) => {
+      const label = document.createElement('label');
+      const cb = document.createElement('input');
       cb.type = 'checkbox';
       cb.checked = !hiddenColumns.has(i);
       cb.dataset.cbCol = i;
       if (i === 0) {
         cb.disabled = true;
       } else {
-        (function(idx) {
-          cb.addEventListener('change', function() {
-            if (this.checked) hiddenColumns.delete(idx);
-            else hiddenColumns.add(idx);
-            updateSelectAll();
-            applyColumnVisibility();
-          });
-        })(i);
+        cb.addEventListener('change', () => {
+          if (cb.checked) hiddenColumns.delete(i);
+          else hiddenColumns.add(i);
+          updateSelectAll();
+          applyColumnVisibility();
+        });
       }
       label.appendChild(cb);
-      label.appendChild(document.createTextNode(' ' + col.name));
+      label.appendChild(document.createTextNode(` ${col.name}`));
       panel.appendChild(label);
     });
 
@@ -378,13 +395,13 @@
    * to reflect how many non-first columns are currently visible.
    */
   function updateSelectAll() {
-    var allCb = document.getElementById('col-select-all');
+    const allCb = document.getElementById('col-select-all');
     if (!allCb || schema.columns.length <= 1) return;
-    var hiddenCount = 0;
-    schema.columns.forEach(function(col, i) {
+    let hiddenCount = 0;
+    schema.columns.forEach((col, i) => {
       if (i !== 0 && hiddenColumns.has(i)) hiddenCount++;
     });
-    var total = schema.columns.length - 1;
+    const total = schema.columns.length - 1;
     if (hiddenCount === 0) {
       allCb.checked = true; allCb.indeterminate = false;
     } else if (hiddenCount === total) {
@@ -400,7 +417,7 @@
    * in sync.
    */
   function applyColumnVisibility() {
-    document.querySelectorAll('#data-table th[data-col-index], #data-table td[data-col-index]').forEach(function(el) {
+    document.querySelectorAll('#data-table th[data-col-index], #data-table td[data-col-index]').forEach(el => {
       el.style.display = hiddenColumns.has(parseInt(el.dataset.colIndex)) ? 'none' : '';
     });
   }
@@ -411,9 +428,9 @@
    * Must be called after the table is visible (offsetHeight requires layout).
    */
   function updateStickyOffsets() {
-    var filterHeight = document.getElementById('filter-row').getBoundingClientRect().height;
-    document.querySelectorAll('#header-row th').forEach(function(th) {
-      th.style.top = filterHeight + 'px';
+    const filterHeight = document.getElementById('filter-row').getBoundingClientRect().height;
+    document.querySelectorAll('#header-row th').forEach(th => {
+      th.style.top = `${filterHeight}px`;
     });
   }
 
@@ -429,12 +446,15 @@
    */
   function extractDriveId(url) {
     if (!url) return null;
-    var m = url.match(/\/file\/d\/([a-zA-Z0-9_-]+)/);
-    if (m) return m[1];
-    m = url.match(/\/drive\/folders\/([a-zA-Z0-9_-]+)/);
-    if (m) return m[1];
-    m = url.match(/[?&]id=([a-zA-Z0-9_-]+)/);
-    if (m) return m[1];
+    const patterns = [
+      /\/file\/d\/([a-zA-Z0-9_-]+)/,
+      /\/drive\/folders\/([a-zA-Z0-9_-]+)/,
+      /[?&]id=([a-zA-Z0-9_-]+)/,
+    ];
+    for (const pattern of patterns) {
+      const m = url.match(pattern);
+      if (m) return m[1];
+    }
     if (/^[a-zA-Z0-9_-]{10,}$/.test(url.trim())) return url.trim();
     return null;
   }
@@ -446,34 +466,37 @@
    * @param {string} fileId - Google Drive file ID.
    */
   function openLightbox(fileId) {
-    var cached = imageCache[fileId];
+    const cached = imageCache[fileId];
+    if (cached?.type === 'no-access') return;
     if (cached && cached.type !== 'image') {
       window.open(cached.viewUrl, '_blank', 'noopener,noreferrer');
       return;
     }
-    var lightbox = document.getElementById('lightbox');
-    var imgEl = document.getElementById('lightbox-img');
-    var pdfMsg = lightbox.querySelector('.lightbox-pdf-msg');
+    const lightbox = document.getElementById('lightbox');
+    const imgEl = document.getElementById('lightbox-img');
+    const pdfMsg = lightbox.querySelector('.lightbox-pdf-msg');
     lightbox.style.display = 'flex';
     pdfMsg.style.display = 'none';
     imgEl.style.display = '';
-    if (cached && cached.type === 'image') {
+    if (cached?.type === 'image') {
       imgEl.src = cached.dataUrl;
     } else {
       imgEl.src = '';
       google.script.run
-        .withSuccessHandler(function(results) {
-          var result = results[fileId] || null;
+        .withSuccessHandler(results => {
+          const result = results[fileId] ?? null;
           imageCache[fileId] = result;
-          if (result && result.type === 'image') {
+          if (result?.type === 'image') {
             imgEl.src = result.dataUrl;
-          } else if (result && result.type !== 'image') {
+          } else if (result?.type === 'no-access') {
+            lightbox.style.display = 'none';
+          } else if (result) {
             imgEl.style.display = 'none';
             pdfMsg.querySelector('a').href = result.viewUrl;
             pdfMsg.style.display = 'flex';
           }
         })
-        .withFailureHandler(function() {})
+        .withFailureHandler(() => {})
         .getImagesDataUrls([fileId]);
     }
   }
@@ -486,35 +509,35 @@
    */
   function openEditView(row) {
     editingRow = row;
-    var form = document.getElementById('edit-form');
+    const form = document.getElementById('edit-form');
     form.innerHTML = '';
 
-    schema.columns.forEach(function(col, i) {
-      var block = document.createElement('div');
+    schema.columns.forEach((col, i) => {
+      const block = document.createElement('div');
       block.className = 'field-block';
 
-      var label = document.createElement('label');
+      const label = document.createElement('label');
       label.textContent = col.name;
       block.appendChild(label);
 
       if (isTableType(col)) {
         block.appendChild(buildTableEditor(i, parseData(row.values[i] || '', col.tableHeaders || []), col.tableHeaders || []));
       } else if (col.type === 'unit') {
-        var currentVal = row.values[i] || '';
-        var sel = document.createElement('select');
+        const currentVal = row.values[i] || '';
+        const sel = document.createElement('select');
         sel.dataset.colIndex = i;
-        var emptyOpt = document.createElement('option');
+        const emptyOpt = document.createElement('option');
         emptyOpt.value = '';
         emptyOpt.textContent = '—';
         sel.appendChild(emptyOpt);
-        (col.unitOptions || []).forEach(function(opt) {
-          var o = document.createElement('option');
+        (col.unitOptions || []).forEach(opt => {
+          const o = document.createElement('option');
           o.value = opt;
           o.textContent = opt;
           sel.appendChild(o);
         });
-        if (currentVal && (col.unitOptions || []).indexOf(currentVal) === -1) {
-          var o = document.createElement('option');
+        if (currentVal && !(col.unitOptions || []).includes(currentVal)) {
+          const o = document.createElement('option');
           o.value = currentVal;
           o.textContent = currentVal;
           sel.appendChild(o);
@@ -522,21 +545,21 @@
         sel.value = currentVal;
         block.appendChild(sel);
       } else if (col.type === 'origin') {
-        var currentVal = row.values[i] || '';
-        var sel = document.createElement('select');
+        const currentVal = row.values[i] || '';
+        const sel = document.createElement('select');
         sel.dataset.colIndex = i;
-        var emptyOpt = document.createElement('option');
+        const emptyOpt = document.createElement('option');
         emptyOpt.value = '';
         emptyOpt.textContent = '—';
         sel.appendChild(emptyOpt);
-        (col.originOptions || []).forEach(function(opt) {
-          var o = document.createElement('option');
+        (col.originOptions || []).forEach(opt => {
+          const o = document.createElement('option');
           o.value = opt;
           o.textContent = opt;
           sel.appendChild(o);
         });
-        if (currentVal && (col.originOptions || []).indexOf(currentVal) === -1) {
-          var o = document.createElement('option');
+        if (currentVal && !(col.originOptions || []).includes(currentVal)) {
+          const o = document.createElement('option');
           o.value = currentVal;
           o.textContent = currentVal;
           sel.appendChild(o);
@@ -544,21 +567,21 @@
         sel.value = currentVal;
         block.appendChild(sel);
       } else if (col.type === 'marital-status') {
-        var currentVal = row.values[i] || '';
-        var sel = document.createElement('select');
+        const currentVal = row.values[i] || '';
+        const sel = document.createElement('select');
         sel.dataset.colIndex = i;
-        var emptyOpt = document.createElement('option');
+        const emptyOpt = document.createElement('option');
         emptyOpt.value = '';
         emptyOpt.textContent = '—';
         sel.appendChild(emptyOpt);
-        (col.maritalStatusOptions || []).forEach(function(opt) {
-          var o = document.createElement('option');
+        (col.maritalStatusOptions || []).forEach(opt => {
+          const o = document.createElement('option');
           o.value = opt;
           o.textContent = opt;
           sel.appendChild(o);
         });
-        if (currentVal && (col.maritalStatusOptions || []).indexOf(currentVal) === -1) {
-          var o = document.createElement('option');
+        if (currentVal && !(col.maritalStatusOptions || []).includes(currentVal)) {
+          const o = document.createElement('option');
           o.value = currentVal;
           o.textContent = currentVal;
           sel.appendChild(o);
@@ -566,70 +589,66 @@
         sel.value = currentVal;
         block.appendChild(sel);
       } else if (col.type === 'tin') {
-        var input = document.createElement('input');
+        const input = document.createElement('input');
         input.type = 'text';
         input.value = row.values[i] || '';
         input.dataset.colIndex = i;
         input.placeholder = '1234567890';
         block.appendChild(input);
 
-        var errHint = document.createElement('div');
+        const errHint = document.createElement('div');
         errHint.className = 'field-hint field-error';
         errHint.style.display = 'none';
         errHint.textContent = 'Must be exactly 10 digits';
         block.appendChild(errHint);
 
-        (function(inp, hint) {
-          inp.addEventListener('input', function() {
-            var val = inp.value.trim();
-            var valid = !val || /^\d{10}$/.test(val);
-            inp.classList.toggle('input-error', !valid);
-            hint.style.display = valid ? 'none' : 'block';
-          });
-        })(input, errHint);
+        input.addEventListener('input', () => {
+          const val = input.value.trim();
+          const valid = !val || /^\d{10}$/.test(val);
+          input.classList.toggle('input-error', !valid);
+          errHint.style.display = valid ? 'none' : 'block';
+        });
       } else if (col.type === 'date') {
-        var input = document.createElement('input');
+        const input = document.createElement('input');
         input.type = 'text';
         input.value = row.values[i] || '';
         input.dataset.colIndex = i;
         input.placeholder = 'DD.MM.YYYY';
         block.appendChild(input);
 
-        var errHint = document.createElement('div');
+        const errHint = document.createElement('div');
         errHint.className = 'field-hint field-error';
         errHint.style.display = 'none';
         errHint.textContent = 'Format: DD.MM.YYYY';
         block.appendChild(errHint);
 
-        (function(inp, hint) {
-          inp.addEventListener('input', function() {
-            var val = inp.value.trim();
-            var valid = !val || /^\d{2}\.\d{2}\.\d{4}$/.test(val);
-            inp.classList.toggle('input-error', !valid);
-            hint.style.display = valid ? 'none' : 'block';
-          });
-        })(input, errHint);
+        input.addEventListener('input', () => {
+          const val = input.value.trim();
+          const valid = !val || /^\d{2}\.\d{2}\.\d{4}$/.test(val);
+          input.classList.toggle('input-error', !valid);
+          errHint.style.display = valid ? 'none' : 'block';
+        });
       } else {
-        var input = document.createElement('input');
+        const input = document.createElement('input');
         input.type = 'text';
         input.value = row.values[i] || '';
         input.dataset.colIndex = i;
         block.appendChild(input);
 
         if (col.type === 'image') {
-          var hint = document.createElement('div');
+          const hint = document.createElement('div');
           hint.className = 'field-hint';
           hint.textContent = 'Paste a Google Drive sharing link';
           block.appendChild(hint);
 
-          var preview = document.createElement('img');
+          const preview = document.createElement('img');
           preview.className = 'edit-preview';
           preview.alt = '';
 
-          var pdfPreview = document.createElement('div');
+          const pdfPreview = document.createElement('div');
           pdfPreview.className = 'edit-preview-pdf';
           pdfPreview.style.display = 'none';
-          var pdfA = document.createElement('a');
+          const pdfA = document.createElement('a');
           pdfA.target = '_blank';
           pdfA.rel = 'noopener noreferrer';
           pdfA.textContent = 'Open PDF in Drive';
@@ -639,11 +658,7 @@
           block.appendChild(pdfPreview);
           updatePreview(preview, pdfPreview, input.value);
 
-          (function(inp, prev, pdfPrev) {
-            inp.addEventListener('input', function() {
-              updatePreview(prev, pdfPrev, inp.value);
-            });
-          })(input, preview, pdfPreview);
+          input.addEventListener('input', () => updatePreview(preview, pdfPreview, input.value));
         }
       }
 
@@ -654,7 +669,7 @@
     document.getElementById('save-error').style.display = 'none';
     document.getElementById('save-status').textContent = '';
     document.getElementById('btn-save').disabled = false;
-    var deleteBtn = document.getElementById('btn-delete');
+    const deleteBtn = document.getElementById('btn-delete');
     deleteBtn.style.display = isNewRow ? 'none' : 'inline-block';
     deleteBtn.disabled = false;
     showView('edit');
@@ -665,24 +680,31 @@
    * Extracts the file ID from the URL, shows a cached data URL immediately if
    * available, or fetches it from the server asynchronously.
    * @param {HTMLImageElement} imgEl - The preview img element to update.
+   * @param {HTMLDivElement} pdfEl - The PDF/no-access fallback container.
    * @param {string} url - The Google Drive URL or file ID entered by the user.
    */
   function updatePreview(imgEl, pdfEl, url) {
-    var id = extractDriveId(url);
+    const id = extractDriveId(url);
     if (!id) {
       imgEl.src = ''; imgEl.style.display = 'none';
       pdfEl.style.display = 'none';
       return;
     }
-    var cached = imageCache[id];
+    const cached = imageCache[id];
     if (cached) {
       if (cached.type === 'image') {
         pdfEl.style.display = 'none';
         imgEl.style.display = 'block';
         imgEl.src = cached.dataUrl;
+      } else if (cached.type === 'no-access') {
+        imgEl.src = ''; imgEl.style.display = 'none';
+        const link = pdfEl.querySelector('a');
+        link.removeAttribute('href');
+        link.textContent = 'No access to this file';
+        pdfEl.style.display = 'block';
       } else {
         imgEl.src = ''; imgEl.style.display = 'none';
-        var link = pdfEl.querySelector('a');
+        const link = pdfEl.querySelector('a');
         link.href = cached.viewUrl;
         link.textContent = cached.type === 'folder' ? 'Open Folder in Drive' : 'Open PDF in Drive';
         pdfEl.style.display = 'block';
@@ -692,16 +714,22 @@
     imgEl.src = ''; imgEl.style.display = 'block';
     pdfEl.style.display = 'none';
     google.script.run
-      .withSuccessHandler(function(results) {
-        var result = results[id] || null;
+      .withSuccessHandler(results => {
+        const result = results[id] ?? null;
         imageCache[id] = result;
-        if (result && result.type === 'image') {
+        if (result?.type === 'image') {
           imgEl.src = result.dataUrl;
           imgEl.style.display = 'block';
           pdfEl.style.display = 'none';
+        } else if (result?.type === 'no-access') {
+          imgEl.src = ''; imgEl.style.display = 'none';
+          const link = pdfEl.querySelector('a');
+          link.removeAttribute('href');
+          link.textContent = 'No access to this file';
+          pdfEl.style.display = 'block';
         } else if (result) {
           imgEl.src = ''; imgEl.style.display = 'none';
-          var link = pdfEl.querySelector('a');
+          const link = pdfEl.querySelector('a');
           link.href = result.viewUrl;
           link.textContent = result.type === 'folder' ? 'Open Folder in Drive' : 'Open PDF in Drive';
           pdfEl.style.display = 'block';
@@ -709,7 +737,7 @@
           imgEl.style.display = 'none';
         }
       })
-      .withFailureHandler(function() { imgEl.style.display = 'none'; })
+      .withFailureHandler(() => { imgEl.style.display = 'none'; })
       .getImagesDataUrls([id]);
   }
 
@@ -721,20 +749,24 @@
    * @returns {HTMLTableElement}
    */
   function buildMiniTable(rows, headers) {
-    var table = document.createElement('table');
+    const table = document.createElement('table');
     table.className = 'mini-table';
-    var thead = document.createElement('thead');
-    var trHead = document.createElement('tr');
-    (headers || []).forEach(function(h) {
-      var th = document.createElement('th'); th.textContent = h; trHead.appendChild(th);
+    const thead = document.createElement('thead');
+    const trHead = document.createElement('tr');
+    (headers || []).forEach(h => {
+      const th = document.createElement('th');
+      th.textContent = h;
+      trHead.appendChild(th);
     });
     thead.appendChild(trHead);
     table.appendChild(thead);
-    var tbody = document.createElement('tbody');
-    (rows || []).forEach(function(rowObj) {
-      var tr = document.createElement('tr');
-      (headers || []).forEach(function(h) {
-        var td = document.createElement('td'); td.textContent = rowObj[h] || ''; tr.appendChild(td);
+    const tbody = document.createElement('tbody');
+    (rows || []).forEach(rowObj => {
+      const tr = document.createElement('tr');
+      (headers || []).forEach(h => {
+        const td = document.createElement('td');
+        td.textContent = rowObj[h] || '';
+        tr.appendChild(td);
       });
       tbody.appendChild(tr);
     });
@@ -753,29 +785,29 @@
    * @returns {HTMLDivElement}
    */
   function buildTableEditor(colIndex, rows, headers) {
-    var wrapper = document.createElement('div');
+    const wrapper = document.createElement('div');
     wrapper.className = 'table-editor';
     wrapper.dataset.colIndex = colIndex;
-    var table = document.createElement('table');
-    var thead = document.createElement('thead');
-    var trHead = document.createElement('tr');
-    (headers || []).forEach(function(h) {
-      var th = document.createElement('th'); th.textContent = h; trHead.appendChild(th);
+    const table = document.createElement('table');
+    const thead = document.createElement('thead');
+    const trHead = document.createElement('tr');
+    (headers || []).forEach(h => {
+      const th = document.createElement('th');
+      th.textContent = h;
+      trHead.appendChild(th);
     });
     trHead.appendChild(document.createElement('th')); // placeholder for delete column
     thead.appendChild(trHead);
     table.appendChild(thead);
-    var tbody = document.createElement('tbody');
-    (rows || []).forEach(function(rowObj) { addTableEditorRow(tbody, headers, rowObj); });
+    const tbody = document.createElement('tbody');
+    (rows || []).forEach(rowObj => addTableEditorRow(tbody, headers, rowObj));
     table.appendChild(tbody);
     wrapper.appendChild(table);
-    var btnAdd = document.createElement('button');
+    const btnAdd = document.createElement('button');
     btnAdd.type = 'button';
     btnAdd.className = 'btn-add-row';
     btnAdd.textContent = '+ Add row';
-    (function(tb, hdrs) {
-      btnAdd.addEventListener('click', function() { addTableEditorRow(tb, hdrs, null); });
-    })(tbody, headers);
+    btnAdd.addEventListener('click', () => addTableEditorRow(tbody, headers, null));
     wrapper.appendChild(btnAdd);
     return wrapper;
   }
@@ -789,22 +821,22 @@
    * @param {Object|null} rowObj - Existing row data to pre-fill, or null for an empty row.
    */
   function addTableEditorRow(tbody, headers, rowObj) {
-    var tr = document.createElement('tr');
-    (headers || []).forEach(function(h) {
-      var td = document.createElement('td');
-      var inp = document.createElement('input');
+    const tr = document.createElement('tr');
+    (headers || []).forEach(h => {
+      const td = document.createElement('td');
+      const inp = document.createElement('input');
       inp.type = 'text';
-      inp.value = (rowObj && rowObj[h]) ? rowObj[h] : '';
+      inp.value = rowObj?.[h] ?? '';
       inp.dataset.field = h;
       td.appendChild(inp);
       tr.appendChild(td);
     });
-    var tdDel = document.createElement('td');
-    var btnDel = document.createElement('button');
+    const tdDel = document.createElement('td');
+    const btnDel = document.createElement('button');
     btnDel.type = 'button';
     btnDel.className = 'btn-delete-row';
     btnDel.textContent = '×';
-    btnDel.addEventListener('click', function() { tr.parentNode.removeChild(tr); });
+    btnDel.addEventListener('click', () => tr.remove());
     tdDel.appendChild(btnDel);
     tr.appendChild(tdDel);
     tbody.appendChild(tr);
@@ -819,12 +851,12 @@
    * @returns {string} Encoded cell value ready to write to the sheet.
    */
   function encodeTableEditor(colIndex, col) {
-    var wrapper = document.querySelector('.table-editor[data-col-index="' + colIndex + '"]');
+    const wrapper = document.querySelector(`.table-editor[data-col-index="${colIndex}"]`);
     if (!wrapper) return '';
-    var rows = [];
-    wrapper.querySelectorAll('tbody tr').forEach(function(tr) {
-      var obj = {};
-      tr.querySelectorAll('input[data-field]').forEach(function(inp) {
+    const rows = [];
+    wrapper.querySelectorAll('tbody tr').forEach(tr => {
+      const obj = {};
+      tr.querySelectorAll('input[data-field]').forEach(inp => {
         obj[inp.dataset.field] = inp.value;
       });
       rows.push(obj);
@@ -838,48 +870,48 @@
    * Disables the Save button for the duration of the async call.
    */
   function saveRow() {
-    var hasDateError = false;
-    schema.columns.forEach(function(col, i) {
+    let hasDateError = false;
+    schema.columns.forEach((col, i) => {
       if (col.type !== 'date') return;
-      var inp = document.querySelector('#edit-form input[data-col-index="' + i + '"]');
+      const inp = document.querySelector(`#edit-form input[data-col-index="${i}"]`);
       if (!inp) return;
-      var val = inp.value.trim();
-      var valid = !val || /^\d{2}\.\d{2}\.\d{4}$/.test(val);
+      const val = inp.value.trim();
+      const valid = !val || /^\d{2}\.\d{2}\.\d{4}$/.test(val);
       inp.classList.toggle('input-error', !valid);
       if (!valid) hasDateError = true;
     });
     if (hasDateError) {
-      var el = document.getElementById('save-error');
+      const el = document.getElementById('save-error');
       el.textContent = 'Fix date fields (expected format: DD.MM.YYYY) before saving.';
       el.style.display = 'block';
       return;
     }
 
-    var hasTinError = false;
-    schema.columns.forEach(function(col, i) {
+    let hasTinError = false;
+    schema.columns.forEach((col, i) => {
       if (col.type !== 'tin') return;
-      var inp = document.querySelector('#edit-form input[data-col-index="' + i + '"]');
+      const inp = document.querySelector(`#edit-form input[data-col-index="${i}"]`);
       if (!inp) return;
-      var val = inp.value.trim();
-      var valid = !val || /^\d{10}$/.test(val);
+      const val = inp.value.trim();
+      const valid = !val || /^\d{10}$/.test(val);
       inp.classList.toggle('input-error', !valid);
       if (!valid) hasTinError = true;
     });
     if (hasTinError) {
-      var el = document.getElementById('save-error');
+      const el = document.getElementById('save-error');
       el.textContent = 'TIN must be exactly 10 digits.';
       el.style.display = 'block';
       return;
     }
 
-    var newValues = new Array(schema.columns.length).fill('');
-    document.querySelectorAll('#edit-form input[data-col-index]').forEach(function(inp) {
+    const newValues = new Array(schema.columns.length).fill('');
+    document.querySelectorAll('#edit-form input[data-col-index]').forEach(inp => {
       newValues[parseInt(inp.dataset.colIndex)] = inp.value;
     });
-    document.querySelectorAll('#edit-form select[data-col-index]').forEach(function(sel) {
+    document.querySelectorAll('#edit-form select[data-col-index]').forEach(sel => {
       newValues[parseInt(sel.dataset.colIndex)] = sel.value;
     });
-    schema.columns.forEach(function(col, i) {
+    schema.columns.forEach((col, i) => {
       if (isTableType(col)) newValues[i] = encodeTableEditor(i, col);
     });
     pendingValues = newValues;
@@ -901,7 +933,7 @@
    */
   function onSaveSuccess() {
     if (pendingValues) {
-      pendingValues.forEach(function(val, i) { editingRow.values[i] = val; });
+      pendingValues.forEach((val, i) => { editingRow.values[i] = val; });
       pendingValues = null;
     }
     if (isNewRow) {
@@ -917,19 +949,19 @@
    * view for it. The row is added to schema.rows only after a successful save.
    */
   function addPerson() {
-    var btn = document.getElementById('btn-add-person');
+    const btn = document.getElementById('btn-add-person');
     btn.disabled = true;
     google.script.run
-      .withSuccessHandler(function(newRowIndex) {
-        var emptyValues = new Array(schema.columns.length).fill('');
-        var newRow = { rowIndex: newRowIndex, values: emptyValues };
+      .withSuccessHandler(newRowIndex => {
+        const emptyValues = new Array(schema.columns.length).fill('');
+        const newRow = { rowIndex: newRowIndex, values: emptyValues };
         isNewRow = true;
         openEditView(newRow);
         btn.disabled = false;
       })
-      .withFailureHandler(function(err) {
+      .withFailureHandler(err => {
         btn.disabled = false;
-        alert('Failed to add person: ' + (err.message || err));
+        alert(`Failed to add person: ${err.message || err}`);
       })
       .addRow();
   }
@@ -942,8 +974,8 @@
   function onSaveError(err) {
     document.getElementById('btn-save').disabled = false;
     document.getElementById('save-status').textContent = '';
-    var el = document.getElementById('save-error');
-    el.textContent = 'Save failed: ' + (err.message || err);
+    const el = document.getElementById('save-error');
+    el.textContent = `Save failed: ${err.message || err}`;
     el.style.display = 'block';
   }
 
@@ -967,9 +999,9 @@
    * and returns to the list view.
    */
   function onDeleteSuccess() {
-    var deletedIndex = editingRow.rowIndex;
-    schema.rows = schema.rows.filter(function(r) { return r !== editingRow; });
-    schema.rows.forEach(function(r) {
+    const deletedIndex = editingRow.rowIndex;
+    schema.rows = schema.rows.filter(r => r !== editingRow);
+    schema.rows.forEach(r => {
       if (r.rowIndex > deletedIndex) r.rowIndex--;
     });
     editingRow = null;
@@ -984,8 +1016,8 @@
   function onDeleteError(err) {
     document.getElementById('btn-delete').disabled = false;
     document.getElementById('btn-save').disabled = false;
-    var el = document.getElementById('save-error');
-    el.textContent = 'Delete failed: ' + (err.message || err);
+    const el = document.getElementById('save-error');
+    el.textContent = `Delete failed: ${err.message || err}`;
     el.style.display = 'block';
   }
 
@@ -1013,11 +1045,11 @@
       return;
     }
 
-    var total = filteredRows.length;
-    var btn = document.getElementById(btnId);
-    var ul = document.getElementById('export-links');
+    const total = filteredRows.length;
+    const btn = document.getElementById(btnId);
+    const ul = document.getElementById('export-links');
 
-    document.getElementById('export-msg').textContent = 'Exporting ' + total + ' document' + (total !== 1 ? 's' : '') + '…';
+    document.getElementById('export-msg').textContent = `Exporting ${total} document${total !== 1 ? 's' : ''}…`;
     ul.style.display = 'none';
     ul.innerHTML = '';
     document.getElementById('export-error').style.display = 'none';
@@ -1026,21 +1058,21 @@
     document.getElementById('export-overlay').style.display = 'flex';
     btn.disabled = true;
 
-    var doneCount = 0;
-    var progressBar = document.getElementById('export-progress-bar');
+    let doneCount = 0;
+    const progressBar = document.getElementById('export-progress-bar');
 
-    function setProgress(pct) {
+    const setProgress = pct => {
       progressBar.classList.remove('indeterminate');
-      progressBar.style.width = pct + '%';
-    }
+      progressBar.style.width = `${pct}%`;
+    };
 
-    function fire(indices) {
+    const fire = indices => {
       progressBar.classList.add('indeterminate');
       google.script.run
-        .withSuccessHandler(function(response) {
-          response.results.forEach(function(r) {
-            var li = document.createElement('li');
-            var a = document.createElement('a');
+        .withSuccessHandler(response => {
+          response.results.forEach(r => {
+            const li = document.createElement('li');
+            const a = document.createElement('a');
             a.href = r.url;
             a.target = '_blank';
             a.textContent = r.name;
@@ -1053,29 +1085,29 @@
 
           if (response.remaining.length > 0) {
             document.getElementById('export-msg').textContent =
-              'Exported ' + doneCount + ' of ' + total + ', continuing…';
+              `Exported ${doneCount} of ${total}, continuing…`;
             fire(response.remaining);
           } else {
             btn.disabled = false;
             document.getElementById('export-msg').textContent =
-              'Exported ' + doneCount + ' document' + (doneCount !== 1 ? 's' : '') + ':';
+              `Exported ${doneCount} document${doneCount !== 1 ? 's' : ''}:`;
             document.getElementById('btn-export-close').style.display = 'inline-block';
           }
         })
-        .withFailureHandler(function(err) {
+        .withFailureHandler(err => {
           btn.disabled = false;
           progressBar.classList.remove('indeterminate');
           document.getElementById('export-msg').textContent =
-            doneCount > 0 ? 'Exported ' + doneCount + ' before error:' : '';
-          var el = document.getElementById('export-error');
-          el.textContent = 'Export failed: ' + (err.message || err);
+            doneCount > 0 ? `Exported ${doneCount} before error:` : '';
+          const el = document.getElementById('export-error');
+          el.textContent = `Export failed: ${err.message || err}`;
           el.style.display = 'block';
           document.getElementById('btn-export-close').style.display = 'inline-block';
         })
         [serverFnName](indices);
-    }
+    };
 
-    fire(filteredRows.map(function(r) { return r.rowIndex; }));
+    fire(filteredRows.map(r => r.rowIndex));
   }
 
   document.addEventListener('DOMContentLoaded', init);

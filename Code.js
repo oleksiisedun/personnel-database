@@ -122,7 +122,8 @@ function getSchemaAndData() {
     if (col.type === 'marital-status') col.maritalStatusOptions = maritalStatusOptions;
   });
 
-  return { columns, rows, editMode: getEditMode(), filterDebounceMs: FILTER_DEBOUNCE_MS };
+  return { columns, rows, editMode: getEditMode(), filterDebounceMs: FILTER_DEBOUNCE_MS,
+           imageFetchBatchSize: IMAGE_FETCH_BATCH_SIZE, imageFetchConcurrency: IMAGE_FETCH_CONCURRENCY };
 }
 
 /**
@@ -151,7 +152,7 @@ function getImagesDataUrls(fileIds) {
         result[fileId] = { type: 'image', dataUrl: 'data:' + (mimeType || 'image/jpeg') + ';base64,' + Utilities.base64Encode(blob.getBytes()) };
       }
     } catch (e) {
-      result[fileId] = null;
+      result[fileId] = { type: 'no-access' };
     }
   });
   return result;

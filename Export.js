@@ -202,12 +202,7 @@ function _computeTotalServiceLength(data) {
   const mm = String(today.getMonth() + 1).padStart(2, '0');
   const yyyy = today.getFullYear();
 
-  return (
-    _pluralizeUk(years, 'year') + ', ' +
-    _pluralizeUk(months, 'month') + ', ' +
-    _pluralizeUk(days, 'day') +
-    ' (станом на ' + dd + '.' + mm + '.' + yyyy + ')'
-  );
+  return `${_pluralizeUk(years, 'year')}, ${_pluralizeUk(months, 'month')}, ${_pluralizeUk(days, 'day')} (станом на ${dd}.${mm}.${yyyy})`;
 }
 
 /**
@@ -234,7 +229,7 @@ function _computeContractSignDate(data) {
     if (unitMatch) unitNumber = unitMatch[1];
   }
 
-  return dateMatch[0] + ' з в/ч ' + unitNumber;
+  return `${dateMatch[0]} з в/ч ${unitNumber}`;
 }
 
 /**
@@ -298,7 +293,7 @@ function _computeChildrenNamesBirthDates(data) {
   return children.map((fields, i) => {
     const name = (fields[1] || '').trim();
     const birthDate = (fields[4] || '').trim();
-    return (i + 1) + ' дитина: ' + name + (birthDate ? ' ' + birthDate : '');
+    return `${i + 1} дитина: ${name}${birthDate ? ` ${birthDate}` : ''}`;
   }).join('\n');
 }
 
@@ -438,7 +433,7 @@ function _pluralizeUk(count, unit) {
     else if (!isTeen && mod10 >= 2 && mod10 <= 4) word = 'дні';
     else word = 'днів';
   }
-  return count + ' ' + word;
+  return `${count} ${word}`;
 }
 
 /**
@@ -454,10 +449,14 @@ function _pluralizeUk(count, unit) {
  */
 function _extractDriveId(url) {
   if (!url) return null;
-  var m = url.match(/\/file\/d\/([a-zA-Z0-9_-]+)/);
-  if (m) return m[1];
-  m = url.match(/[?&]id=([a-zA-Z0-9_-]+)/);
-  if (m) return m[1];
+  const patterns = [
+    /\/file\/d\/([a-zA-Z0-9_-]+)/,
+    /[?&]id=([a-zA-Z0-9_-]+)/,
+  ];
+  for (const pattern of patterns) {
+    const m = url.match(pattern);
+    if (m) return m[1];
+  }
   if (/^[a-zA-Z0-9_-]{10,}$/.test(url.trim())) return url.trim();
   return null;
 }

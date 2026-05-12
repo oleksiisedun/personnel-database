@@ -44,3 +44,12 @@ const IMAGE_MAX_HEIGHT = 500;
 const COLUMN_MIN_WIDTHS = { text: 150, image: 150, table: 900 };
 const COLUMN_MAX_WIDTHS = { image: 250 };
 const FILTER_DEBOUNCE_MS = 500;
+
+// Image fetch concurrency pool.
+// BATCH: how many Drive files are resolved in a single google.script.run call.
+//   Larger → fewer round trips, but bigger response payload per call.
+// CONCURRENCY: how many batches run in parallel.
+//   Raising this speeds up large lists, but too high risks Apps Script's
+//   30-concurrent-execution quota and re-introduces dropped images.
+const IMAGE_FETCH_BATCH_SIZE = 10;
+const IMAGE_FETCH_CONCURRENCY = 3;
