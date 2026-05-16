@@ -6,6 +6,8 @@ A Google Sheets–based personnel database with a built-in web editor. Data live
 
 The project is a [Google Apps Script](https://developers.google.com/apps-script) bound to a Google Spreadsheet, deployed locally with [CLASP](https://github.com/google/clasp).
 
+![Architecture](architecture.svg)
+
 | File | Purpose |
 |------|---------|
 | `Config.js` | All constants — sheet names, column names, Drive IDs, export settings |
@@ -195,6 +197,117 @@ Exports run in automatic batches capped at `EXPORT_TIME_LIMIT_MS` (5 minutes) to
 | `FILTER_DEBOUNCE_MS` | `500` | Debounce delay (ms) for filter text inputs |
 | `IMAGE_FETCH_BATCH_SIZE` | `10` | Number of Drive files resolved per `google.script.run` call |
 | `IMAGE_FETCH_CONCURRENCY` | `3` | Number of image-fetch batches running in parallel; raising it speeds up large lists but risks the Apps Script 30-concurrent-execution limit |
+
+## Call flows
+
+> Color coding: 🟣 Code.js · 🟠 Export.js · 🟢 WebEditor.js.html · ⚪ Google API
+
+### 1 · Page load
+
+```mermaid
+flowchart LR
+  doGet --> getSchema --> getRows --> getEditMode --> renderList
+  renderList --> applyFilters
+  renderList --> loadImageBatch
+
+  classDef code   fill:#EEEDFE,stroke:#534AB7,color:#26215C
+  classDef client fill:#E1F5EE,stroke:#0F6E56,color:#04342C
+
+  class doGet,getSchema,getRows,getEditMode code
+  class renderList,applyFilters,loadImageBatch client
+```
+
+### 2 · Open record
+
+```mermaid
+flowchart LR
+  rowClick[row click] --> getRow --> renderEditView
+  renderEditView --> validateField
+  renderEditView --> renderTableEditor
+
+  classDef code   fill:#EEEDFE,stroke:#534AB7,color:#26215C
+  classDef client fill:#E1F5EE,stroke:#0F6E56,color:#04342C
+
+  class getRow code
+  class rowClick,renderEditView,validateField,renderTableEditor client
+```
+
+### 3 · Save record
+
+```mermaid
+flowchart LR
+  saveRecord --> validateField
+  validateField --> saveRow --> renderList
+  validateField --> addRow  --> renderList
+
+  classDef code   fill:#EEEDFE,stroke:#534AB7,color:#26215C
+  classDef client fill:#E1F5EE,stroke:#0F6E56,color:#04342C
+
+  class saveRow,addRow code
+  class saveRecord,validateField,renderList client
+```
+
+### 4 · Delete record
+
+```mermaid
+flowchart LR
+  deleteRecord --> deleteRow --> createTrashIfMissing --> renderList
+
+  classDef code   fill:#EEEDFE,stroke:#534AB7,color:#26215C
+  classDef client fill:#E1F5EE,stroke:#0F6E56,color:#04342C
+
+  class deleteRow,createTrashIfMissing code
+  class deleteRecord,renderList client
+```
+
+### 5 · Image load
+
+```mermaid
+flowchart LR
+  renderList --> loadImageBatch --> gsr[google.script.run]
+  gsr --> fetchImageBatch --> getImageAsBase64 --> DriveApp
+
+  classDef code   fill:#EEEDFE,stroke:#534AB7,color:#26215C
+  classDef client fill:#E1F5EE,stroke:#0F6E56,color:#04342C
+  classDef api    fill:#F1EFE8,stroke:#5F5E5A,color:#2C2C2A
+
+  class fetchImageBatch,getImageAsBase64 code
+  class renderList,loadImageBatch client
+  class gsr,DriveApp api
+```
+
+### 6 · Export
+
+```mermaid
+flowchart TD
+  startExportFlow --> gsr[google.script.run]
+  gsr --> startExport --> exportBatch
+  exportBatch -->|loop ↻| exportBatch
+  exportBatch --> processRow
+
+  processRow --> replaceImages
+  processRow --> replaceText
+  processRow --> replaceServiceTable
+  processRow --> replaceCorrespondence
+
+  replaceCorrespondence --> computeValue
+  replaceCorrespondence --> getCorrespondenceTable
+
+  replaceImages         --> underlineMaritalStatus
+  replaceText           --> underlineMaritalStatus
+  replaceServiceTable   --> underlineMaritalStatus
+  replaceCorrespondence --> underlineMaritalStatus
+
+  underlineMaritalStatus --> saveToFolder --> DriveApp
+
+  classDef export fill:#FAECE7,stroke:#993C1D,color:#4A1B0C
+  classDef client fill:#E1F5EE,stroke:#0F6E56,color:#04342C
+  classDef api    fill:#F1EFE8,stroke:#5F5E5A,color:#2C2C2A
+
+  class startExport,exportBatch,processRow,replaceImages,replaceText,replaceServiceTable,replaceCorrespondence,computeValue,getCorrespondenceTable,underlineMaritalStatus,saveToFolder export
+  class startExportFlow client
+  class gsr,DriveApp api
+```
 
 ## Local development
 
