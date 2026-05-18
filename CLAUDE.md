@@ -55,10 +55,6 @@ Loading uses a **concurrency pool**: `IMAGE_FETCH_CONCURRENCY` batches of `IMAGE
 
 ## Code conventions
 
-### JavaScript — modern JS only
-
-Use ES2020+ everywhere — `const`/`let`, arrow functions, template literals, optional chaining (`?.`), nullish coalescing (`??`), `Array.includes()`, `element.remove()`. Never use `var` or old-style `function()` callbacks. Closure-capturing IIFEs (`(function(x){...})(x)`) are never needed — arrow functions in `forEach` close over `const`/`let` correctly.
-
 ### Constants — always in `Config.js`
 
 All tuneable values belong in `Config.js`. Constants needed by the client must also be threaded through the `getSchemaAndData()` return value in `Code.js` (see `filterDebounceMs`, `imageFetchBatchSize`, `imageFetchConcurrency` as examples). Never hardcode magic numbers in `WebEditor.js.html`.
