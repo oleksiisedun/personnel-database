@@ -3,23 +3,27 @@ const SHEET_DATABASE = 'Database';
 const SHEET_HANDBOOK = 'Handbook';
 const SHEET_TRASH = 'Trash';
 
-// Named cell / range addresses
-const EDIT_MODE_CELL = 'I2';
+// Handbook layout — Master Mode toggle cell and source spreadsheet IDs range
+const MASTER_MODE_CELL = 'M2';
+const MASTER_MODE_SOURCES_RANGE = 'N2:N';
 
 // Handbook layout — table-type definitions
-const HANDBOOK_TYPES_RANGE = 'A2:G10';
+const HANDBOOK_TYPES_RANGE = 'A2:K15';
 
 // Handbook layout — placeholder correspondence table
-const HANDBOOK_CORR_RANGE = 'A12:C40';
+const HANDBOOK_CORR_RANGE = 'A17:C40';
 
 // Handbook layout — allowed values for "unit" type columns
-const HANDBOOK_UNIT_RANGE = 'D12:D40';
+const HANDBOOK_UNIT_RANGE = 'D17:D40';
 
 // Handbook layout — allowed values for "origin" type columns
-const HANDBOOK_ORIGIN_RANGE = 'E12:E40';
+const HANDBOOK_ORIGIN_RANGE = 'E17:E40';
 
 // Handbook layout — allowed values for "marital-status" type columns
-const HANDBOOK_MARITAL_STATUS_RANGE = 'F12:F40';
+const HANDBOOK_MARITAL_STATUS_RANGE = 'F17:F40';
+
+// Handbook layout — allowed values for "sex" type columns
+const HANDBOOK_SEX_RANGE = 'G17:G40';
 
 // Database column names
 const COL_DRAFT_DATE = 'Дата призову';

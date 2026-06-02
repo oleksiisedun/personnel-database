@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8">
   <?!= HtmlService.createHtmlOutputFromFile('WebEditor.css').getContent(); ?>
-  <? var editMode = getEditMode(); var colMinWidths = getColumnMinWidths(); var colMaxWidths = getColumnMaxWidths(); ?>
+  <? var colMinWidths = getColumnMinWidths(); var colMaxWidths = getColumnMaxWidths(); ?>
   <style>
     :root {
       --text-min-width: <?= colMinWidths.text ?>px;
@@ -21,7 +21,7 @@
     <div id="error-msg" style="display:none"></div>
     <div id="toolbar">
       <div id="toolbar-left">
-        <? if (editMode) { ?><button id="btn-add-person">Add person</button><? } else { ?><span id="readonly-label">Read-only view</span><? } ?>
+        <button id="btn-add-person">Add person</button>
         <button id="btn-export-f1">Export F-1</button>
         <button id="btn-export-wc">Export WC</button>
       </div>

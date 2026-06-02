@@ -1,13 +1,27 @@
 /**
- * Reads the edit mode flag from Handbook!M2.
- * When true, the "Add person" button and edit view are enabled; when false the editor is read-only.
+ * Returns the list of source spreadsheet IDs from Handbook N2:N.
+ * Used by Master Mode to aggregate data from multiple spreadsheets.
+ *
+ * @returns {string[]}
+ */
+function getMasterSources() {
+  const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(SHEET_HANDBOOK);
+  if (!sheet) return [];
+  return sheet.getRange(MASTER_MODE_SOURCES_RANGE).getValues()
+    .map(r => String(r[0]).trim())
+    .filter(v => v !== '');
+}
+
+/**
+ * Reads the Master Mode toggle from Handbook!M2.
+ * When true, the webview aggregates data from all source spreadsheets listed in N2:N.
  *
  * @returns {boolean}
  */
-function getEditMode() {
+function getMasterMode() {
   const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(SHEET_HANDBOOK);
   if (!sheet) return false;
-  return sheet.getRange(EDIT_MODE_CELL).getValue() === true;
+  return sheet.getRange(MASTER_MODE_CELL).getValue() === true;
 }
 
 /**
@@ -80,6 +94,24 @@ function getSchemaAndData() {
     rows.push({ rowIndex: i + 1, values });
   }
 
+  const masterMode = getMasterMode();
+  if (masterMode) {
+    getMasterSources().forEach(spreadsheetId => {
+      try {
+        const remoteSheet = SpreadsheetApp.openById(spreadsheetId).getSheetByName(SHEET_DATABASE);
+        if (!remoteSheet) return;
+        const remoteAll = remoteSheet.getDataRange().getValues();
+        for (let i = 2; i < remoteAll.length; i++) {
+          const values = remoteAll[i].map(c => String(c == null ? '' : c));
+          if (values.every(v => v === '')) continue;
+          rows.push({ rowIndex: i + 1, values, spreadsheetId });
+        }
+      } catch (e) {
+        // skip inaccessible spreadsheets
+      }
+    });
+  }
+
   const tableHeadersMap = {};
   const handbookSheet = ss.getSheetByName(SHEET_HANDBOOK);
   if (handbookSheet) {
@@ -122,7 +154,16 @@ function getSchemaAndData() {
     if (col.type === 'marital-status') col.maritalStatusOptions = maritalStatusOptions;
   });
 
-  return { columns, rows, editMode: getEditMode(), filterDebounceMs: FILTER_DEBOUNCE_MS,
+  let sexOptions = [];
+  if (handbookSheet) {
+    sexOptions = handbookSheet.getRange(HANDBOOK_SEX_RANGE).getValues()
+      .map(r => String(r[0])).filter(v => v !== '');
+  }
+  columns.forEach(col => {
+    if (col.type === 'sex') col.sexOptions = sexOptions;
+  });
+
+  return { columns, rows, masterMode, filterDebounceMs: FILTER_DEBOUNCE_MS,
            imageFetchBatchSize: IMAGE_FETCH_BATCH_SIZE, imageFetchConcurrency: IMAGE_FETCH_CONCURRENCY };
 }
 
@@ -174,13 +215,18 @@ function addRow() {
 
 /**
  * Writes new values for a single data row back to the "Database" sheet.
+ * When spreadsheetId is provided, writes to that remote spreadsheet instead.
  *
  * @param {number} rowIndex - 1-based spreadsheet row number to update.
  * @param {string[]} values - Array of cell values, one per column.
+ * @param {string|null} spreadsheetId - Remote spreadsheet ID, or null for local.
  * @returns {boolean} Always true; thrown errors propagate to the client failure handler.
  */
-function updateRow(rowIndex, values) {
-  const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(SHEET_DATABASE);
+function updateRow(rowIndex, values, spreadsheetId) {
+  const ss = spreadsheetId
+    ? SpreadsheetApp.openById(spreadsheetId)
+    : SpreadsheetApp.getActiveSpreadsheet();
+  const sheet = ss.getSheetByName(SHEET_DATABASE);
   if (!sheet) throw new Error('Sheet "Database" not found.');
   sheet.getRange(rowIndex, 1, 1, values.length).setValues([values]);
   return true;
@@ -190,12 +236,16 @@ function updateRow(rowIndex, values) {
  * Moves a row from the "Database" sheet to the "Trash" sheet.
  * If the Trash sheet does not yet exist it is created with the same
  * header rows (rows 1 and 2) as the Database sheet.
+ * When spreadsheetId is provided, operates on that remote spreadsheet instead.
  *
  * @param {number} rowIndex - 1-based spreadsheet row number to delete.
+ * @param {string|null} spreadsheetId - Remote spreadsheet ID, or null for local.
  * @returns {boolean} Always true; thrown errors propagate to the client failure handler.
  */
-function deleteRow(rowIndex) {
-  const ss = SpreadsheetApp.getActiveSpreadsheet();
+function deleteRow(rowIndex, spreadsheetId) {
+  const ss = spreadsheetId
+    ? SpreadsheetApp.openById(spreadsheetId)
+    : SpreadsheetApp.getActiveSpreadsheet();
   const dbSheet = ss.getSheetByName(SHEET_DATABASE);
   if (!dbSheet) throw new Error('Sheet "Database" not found.');
 

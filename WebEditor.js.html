@@ -151,7 +151,7 @@
       fth.dataset.colIndex = i;
       const fDiv = document.createElement('div');
       fDiv.className = 'cell-content';
-      if (col.type === 'text' || col.type === 'unit' || col.type === 'origin' || col.type === 'date' || col.type === 'tin' || col.type === 'marital-status' || col.type === 'image' || isTableType(col)) {
+      if (col.type === 'text' || col.type === 'unit' || col.type === 'origin' || col.type === 'date' || col.type === 'tin' || col.type === 'marital-status' || col.type === 'sex' || col.type === 'image' || isTableType(col)) {
         const input = document.createElement('input');
         input.type = 'text';
         input.placeholder = 'Filter';
@@ -243,7 +243,7 @@
             span.textContent = '—';
             cell.appendChild(span);
           }
-        } else if (i === 0 && schema.editMode) {
+        } else if (i === 0) {
           const a = document.createElement('a');
           a.className = 'name-link';
           a.href = '#';
@@ -588,6 +588,28 @@
         }
         sel.value = currentVal;
         block.appendChild(sel);
+      } else if (col.type === 'sex') {
+        const currentVal = row.values[i] || '';
+        const sel = document.createElement('select');
+        sel.dataset.colIndex = i;
+        const emptyOpt = document.createElement('option');
+        emptyOpt.value = '';
+        emptyOpt.textContent = '—';
+        sel.appendChild(emptyOpt);
+        (col.sexOptions || []).forEach(opt => {
+          const o = document.createElement('option');
+          o.value = opt;
+          o.textContent = opt;
+          sel.appendChild(o);
+        });
+        if (currentVal && !(col.sexOptions || []).includes(currentVal)) {
+          const o = document.createElement('option');
+          o.value = currentVal;
+          o.textContent = currentVal;
+          sel.appendChild(o);
+        }
+        sel.value = currentVal;
+        block.appendChild(sel);
       } else if (col.type === 'tin') {
         const input = document.createElement('input');
         input.type = 'text';
@@ -923,7 +945,7 @@
     google.script.run
       .withSuccessHandler(onSaveSuccess)
       .withFailureHandler(onSaveError)
-      .updateRow(editingRow.rowIndex, newValues);
+      .updateRow(editingRow.rowIndex, newValues, editingRow.spreadsheetId ?? null);
   }
 
   /**
@@ -990,7 +1012,7 @@
     google.script.run
       .withSuccessHandler(onDeleteSuccess)
       .withFailureHandler(onDeleteError)
-      .deleteRow(editingRow.rowIndex);
+      .deleteRow(editingRow.rowIndex, editingRow.spreadsheetId ?? null);
   }
 
   /**
@@ -1000,9 +1022,10 @@
    */
   function onDeleteSuccess() {
     const deletedIndex = editingRow.rowIndex;
+    const deletedSpreadsheetId = editingRow.spreadsheetId ?? null;
     schema.rows = schema.rows.filter(r => r !== editingRow);
     schema.rows.forEach(r => {
-      if (r.rowIndex > deletedIndex) r.rowIndex--;
+      if ((r.spreadsheetId ?? null) === deletedSpreadsheetId && r.rowIndex > deletedIndex) r.rowIndex--;
     });
     editingRow = null;
     applyFilters();
