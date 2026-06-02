@@ -35,12 +35,14 @@ Same structure as `Database` (row 1 = column names, row 2 = column types, row 3+
 
 | Range | Purpose |
 |-------|---------|
-| `A2:G10` (`HANDBOOK_TYPES_RANGE`) | Sub-column headers for each `*-table` type; col A = type name, col B onward = headers |
-| `I2` (`EDIT_MODE_CELL`) | Edit mode flag (checkbox) — when checked, the editor allows adding and editing records |
-| `A12:C40` (`HANDBOOK_CORR_RANGE`) | Placeholder correspondence table for document exports |
-| `D12:D40` (`HANDBOOK_UNIT_RANGE`) | Allowed values for `unit`-type columns |
-| `E12:E40` (`HANDBOOK_ORIGIN_RANGE`) | Allowed values for `origin`-type columns |
-| `F12:F40` (`HANDBOOK_MARITAL_STATUS_RANGE`) | Allowed values for `marital-status`-type columns |
+| `A2:K15` (`HANDBOOK_TYPES_RANGE`) | Sub-column headers for each `*-table` type; col A = type name, col B onward = headers |
+| `M2` (`MASTER_MODE_CELL`) | Master Mode toggle (checkbox) — when checked, the webview aggregates data from all source spreadsheets listed in `N2:N` |
+| `N2:N` (`MASTER_MODE_SOURCES_RANGE`) | Source spreadsheet IDs — one per row; used when Master Mode is ON |
+| `A17:C40` (`HANDBOOK_CORR_RANGE`) | Placeholder correspondence table for document exports |
+| `D17:D40` (`HANDBOOK_UNIT_RANGE`) | Allowed values for `unit`-type columns |
+| `E17:E40` (`HANDBOOK_ORIGIN_RANGE`) | Allowed values for `origin`-type columns |
+| `F17:F40` (`HANDBOOK_MARITAL_STATUS_RANGE`) | Allowed values for `marital-status`-type columns |
+| `G17:G40` (`HANDBOOK_SEX_RANGE`) | Allowed values for `sex`-type columns |
 
 #### Correspondence table columns
 
@@ -60,9 +62,10 @@ Exactly one of B or C should be filled per row.
 | `image` | Thumbnail (click to enlarge) | Google Drive link input with live preview |
 | `date` | Plain text | Text input with `DD.MM.YYYY` format validation |
 | `tin` | Plain text | Text input validated as exactly 10 digits |
-| `unit` | Plain text | Dropdown of allowed values from Handbook `D12:D40` |
-| `origin` | Plain text | Dropdown of allowed values from Handbook `E12:E40` |
-| `marital-status` | Plain text | Dropdown of allowed values from Handbook `F12:F40` |
+| `unit` | Plain text | Dropdown of allowed values from Handbook `D17:D40` |
+| `origin` | Plain text | Dropdown of allowed values from Handbook `E17:E40` |
+| `marital-status` | Plain text | Dropdown of allowed values from Handbook `F17:F40` |
+| `sex` | Plain text | Dropdown of allowed values from Handbook `G17:G40` |
 | `*-table` | Decoded mini-table | Row/column editor with add & delete |
 
 ### `*-table` encoding format
@@ -101,26 +104,38 @@ Values entered directly in the sheet that do not match the format are displayed 
 
 ### Unit columns
 
-Allowed values are read from Handbook `D12:D40` at page load and served to the client as part of the schema. In the edit view the field renders as a dropdown containing only those values. Values entered directly in the sheet that are not in the allowed list are appended to the dropdown as an extra option and shown selected, so no data is lost.
+Allowed values are read from Handbook `D17:D40` at page load and served to the client as part of the schema. In the edit view the field renders as a dropdown containing only those values. Values entered directly in the sheet that are not in the allowed list are appended to the dropdown as an extra option and shown selected, so no data is lost.
 
 ### Origin columns
 
-Same behaviour as `unit`, but the allowed values come from Handbook `E12:E40`.
+Same behaviour as `unit`, but the allowed values come from Handbook `E17:E40`.
 
 ### Marital-status columns
 
-Same behaviour as `unit`, but the allowed values come from Handbook `F12:F40`.
+Same behaviour as `unit`, but the allowed values come from Handbook `F17:F40`.
+
+### Sex columns
+
+Same behaviour as `unit`, but the allowed values come from Handbook `G17:G40`.
+
+## Master Mode
+
+When the **Master Mode** checkbox (`Handbook!M2`) is checked, `getSchemaAndData()` opens every spreadsheet ID listed in `Handbook!N2:N` and appends their `Database` rows to the local ones. Each remote row carries a `spreadsheetId` property so saves and deletes are routed back to the correct spreadsheet.
+
+When Master Mode is **OFF**, only the local `Database` sheet is shown. Editing (add / edit / delete) is always available regardless of Master Mode.
+
+New rows added via **Add person** always go to the local `Database` sheet, never to a remote source.
 
 ## Web editor features
 
 - **List view** — full-screen table with all columns and data
 - **Filtering** — debounced live filter input above every column; supports plain text and regular expressions (toggle per session); for `image` columns the search matches the raw Drive URL/ID (`""` to filter empty); for `*-table` columns the search runs against the raw encoded cell content, so any sub-field value is matched
-- **Add person** — appends a new empty row and opens it in the edit view immediately (edit mode only)
-- **Delete** — red "Delete" button in the edit view moves the record to the `Trash` sheet (edit mode only; not available for unsaved new rows)
+- **Add person** — appends a new empty row to the local `Database` sheet and opens it in the edit view immediately
+- **Delete** — red "Delete" button in the edit view moves the record to the `Trash` sheet of its source spreadsheet (not available for unsaved new rows)
 - **Column visibility** — "Columns ▾" button to hide/show individual columns; first column is always visible
 - **Image thumbnails** — loaded asynchronously, cached for the session
 - **Lightbox** — click any thumbnail to view the full image
-- **Edit view** — click a name in the first column to open a per-record editor (edit mode only)
+- **Edit view** — click a name in the first column to open a per-record editor
 
 ## Document export
 
@@ -178,12 +193,14 @@ Exports run in automatic batches capped at `EXPORT_TIME_LIMIT_MS` (5 minutes) to
 | `SHEET_DATABASE` | `'Database'` | Name of the data sheet |
 | `SHEET_HANDBOOK` | `'Handbook'` | Name of the handbook sheet |
 | `SHEET_TRASH` | `'Trash'` | Name of the trash sheet (created automatically on first delete) |
-| `EDIT_MODE_CELL` | `'I2'` | Cell that holds the edit mode checkbox |
-| `HANDBOOK_TYPES_RANGE` | `'A2:G10'` | Range of table-type definitions in Handbook |
-| `HANDBOOK_CORR_RANGE` | `'A12:C40'` | Range of the placeholder correspondence table |
-| `HANDBOOK_UNIT_RANGE` | `'D12:D40'` | Range of allowed values for `unit`-type columns |
-| `HANDBOOK_ORIGIN_RANGE` | `'E12:E40'` | Range of allowed values for `origin`-type columns |
-| `HANDBOOK_MARITAL_STATUS_RANGE` | `'F12:F40'` | Range of allowed values for `marital-status`-type columns |
+| `MASTER_MODE_CELL` | `'M2'` | Cell that holds the Master Mode checkbox |
+| `MASTER_MODE_SOURCES_RANGE` | `'N2:N'` | Range of source spreadsheet IDs for Master Mode |
+| `HANDBOOK_TYPES_RANGE` | `'A2:K15'` | Range of table-type definitions in Handbook |
+| `HANDBOOK_CORR_RANGE` | `'A17:C40'` | Range of the placeholder correspondence table |
+| `HANDBOOK_UNIT_RANGE` | `'D17:D40'` | Range of allowed values for `unit`-type columns |
+| `HANDBOOK_ORIGIN_RANGE` | `'E17:E40'` | Range of allowed values for `origin`-type columns |
+| `HANDBOOK_MARITAL_STATUS_RANGE` | `'F17:F40'` | Range of allowed values for `marital-status`-type columns |
+| `HANDBOOK_SEX_RANGE` | `'G17:G40'` | Range of allowed values for `sex`-type columns |
 | `F1_TEMPLATE_ID` | — | Google Docs template ID for F-1 export |
 | `WC_TEMPLATE_ID` | — | Google Docs template ID for Wanted Card export |
 | `EXPORT_FOLDER_ID` | — | Google Drive folder ID for exported documents |
@@ -206,14 +223,14 @@ Exports run in automatic batches capped at `EXPORT_TIME_LIMIT_MS` (5 minutes) to
 
 ```mermaid
 flowchart LR
-  doGet --> getSchema --> getRows --> getEditMode --> renderList
+  doGet --> getSchema --> getRows --> getMasterMode --> renderList
   renderList --> applyFilters
   renderList --> loadImageBatch
 
   classDef code   fill:#EEEDFE,stroke:#534AB7,color:#26215C
   classDef client fill:#E1F5EE,stroke:#0F6E56,color:#04342C
 
-  class doGet,getSchema,getRows,getEditMode code
+  class doGet,getSchema,getRows,getMasterMode code
   class renderList,applyFilters,loadImageBatch client
 ```
 
