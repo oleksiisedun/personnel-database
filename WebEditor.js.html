@@ -11,6 +11,7 @@
   let pendingImages = new Set(); // fileIds currently being fetched to avoid duplicate requests
   let isNewRow = false;    // true when the edit view holds a freshly appended row
   let useRegex = false;    // true when filter inputs are treated as regular expressions
+  let dbPromise = null;    // Promise<IDBDatabase> — opened once in init(), reused thereafter
 
   const FIELD_SEP = ' | ';
   const ROW_SEP = '\n';
@@ -18,6 +19,70 @@
   function debounce(fn, delay) {
     let timer;
     return () => { clearTimeout(timer); timer = setTimeout(fn, delay); };
+  }
+
+  /**
+   * Opens (or reuses) the IndexedDB database for the persistent image cache.
+   * Called eagerly in init() so the DB is ready before onDataLoaded fires.
+   * @returns {Promise<IDBDatabase>}
+   */
+  function openImageDB() {
+    if (dbPromise) return dbPromise;
+    dbPromise = new Promise((resolve, reject) => {
+      try {
+        const req = indexedDB.open('pdb_images', 1);
+        req.onupgradeneeded = e => { e.target.result.createObjectStore('images'); };
+        req.onsuccess = e => resolve(e.target.result);
+        req.onerror = () => reject(req.error);
+      } catch (e) {
+        reject(e);
+      }
+    });
+    return dbPromise;
+  }
+
+  /**
+   * Reads all entries from IndexedDB, validates TTL, and pre-populates imageCache
+   * so renderList() can display cached images without queuing network requests.
+   * Expired or invalid entries are deleted in the same pass. Always resolves.
+   * @returns {Promise<void>}
+   */
+  async function loadCacheFromIndexedDB() {
+    try {
+      const db = await openImageDB();
+      const ttlMs = schema.imageCacheTtlDays * 24 * 60 * 60 * 1000;
+      const now = Date.now();
+      await new Promise(resolve => {
+        const req = db.transaction('images', 'readwrite').objectStore('images').openCursor();
+        req.onsuccess = e => {
+          const cursor = e.target.result;
+          if (!cursor) { resolve(); return; }
+          const entry = cursor.value;
+          if (!entry?.data || now - entry.savedAt > ttlMs) {
+            cursor.delete();
+          } else {
+            imageCache[cursor.key] = entry.data;
+          }
+          cursor.continue();
+        };
+        req.onerror = () => resolve();
+      });
+    } catch (e) {
+      // IndexedDB unavailable — silent fallback, images fetched from server
+    }
+  }
+
+  /**
+   * Persists a single fetched image result to IndexedDB. Fire-and-forget.
+   * @param {string} fileId - Google Drive file ID used as the record key.
+   * @param {Object} result - Value returned by getImagesDataUrls for this file ID.
+   * @returns {void}
+   */
+  function saveToIndexedDB(fileId, result) {
+    openImageDB().then(db => {
+      db.transaction('images', 'readwrite').objectStore('images')
+        .put({ savedAt: Date.now(), data: result }, fileId);
+    }).catch(() => {});
   }
 
   /**
@@ -92,6 +157,7 @@
       document.getElementById('col-panel').style.display = 'none';
     });
 
+    openImageDB(); // start DB open in parallel with getSchemaAndData
     google.script.run
       .withSuccessHandler(onDataLoaded)
       .withFailureHandler(onLoadError)
@@ -100,12 +166,14 @@
 
   /**
    * Success handler for the initial getSchemaAndData() call.
-   * Stores the schema, builds the table header/filter rows, renders data, and
-   * corrects sticky header offsets after the table becomes visible.
+   * Awaits the IndexedDB cache load so renderList() can display cached images
+   * immediately, then builds and shows the table.
    * @param {{columns: Object[], rows: Object[]}} data
+   * @returns {Promise<void>}
    */
-  function onDataLoaded(data) {
+  async function onDataLoaded(data) {
     schema = data;
+    await loadCacheFromIndexedDB();
     document.getElementById('loading').style.display = 'none';
     buildListView();
     applyFilters();
@@ -316,6 +384,7 @@
             pendingImages.delete(fileId);
             const result = results[fileId] ?? null;
             imageCache[fileId] = result;
+            saveToIndexedDB(fileId, result);
             document.querySelectorAll(`img[data-file-id="${fileId}"]`).forEach(el => {
               el.removeAttribute('data-file-id');
               if (result?.type === 'image') {
@@ -486,6 +555,7 @@
         .withSuccessHandler(results => {
           const result = results[fileId] ?? null;
           imageCache[fileId] = result;
+          saveToIndexedDB(fileId, result);
           if (result?.type === 'image') {
             imgEl.src = result.dataUrl;
           } else if (result?.type === 'no-access') {
@@ -739,6 +809,7 @@
       .withSuccessHandler(results => {
         const result = results[id] ?? null;
         imageCache[id] = result;
+        saveToIndexedDB(id, result);
         if (result?.type === 'image') {
           imgEl.src = result.dataUrl;
           imgEl.style.display = 'block';

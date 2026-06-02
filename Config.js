@@ -57,3 +57,6 @@ const FILTER_DEBOUNCE_MS = 500;
 //   30-concurrent-execution quota and re-introduces dropped images.
 const IMAGE_FETCH_BATCH_SIZE = 10;
 const IMAGE_FETCH_CONCURRENCY = 3;
+
+// Persistent IndexedDB image cache — how long an entry is kept before re-fetching from Drive.
+const IMAGE_CACHE_TTL_DAYS = 7;

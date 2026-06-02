@@ -74,7 +74,12 @@ function openWebEditor() {
  *
  * @returns {{
  *   columns: Array<{name: string, type: string, tableHeaders?: string[]}>,
- *   rows: Array<{rowIndex: number, values: string[]}>
+ *   rows: Array<{rowIndex: number, values: string[]}>,
+ *   masterMode: boolean,
+ *   filterDebounceMs: number,
+ *   imageFetchBatchSize: number,
+ *   imageFetchConcurrency: number,
+ *   imageCacheTtlDays: number
  * }}
  */
 function getSchemaAndData() {
@@ -164,7 +169,8 @@ function getSchemaAndData() {
   });
 
   return { columns, rows, masterMode, filterDebounceMs: FILTER_DEBOUNCE_MS,
-           imageFetchBatchSize: IMAGE_FETCH_BATCH_SIZE, imageFetchConcurrency: IMAGE_FETCH_CONCURRENCY };
+           imageFetchBatchSize: IMAGE_FETCH_BATCH_SIZE, imageFetchConcurrency: IMAGE_FETCH_CONCURRENCY,
+           imageCacheTtlDays: IMAGE_CACHE_TTL_DAYS };
 }
 
 /**

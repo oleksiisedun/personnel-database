@@ -75,7 +75,10 @@ When `Handbook!M2` is `true`, `getSchemaAndData()` reads spreadsheet IDs from `H
 
 ### Image loading
 
-Images are fetched server-side via `DriveApp` (using the script owner's OAuth token) so users without personal Drive access can still view images. The client caches results in `imageCache` for the session.
+Images are fetched server-side via `DriveApp` (using the script owner's OAuth token) so users without personal Drive access can still view images. The client caches results in two layers:
+
+1. **IndexedDB** (`pdb_images` / `images` store) — persistent across dialog sessions. `openImageDB()` is called eagerly in `init()` so the DB is ready before `onDataLoaded` fires. `loadCacheFromIndexedDB()` (async) pre-populates `imageCache` before `renderList()` runs; `saveToIndexedDB()` writes each fetched result back. Entries expire after `IMAGE_CACHE_TTL_DAYS` days (default 7). Use IndexedDB (not localStorage) because the full base64 dataset easily exceeds the ~5 MB localStorage quota.
+2. **In-memory `imageCache`** — session-only map from fileId to result, used for O(1) lookups during rendering and lightbox opens.
 
 Loading uses a **concurrency pool** controlled by `IMAGE_FETCH_CONCURRENCY` and `IMAGE_FETCH_BATCH_SIZE` in `Config.js` — raising concurrency too high exceeds Apps Script's ~30 concurrent-execution limit and causes dropped images. See the comments in `Config.js` for tuning guidance.
 

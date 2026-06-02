@@ -88,6 +88,8 @@ Images are stored as Google Drive sharing links. Supported URL formats:
 
 Images are fetched server-side (via `DriveApp`) and returned as base64 data URLs, so all users with access to the spreadsheet can view images regardless of their personal Drive session.
 
+Fetched images are persisted in an **IndexedDB** database (`pdb_images`) so subsequent dialog opens display all thumbnails immediately without any server round-trips. Entries expire after `IMAGE_CACHE_TTL_DAYS` (default 7 days). To force a full re-fetch, clear the site data for the script origin in browser DevTools.
+
 If the linked file is a **PDF**, the cell shows a red "PDF" badge instead of a thumbnail; clicking it opens the file in Drive in a new tab. If the link points to a **Drive folder**, a blue "Folder" badge is shown instead. If the script owner does not have access to the linked file, a gray **"No access"** badge is shown.
 
 ### Date columns
@@ -133,7 +135,7 @@ New rows added via **Add person** always go to the local `Database` sheet, never
 - **Add person** — appends a new empty row to the local `Database` sheet and opens it in the edit view immediately
 - **Delete** — red "Delete" button in the edit view moves the record to the `Trash` sheet of its source spreadsheet (not available for unsaved new rows)
 - **Column visibility** — "Columns ▾" button to hide/show individual columns; first column is always visible
-- **Image thumbnails** — loaded asynchronously, cached for the session
+- **Image thumbnails** — loaded asynchronously; persisted in IndexedDB so subsequent opens display instantly
 - **Lightbox** — click any thumbnail to view the full image
 - **Edit view** — click a name in the first column to open a per-record editor
 
@@ -214,6 +216,7 @@ Exports run in automatic batches capped at `EXPORT_TIME_LIMIT_MS` (5 minutes) to
 | `FILTER_DEBOUNCE_MS` | `500` | Debounce delay (ms) for filter text inputs |
 | `IMAGE_FETCH_BATCH_SIZE` | `10` | Number of Drive files resolved per `google.script.run` call |
 | `IMAGE_FETCH_CONCURRENCY` | `3` | Number of image-fetch batches running in parallel; raising it speeds up large lists but risks the Apps Script 30-concurrent-execution limit |
+| `IMAGE_CACHE_TTL_DAYS` | `7` | How many days a cached image entry survives in IndexedDB before being re-fetched |
 
 ## Call flows
 
@@ -281,16 +284,22 @@ flowchart LR
 
 ```mermaid
 flowchart LR
-  renderList --> loadImageBatch --> gsr[google.script.run]
+  init --> openImageDB[(IndexedDB)]
+  onDataLoaded --> loadCacheFromIDB --> openImageDB
+  loadCacheFromIDB --> imageCache --> renderList
+  renderList -->|cache miss| loadImageBatch --> gsr[google.script.run]
   gsr --> fetchImageBatch --> getImageAsBase64 --> DriveApp
+  loadImageBatch --> saveToIDB --> openImageDB
 
   classDef code   fill:#EEEDFE,stroke:#534AB7,color:#26215C
   classDef client fill:#E1F5EE,stroke:#0F6E56,color:#04342C
   classDef api    fill:#F1EFE8,stroke:#5F5E5A,color:#2C2C2A
+  classDef store  fill:#FFF8E1,stroke:#F9A825,color:#3E2723
 
   class fetchImageBatch,getImageAsBase64 code
-  class renderList,loadImageBatch client
+  class init,onDataLoaded,loadCacheFromIDB,imageCache,renderList,loadImageBatch,saveToIDB client
   class gsr,DriveApp api
+  class openImageDB store
 ```
 
 ### 6 · Export
