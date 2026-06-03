@@ -8,7 +8,7 @@ function getMasterSources() {
   const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(SHEET_HANDBOOK);
   if (!sheet) return [];
   return sheet.getRange(MASTER_MODE_SOURCES_RANGE).getValues()
-    .map(r => String(r[0]).trim())
+    .map(r => parseDriveId(String(r[0]).trim()))
     .filter(v => v !== '');
 }
 
