@@ -12,6 +12,15 @@
   let isNewRow = false;    // true when the edit view holds a freshly appended row
   let useRegex = false;    // true when filter inputs are treated as regular expressions
   let dbPromise = null;    // Promise<IDBDatabase> — opened once in init(), reused thereafter
+  const selectedKeys = new Set(); // compound "spreadsheetId:rowIndex" keys of rows checked for export
+
+  /**
+   * Returns a stable unique key for a row, combining spreadsheetId and rowIndex.
+   * Local rows (no spreadsheetId) use an empty string prefix.
+   * @param {{rowIndex: number, spreadsheetId?: string}} row
+   * @returns {string}
+   */
+  const rowKey = row => `${row.spreadsheetId ?? ''}:${row.rowIndex}`;
 
   const FIELD_SEP = ' | ';
   const ROW_SEP = '\n';
@@ -204,6 +213,31 @@
     filterRow.innerHTML = '';
     headerRow.innerHTML = '';
 
+    // Checkbox column — filter row: master select-all checkbox
+    const fthCb = document.createElement('th');
+    fthCb.className = 'col-checkbox';
+    const chkAll = document.createElement('input');
+    chkAll.type = 'checkbox';
+    chkAll.id = 'chk-select-all';
+    chkAll.title = 'Select / deselect all visible';
+    chkAll.addEventListener('change', () => {
+      filteredRows.forEach(row => {
+        if (chkAll.checked) selectedKeys.add(rowKey(row));
+        else selectedKeys.delete(rowKey(row));
+      });
+      document.querySelectorAll('#table-body input[type=checkbox]').forEach(cb => {
+        cb.checked = chkAll.checked;
+      });
+      updateSelectionUI();
+    });
+    fthCb.appendChild(chkAll);
+    filterRow.appendChild(fthCb);
+
+    // Checkbox column — header row: empty label cell
+    const thCb = document.createElement('th');
+    thCb.className = 'col-checkbox';
+    headerRow.appendChild(thCb);
+
     schema.columns.forEach((col, i) => {
       const th = document.createElement('th');
       th.dataset.colIndex = i;
@@ -275,6 +309,20 @@
 
     filteredRows.forEach(row => {
       const tr = document.createElement('tr');
+
+      const tdCb = document.createElement('td');
+      tdCb.className = 'col-checkbox';
+      const chk = document.createElement('input');
+      chk.type = 'checkbox';
+      chk.checked = selectedKeys.has(rowKey(row));
+      chk.addEventListener('change', () => {
+        if (chk.checked) selectedKeys.add(rowKey(row));
+        else selectedKeys.delete(rowKey(row));
+        updateSelectionUI();
+      });
+      tdCb.appendChild(chk);
+      tr.appendChild(tdCb);
+
       row.values.forEach((val, i) => {
         const td = document.createElement('td');
         td.dataset.colIndex = i;
@@ -332,6 +380,31 @@
     });
     applyColumnVisibility();
     queueImageFetch();
+    updateSelectionUI();
+  }
+
+  /**
+   * Updates export button disabled state and the master checkbox
+   * (checked / indeterminate / unchecked) to reflect current selection vs visible rows.
+   */
+  function updateSelectionUI() {
+    const selectedInView = filteredRows.filter(r => selectedKeys.has(rowKey(r))).length;
+    document.getElementById('btn-export-f1').disabled = selectedInView === 0;
+    document.getElementById('btn-export-wc').disabled = selectedInView === 0;
+
+    const chkAll = document.getElementById('chk-select-all');
+    if (!chkAll) return;
+    const total = filteredRows.length;
+    if (total === 0 || selectedInView === 0) {
+      chkAll.checked = false;
+      chkAll.indeterminate = false;
+    } else if (selectedInView === total) {
+      chkAll.checked = true;
+      chkAll.indeterminate = false;
+    } else {
+      chkAll.checked = false;
+      chkAll.indeterminate = true;
+    }
   }
 
   /**
@@ -1134,12 +1207,10 @@
    * @param {string} serverFnName - Name of the Apps Script function to call ('exportF1' or 'exportWC').
    */
   function runExport(btnId, serverFnName) {
-    if (!filteredRows || filteredRows.length === 0) {
-      alert('No visible rows to export. Adjust your filters and try again.');
-      return;
-    }
+    const rowsToExport = filteredRows.filter(r => selectedKeys.has(rowKey(r)));
+    if (!rowsToExport.length) return; // safety guard — buttons should already be disabled
 
-    const total = filteredRows.length;
+    const total = rowsToExport.length;
     const btn = document.getElementById(btnId);
     const ul = document.getElementById('export-links');
 
@@ -1201,7 +1272,7 @@
         [serverFnName](indices);
     };
 
-    fire(filteredRows.map(r => r.rowIndex));
+    fire(rowsToExport.map(r => r.rowIndex));
   }
 
   document.addEventListener('DOMContentLoaded', init);
