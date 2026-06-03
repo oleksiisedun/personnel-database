@@ -7,6 +7,9 @@ const SHEET_TRASH = 'Trash';
 const MASTER_MODE_CELL = 'M2';
 const MASTER_MODE_SOURCES_RANGE = 'N2:N';
 
+// Handbook layout — data folder cell
+const DATA_FOLDER = 'M4';
+
 // Handbook layout — table-type definitions
 const HANDBOOK_TYPES_RANGE = 'A2:K15';
 
