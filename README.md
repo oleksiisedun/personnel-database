@@ -37,6 +37,7 @@ Same structure as `Database` (row 1 = column names, row 2 = column types, row 3+
 |-------|---------|
 | `A2:K15` (`HANDBOOK_TYPES_RANGE`) | Sub-column headers for each `*-table` type; col A = type name, col B onward = headers |
 | `M2` (`MASTER_MODE_CELL`) | Master Mode toggle (checkbox) — when checked, the webview aggregates data from all source spreadsheets listed in `N2:N` |
+| `M4` (`DATA_FOLDER`) | Google Drive folder ID that contains person images and PDFs |
 | `N2:N` (`MASTER_MODE_SOURCES_RANGE`) | Source spreadsheet IDs — one per row; used when Master Mode is ON |
 | `A17:C40` (`HANDBOOK_CORR_RANGE`) | Placeholder correspondence table for document exports |
 | `D17:D40` (`HANDBOOK_UNIT_RANGE`) | Allowed values for `unit`-type columns |
@@ -137,11 +138,12 @@ New rows added via **Add person** always go to the local `Database` sheet, never
 - **Column visibility** — "Columns ▾" button to hide/show individual columns; first column is always visible
 - **Image thumbnails** — loaded asynchronously; persisted in IndexedDB so subsequent opens display instantly
 - **Lightbox** — click any thumbnail to view the full image
+- **Row selection** — checkbox column at the left of the table; master checkbox in the filter row selects/deselects all visible rows; indeterminate state when a subset is selected; drives which rows are exported
 - **Edit view** — click a name in the first column to open a per-record editor
 
 ## Document export
 
-Two export types are available from the toolbar. Both operate on the currently visible (filtered) rows.
+Two export types are available from the toolbar. Both operate on the **selected** rows (rows checked via the checkbox column). The export buttons are disabled until at least one row is selected.
 
 | Button | Template | Output prefix |
 |--------|----------|---------------|
@@ -196,6 +198,7 @@ Exports run in automatic batches capped at `EXPORT_TIME_LIMIT_MS` (5 minutes) to
 | `SHEET_HANDBOOK` | `'Handbook'` | Name of the handbook sheet |
 | `SHEET_TRASH` | `'Trash'` | Name of the trash sheet (created automatically on first delete) |
 | `MASTER_MODE_CELL` | `'M2'` | Cell that holds the Master Mode checkbox |
+| `DATA_FOLDER` | `'M4'` | Cell that holds the Google Drive folder ID for person images/PDFs |
 | `MASTER_MODE_SOURCES_RANGE` | `'N2:N'` | Range of source spreadsheet IDs for Master Mode |
 | `HANDBOOK_TYPES_RANGE` | `'A2:K15'` | Range of table-type definitions in Handbook |
 | `HANDBOOK_CORR_RANGE` | `'A17:C40'` | Range of the placeholder correspondence table |

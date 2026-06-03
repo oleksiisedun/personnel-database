@@ -29,7 +29,12 @@ The `Database` sheet has this fixed structure:
 - Row 2 — column types (`text`, `image`, `*-table`, `unit`, `origin`, `marital-status`, `sex`, `tin`)
 - Row 3+ — one person record per row
 
-The `Handbook` sheet holds schema metadata, dropdown option lists, the Master Mode toggle, and export correspondence tables. Constants in `Config.js` define each range address.
+The `Handbook` sheet holds schema metadata, dropdown option lists, the Master Mode toggle, the data folder cell, and export correspondence tables. Constants in `Config.js` define each range address.
+
+Key Handbook cells:
+- `M2` (`MASTER_MODE_CELL`) — Master Mode checkbox
+- `M4` (`DATA_FOLDER`) — Google Drive folder ID containing person images and PDFs
+- `N2:N` (`MASTER_MODE_SOURCES_RANGE`) — source spreadsheet IDs for Master Mode
 
 ### How the HTML template works
 
@@ -85,6 +90,8 @@ Loading uses a **concurrency pool** controlled by `IMAGE_FETCH_CONCURRENCY` and 
 `DriveApp.getFileById()` throws for inaccessible files; the server catches it and returns `{ type: 'no-access' }`. The client renders a gray "No access" badge.
 
 ### Document export (`Export.js`)
+
+Export is triggered from the toolbar. The Export F-1 and Export WC buttons are disabled until at least one row is checked via the selection checkbox column. `runExport()` collects `rowIndex` values only from `selectedKeys`-checked rows and passes them as `rowIndices` to the server.
 
 `exportF1(rowIndices)` and `exportWC(rowIndices)` copy Google Docs templates into the export folder and fill placeholders with row data. Both delegate to `_exportDoc()`, which runs four passes in strict order:
 
