@@ -66,6 +66,17 @@ When `Handbook!M2` is `true`, `getSchemaAndData()` reads spreadsheet IDs from `H
 
 `updateRow(rowIndex, values, spreadsheetId)` and `deleteRow(rowIndex, spreadsheetId)` route to the correct spreadsheet based on `spreadsheetId` — `SpreadsheetApp.openById()` for remote, `getActiveSpreadsheet()` for local. New rows (`addRow()`) always go to the local `Database` sheet. Editing is never restricted by Master Mode state.
 
+When masterMode is true, `getSchemaAndData()` also calls `getSourceSpreadsheetInfos()` and includes the result as `masterSources: Array<{id, name}>` in the return value (current spreadsheet has `id: null`). The client uses this to populate the Move destination dropdown.
+
+### Move personnel (`movePersonnel`)
+
+`movePersonnel(rowEntries, destinationSpreadsheetId)` is available only in Master Mode. It moves rows between spreadsheets:
+
+1. Groups `rowEntries` by source `spreadsheetId` and sorts each group in descending `rowIndex` order (so deleting lower rows doesn't shift higher ones).
+2. For each row: reads the row data, appends it to the destination `Database` sheet, then **hard-deletes** it from the source (`sheet.deleteRow()` — not a soft delete like `deleteRow()`). Returns the new `rowIndex` and `values` so the client can update `schema.rows` in place without reloading.
+3. Rows where source === destination spreadsheet are skipped (logged but not moved or deleted).
+4. After each row move, tries to move the person's Drive folder (named after the first column value) from the source `DATA_FOLDER` to the destination `DATA_FOLDER` using `DriveApp.getFolderById()` / `getFoldersByName()` / `moveTo()`. If either `DATA_FOLDER` is not configured, or the named folder is not found, the row move still completes and a note is logged. `parseDriveId(value)` strips any Drive URL wrapper from the cell value to get a bare folder ID.
+
 ### Soft delete (Trash sheet)
 
 `deleteRow()` never permanently removes data. It copies the row to the `Trash` sheet and then deletes it from `Database`. If `Trash` doesn't exist yet, it is created with the same two header rows as `Database`. There is no restore UI — recovery requires manually moving rows back in Sheets.

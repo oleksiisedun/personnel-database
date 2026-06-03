@@ -60,6 +60,149 @@ function openWebEditor() {
 }
 
 /**
+ * Returns an array of { id, name } for the current spreadsheet (id = null) and
+ * every source listed in MASTER_MODE_SOURCES_RANGE. Falls back to the raw ID
+ * string if a remote spreadsheet cannot be opened.
+ *
+ * @returns {Array<{id: string|null, name: string}>}
+ */
+function getSourceSpreadsheetInfos() {
+  const currentSs = SpreadsheetApp.getActiveSpreadsheet();
+  const result = [{ id: null, name: currentSs.getName() }];
+  getMasterSources().forEach(id => {
+    try {
+      result.push({ id, name: SpreadsheetApp.openById(id).getName() });
+    } catch (e) {
+      result.push({ id, name: id });
+    }
+  });
+  return result;
+}
+
+/**
+ * Extracts a bare Drive resource ID from a raw ID string or any Drive URL form:
+ *   https://drive.google.com/drive/folders/<ID>
+ *   https://drive.google.com/file/d/<ID>/view
+ *   https://drive.google.com/open?id=<ID>
+ * Returns the input unchanged when it does not look like a URL.
+ *
+ * @param {string} value
+ * @returns {string}
+ */
+function parseDriveId(value) {
+  const m = value.match(/(?:\/folders\/|\/d\/|[?&]id=)([-\w]+)/);
+  return m ? m[1] : value;
+}
+
+
+/**
+ * Moves rows from their source spreadsheets into the destination spreadsheet.
+ * Rows are appended to the destination Database sheet and hard-deleted from
+ * the source. Within each source the rows are processed in descending rowIndex
+ * order so that deleting one row does not shift the indices of others.
+ *
+ * After moving each row the function tries to find the person's Drive folder
+ * (by full name, first column) in the source DATA_FOLDER and move it to the
+ * destination DATA_FOLDER. If the folder is not found or DATA_FOLDER is not
+ * configured the row move still succeeds and a note is added to the log.
+ *
+ * @param {Array<{rowIndex: number, spreadsheetId: string|null}>} rowEntries
+ * @param {string|null} destinationSpreadsheetId
+ * @returns {{ log: Array<{name: string, folderNote: string}> }}
+ */
+function movePersonnel(rowEntries, destinationSpreadsheetId) {
+  const destSs = destinationSpreadsheetId
+    ? SpreadsheetApp.openById(destinationSpreadsheetId)
+    : SpreadsheetApp.getActiveSpreadsheet();
+  const destSheet = destSs.getSheetByName(SHEET_DATABASE);
+  if (!destSheet) throw new Error('Destination sheet "Database" not found.');
+
+  const destHandbook = destSs.getSheetByName(SHEET_HANDBOOK);
+  const destFolderId = parseDriveId(destHandbook
+    ? String(destHandbook.getRange(DATA_FOLDER).getValue()).trim()
+    : '');
+
+  // Group entries by source spreadsheetId, sort each group descending by rowIndex.
+  const groups = new Map();
+  rowEntries.forEach(entry => {
+    const key = entry.spreadsheetId ?? null;
+    if (!groups.has(key)) groups.set(key, []);
+    groups.get(key).push(entry);
+  });
+  groups.forEach(entries => entries.sort((a, b) => b.rowIndex - a.rowIndex));
+
+  const log = [];
+  const movedRows = [];
+
+  groups.forEach((entries, spreadsheetId) => {
+    const srcSs = spreadsheetId
+      ? SpreadsheetApp.openById(spreadsheetId)
+      : SpreadsheetApp.getActiveSpreadsheet();
+    const srcSheet = srcSs.getSheetByName(SHEET_DATABASE);
+    if (!srcSheet) {
+      entries.forEach(() => log.push({ name: '?', folderNote: 'Source sheet not found — skipped' }));
+      return;
+    }
+
+    const srcHandbook = srcSs.getSheetByName(SHEET_HANDBOOK);
+    const srcFolderId = parseDriveId(srcHandbook
+      ? String(srcHandbook.getRange(DATA_FOLDER).getValue()).trim()
+      : '');
+
+    const destNumCols = destSheet.getLastColumn();
+
+    entries.forEach(({ rowIndex }) => {
+      const srcNumCols = srcSheet.getLastColumn();
+      const rowData = srcSheet.getRange(rowIndex, 1, 1, srcNumCols).getValues()[0];
+      const fullName = String(rowData[0]).trim();
+
+      if (spreadsheetId === destinationSpreadsheetId) {
+        log.push({ name: fullName, folderNote: 'Same spreadsheet — skipped' });
+        return;
+      }
+
+      // Pad or trim row to match destination column count.
+      const paddedData = rowData.slice(0, destNumCols);
+      while (paddedData.length < destNumCols) paddedData.push('');
+
+      const newRowIndex = Math.max(destSheet.getLastRow(), 2) + 1;
+      destSheet.getRange(newRowIndex, 1, 1, destNumCols).setValues([paddedData]);
+
+      srcSheet.deleteRow(rowIndex);
+
+      const newRow = { rowIndex: newRowIndex, values: paddedData.map(c => String(c == null ? '' : c)) };
+      if (destinationSpreadsheetId) newRow.spreadsheetId = destinationSpreadsheetId;
+      movedRows.push(newRow);
+
+      // Try to move the person's Drive folder.
+      let folderNote = '';
+      if (!srcFolderId || !destFolderId) {
+        folderNote = 'DATA_FOLDER not configured — folder not moved';
+      } else {
+        try {
+          const srcDataFolder = DriveApp.getFolderById(srcFolderId);
+          const folderIter = srcDataFolder.getFoldersByName(fullName);
+          if (!folderIter.hasNext()) {
+            folderNote = 'Folder not found — skipped';
+          } else {
+            const personFolder = folderIter.next();
+            const destDataFolder = DriveApp.getFolderById(destFolderId);
+            personFolder.moveTo(destDataFolder);
+            folderNote = 'Folder moved';
+          }
+        } catch (e) {
+          folderNote = `Folder move failed: ${e.message}`;
+        }
+      }
+
+      log.push({ name: fullName, folderNote });
+    });
+  });
+
+  return { log, movedRows };
+}
+
+/**
  * Returns the full schema and data from the "Database" sheet, plus sub-column
  * headers for any *-table columns resolved from the "Handbook" sheet.
  *
@@ -76,6 +219,7 @@ function openWebEditor() {
  *   columns: Array<{name: string, type: string, tableHeaders?: string[]}>,
  *   rows: Array<{rowIndex: number, values: string[]}>,
  *   masterMode: boolean,
+ *   masterSources: Array<{id: string|null, name: string}>|undefined,
  *   filterDebounceMs: number,
  *   imageFetchBatchSize: number,
  *   imageFetchConcurrency: number,
@@ -168,7 +312,8 @@ function getSchemaAndData() {
     if (col.type === 'sex') col.sexOptions = sexOptions;
   });
 
-  return { columns, rows, masterMode, filterDebounceMs: FILTER_DEBOUNCE_MS,
+  const masterSources = masterMode ? getSourceSpreadsheetInfos() : undefined;
+  return { columns, rows, masterMode, masterSources, filterDebounceMs: FILTER_DEBOUNCE_MS,
            imageFetchBatchSize: IMAGE_FETCH_BATCH_SIZE, imageFetchConcurrency: IMAGE_FETCH_CONCURRENCY,
            imageCacheTtlDays: IMAGE_CACHE_TTL_DAYS };
 }

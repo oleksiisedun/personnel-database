@@ -24,12 +24,28 @@
         <button id="btn-add-person">Add person</button>
         <button id="btn-export-f1" disabled>Export F-1</button>
         <button id="btn-export-wc" disabled>Export WC</button>
+        <button id="btn-move" disabled style="display:none">Move</button>
       </div>
       <div id="toolbar-right">
         <label id="regex-label"><input type="checkbox" id="chk-regex"> Search using REGEX</label>
         <div id="col-toggle-wrap">
           <button id="btn-columns">Columns ▾</button>
           <div id="col-panel" style="display:none"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Move overlay -->
+    <div id="move-overlay" style="display:none">
+      <div id="move-dialog">
+        <div id="move-dialog-title">Move selected persons to:</div>
+        <select id="move-destination"></select>
+        <div id="move-status" style="display:none"></div>
+        <div id="move-log" style="display:none"></div>
+        <div id="move-error" style="display:none"></div>
+        <div id="move-actions">
+          <button id="btn-move-cancel">Cancel</button>
+          <button id="btn-move-confirm">Move</button>
         </div>
       </div>
     </div>

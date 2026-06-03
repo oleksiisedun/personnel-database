@@ -129,6 +129,17 @@ When Master Mode is **OFF**, only the local `Database` sheet is shown. Editing (
 
 New rows added via **Add person** always go to the local `Database` sheet, never to a remote source.
 
+### Move personnel (Master Mode only)
+
+The **Move** toolbar button appears only when Master Mode is on. Select one or more rows with the checkbox column, click **Move**, pick a destination spreadsheet from the dropdown, and confirm.
+
+What happens on the server:
+1. The row is appended to the destination `Database` sheet and **hard-deleted** from the source (not sent to Trash).
+2. The person's Drive folder — searched by full name (first column) inside the source `DATA_FOLDER` — is moved to the destination `DATA_FOLDER` using `DriveApp`. If the folder is not found or `DATA_FOLDER` is not configured in either spreadsheet the row move still completes; the result dialog shows a per-person note.
+3. Rows that already belong to the destination spreadsheet are skipped.
+
+After a successful move the rows reappear in the list immediately under their new spreadsheet, without reopening the webview.
+
 ## Web editor features
 
 - **List view** — full-screen table with all columns and data
@@ -138,7 +149,8 @@ New rows added via **Add person** always go to the local `Database` sheet, never
 - **Column visibility** — "Columns ▾" button to hide/show individual columns; first column is always visible
 - **Image thumbnails** — loaded asynchronously; persisted in IndexedDB so subsequent opens display instantly
 - **Lightbox** — click any thumbnail to view the full image
-- **Row selection** — checkbox column at the left of the table; master checkbox in the filter row selects/deselects all visible rows; indeterminate state when a subset is selected; drives which rows are exported
+- **Row selection** — checkbox column at the left of the table; master checkbox in the filter row selects/deselects all visible rows; indeterminate state when a subset is selected; drives which rows are exported and moved
+- **Move** (Master Mode only) — moves selected rows to another spreadsheet and relocates the person's Drive folder; button is hidden when Master Mode is off
 - **Edit view** — click a name in the first column to open a per-record editor
 
 ## Document export
@@ -336,6 +348,32 @@ flowchart TD
   class startExport,exportBatch,processRow,replaceImages,replaceText,replaceServiceTable,replaceCorrespondence,computeValue,getCorrespondenceTable,underlineMaritalStatus,saveToFolder export
   class startExportFlow client
   class gsr,DriveApp api
+```
+
+### 7 · Move personnel
+
+```mermaid
+flowchart TD
+  openMoveOverlay --> selectDestination --> runMove
+  runMove --> gsr[google.script.run]
+  gsr --> movePersonnel
+  movePersonnel --> appendToDestination[append row to dest Database]
+  movePersonnel --> deleteFromSource[hard-delete from src Database]
+  movePersonnel --> findFolder[find folder in src DATA_FOLDER]
+  findFolder -->|found| moveFolder[moveTo dest DATA_FOLDER]
+  findFolder -->|not found| logSkip[log: skipped]
+  movePersonnel --> returnMovedRows[return movedRows + log]
+  returnMovedRows --> onMoveSuccess
+  onMoveSuccess --> updateSchemaRows[update schema.rows]
+  onMoveSuccess --> applyFilters
+
+  classDef code   fill:#EEEDFE,stroke:#534AB7,color:#26215C
+  classDef client fill:#E1F5EE,stroke:#0F6E56,color:#04342C
+  classDef api    fill:#F1EFE8,stroke:#5F5E5A,color:#2C2C2A
+
+  class movePersonnel,appendToDestination,deleteFromSource,findFolder,moveFolder,logSkip,returnMovedRows code
+  class openMoveOverlay,selectDestination,runMove,onMoveSuccess,updateSchemaRows,applyFilters client
+  class gsr api
 ```
 
 ## Local development

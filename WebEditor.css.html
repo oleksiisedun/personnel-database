@@ -45,12 +45,12 @@
   #toolbar-right { display: flex; align-items: center; gap: 8px; }
   #col-toggle-wrap { position: relative; display: inline-block; }
   #regex-label { font-size: 13px; color: #555; cursor: pointer; display: flex; align-items: center; gap: 4px; user-select: none; }
-  #btn-columns, #btn-add-person, #btn-export-f1, #btn-export-wc {
+  #btn-columns, #btn-add-person, #btn-export-f1, #btn-export-wc, #btn-move {
     background: none; border: 1px solid #ccc; border-radius: 4px;
     padding: 5px 12px; cursor: pointer; font-size: 13px; color: #555;
   }
-  #btn-columns:hover, #btn-add-person:hover, #btn-export-f1:hover, #btn-export-wc:hover { background: #f5f5f5; }
-  #btn-columns:disabled, #btn-export-f1:disabled, #btn-export-wc:disabled { opacity: 0.5; cursor: default; }
+  #btn-columns:hover, #btn-add-person:hover, #btn-export-f1:hover, #btn-export-wc:hover, #btn-move:hover { background: #f5f5f5; }
+  #btn-columns:disabled, #btn-export-f1:disabled, #btn-export-wc:disabled, #btn-move:disabled { opacity: 0.5; cursor: default; }
 
   /* ── Export overlay ── */
   #export-overlay {
@@ -87,6 +87,44 @@
     padding: 8px 20px; cursor: pointer; font-size: 13px; font-weight: 600;
   }
   #btn-export-close:hover { background: #1557b0; }
+  /* ── Move overlay ── */
+  #move-overlay {
+    position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+    background: rgba(0,0,0,0.5); display: flex;
+    align-items: center; justify-content: center; z-index: 9998;
+  }
+  #move-dialog {
+    background: #fff; border-radius: 8px; padding: 28px 32px;
+    min-width: 320px; max-width: 480px; box-shadow: 0 4px 24px rgba(0,0,0,0.3);
+  }
+  #move-dialog-title { font-size: 14px; font-weight: 600; color: #333; margin-bottom: 12px; }
+  #move-destination {
+    width: 100%; padding: 7px 10px; border: 1px solid #ccc; border-radius: 4px;
+    font-size: 13px; outline: none; background: #fff; cursor: pointer; margin-bottom: 16px;
+  }
+  #move-destination:focus { border-color: #4285f4; }
+  #move-status { font-size: 13px; color: #555; margin-bottom: 8px; }
+  #move-error { font-size: 13px; color: #c62828; margin-bottom: 8px; }
+  #move-log {
+    font-size: 12px; color: #666; font-family: monospace; margin-bottom: 12px;
+    max-height: 160px; overflow-y: auto; background: #f9f9f9;
+    border: 1px solid #e0e0e0; border-radius: 4px; padding: 8px 10px;
+  }
+  #move-log div { padding: 2px 0; }
+  #move-actions { display: flex; gap: 10px; justify-content: flex-end; }
+  #btn-move-cancel {
+    background: none; border: 1px solid #ccc; border-radius: 4px;
+    padding: 8px 20px; cursor: pointer; font-size: 13px; color: #555;
+  }
+  #btn-move-cancel:hover:not(:disabled) { background: #f5f5f5; }
+  #btn-move-cancel:disabled { opacity: 0.5; cursor: default; }
+  #btn-move-confirm {
+    background: #1a73e8; color: #fff; border: none; border-radius: 4px;
+    padding: 8px 20px; cursor: pointer; font-size: 13px; font-weight: 600;
+  }
+  #btn-move-confirm:hover:not(:disabled) { background: #1557b0; }
+  #btn-move-confirm:disabled { opacity: 0.5; cursor: default; }
+
   #col-panel {
     position: absolute; top: calc(100% + 4px); right: 0; z-index: 100;
     background: #fff; border: 1px solid #ddd; border-radius: 4px;
