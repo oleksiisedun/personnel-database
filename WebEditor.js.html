@@ -25,6 +25,12 @@
   const FIELD_SEP = ' | ';
   const ROW_SEP = '\n';
 
+  /**
+   * Returns a debounced version of fn that fires only after delay ms of silence.
+   * @param {Function} fn
+   * @param {number} delay - Milliseconds to wait after the last call.
+   * @returns {Function}
+   */
   function debounce(fn, delay) {
     let timer;
     return () => { clearTimeout(timer); timer = setTimeout(fn, delay); };
@@ -259,14 +265,12 @@
       fth.dataset.colIndex = i;
       const fDiv = document.createElement('div');
       fDiv.className = 'cell-content';
-      if (col.type === 'text' || col.type === 'unit' || col.type === 'origin' || col.type === 'date' || col.type === 'tin' || col.type === 'marital-status' || col.type === 'sex' || col.type === 'image' || isTableType(col)) {
-        const input = document.createElement('input');
-        input.type = 'text';
-        input.placeholder = 'Filter';
-        input.dataset.colIndex = i;
-        input.addEventListener('input', debounce(applyFilters, schema.filterDebounceMs));
-        fDiv.appendChild(input);
-      }
+      const input = document.createElement('input');
+      input.type = 'text';
+      input.placeholder = 'Filter';
+      input.dataset.colIndex = i;
+      input.addEventListener('input', debounce(applyFilters, schema.filterDebounceMs));
+      fDiv.appendChild(input);
       fth.appendChild(fDiv);
       filterRow.appendChild(fth);
     });
@@ -652,10 +656,43 @@
   }
 
   /**
+   * Builds a <select> element for a dropdown column type (unit, origin, marital-status, sex).
+   * Appends all known options plus the current value if it is not already in the list.
+   * @param {{type: string, [key: string]: string[]}} col - Column descriptor with XyzOptions array.
+   * @param {number} colIndex - Column index used as the select's data-col-index attribute.
+   * @param {string} currentVal - The row's current value for this column.
+   * @returns {HTMLSelectElement}
+   */
+  function buildDropdownField(col, colIndex, currentVal) {
+    const optKey = col.type === 'marital-status' ? 'maritalStatusOptions' : col.type + 'Options';
+    const options = col[optKey] || [];
+    const sel = document.createElement('select');
+    sel.dataset.colIndex = colIndex;
+    const emptyOpt = document.createElement('option');
+    emptyOpt.value = '';
+    emptyOpt.textContent = '—';
+    sel.appendChild(emptyOpt);
+    options.forEach(opt => {
+      const o = document.createElement('option');
+      o.value = opt;
+      o.textContent = opt;
+      sel.appendChild(o);
+    });
+    if (currentVal && !options.includes(currentVal)) {
+      const o = document.createElement('option');
+      o.value = currentVal;
+      o.textContent = currentVal;
+      sel.appendChild(o);
+    }
+    sel.value = currentVal;
+    return sel;
+  }
+
+  /**
    * Switches to the edit view for the given row. Dynamically builds a form field
-   * for each column: a table editor for *-table types, a text input with live
-   * image preview for image types, and a plain text input for text types.
-   * @param {{rowIndex: number, values: string[]}} row
+   * for each column: a dropdown for dropdown types, a table editor for *-table types,
+   * a text input with live image preview for image types, and a plain text input for text types.
+   * @param {{rowIndex: number|null, values: string[]}} row
    */
   function openEditView(row) {
     editingRow = row;
@@ -672,94 +709,8 @@
 
       if (isTableType(col)) {
         block.appendChild(buildTableEditor(i, parseData(row.values[i] || '', col.tableHeaders || []), col.tableHeaders || []));
-      } else if (col.type === 'unit') {
-        const currentVal = row.values[i] || '';
-        const sel = document.createElement('select');
-        sel.dataset.colIndex = i;
-        const emptyOpt = document.createElement('option');
-        emptyOpt.value = '';
-        emptyOpt.textContent = '—';
-        sel.appendChild(emptyOpt);
-        (col.unitOptions || []).forEach(opt => {
-          const o = document.createElement('option');
-          o.value = opt;
-          o.textContent = opt;
-          sel.appendChild(o);
-        });
-        if (currentVal && !(col.unitOptions || []).includes(currentVal)) {
-          const o = document.createElement('option');
-          o.value = currentVal;
-          o.textContent = currentVal;
-          sel.appendChild(o);
-        }
-        sel.value = currentVal;
-        block.appendChild(sel);
-      } else if (col.type === 'origin') {
-        const currentVal = row.values[i] || '';
-        const sel = document.createElement('select');
-        sel.dataset.colIndex = i;
-        const emptyOpt = document.createElement('option');
-        emptyOpt.value = '';
-        emptyOpt.textContent = '—';
-        sel.appendChild(emptyOpt);
-        (col.originOptions || []).forEach(opt => {
-          const o = document.createElement('option');
-          o.value = opt;
-          o.textContent = opt;
-          sel.appendChild(o);
-        });
-        if (currentVal && !(col.originOptions || []).includes(currentVal)) {
-          const o = document.createElement('option');
-          o.value = currentVal;
-          o.textContent = currentVal;
-          sel.appendChild(o);
-        }
-        sel.value = currentVal;
-        block.appendChild(sel);
-      } else if (col.type === 'marital-status') {
-        const currentVal = row.values[i] || '';
-        const sel = document.createElement('select');
-        sel.dataset.colIndex = i;
-        const emptyOpt = document.createElement('option');
-        emptyOpt.value = '';
-        emptyOpt.textContent = '—';
-        sel.appendChild(emptyOpt);
-        (col.maritalStatusOptions || []).forEach(opt => {
-          const o = document.createElement('option');
-          o.value = opt;
-          o.textContent = opt;
-          sel.appendChild(o);
-        });
-        if (currentVal && !(col.maritalStatusOptions || []).includes(currentVal)) {
-          const o = document.createElement('option');
-          o.value = currentVal;
-          o.textContent = currentVal;
-          sel.appendChild(o);
-        }
-        sel.value = currentVal;
-        block.appendChild(sel);
-      } else if (col.type === 'sex') {
-        const currentVal = row.values[i] || '';
-        const sel = document.createElement('select');
-        sel.dataset.colIndex = i;
-        const emptyOpt = document.createElement('option');
-        emptyOpt.value = '';
-        emptyOpt.textContent = '—';
-        sel.appendChild(emptyOpt);
-        (col.sexOptions || []).forEach(opt => {
-          const o = document.createElement('option');
-          o.value = opt;
-          o.textContent = opt;
-          sel.appendChild(o);
-        });
-        if (currentVal && !(col.sexOptions || []).includes(currentVal)) {
-          const o = document.createElement('option');
-          o.value = currentVal;
-          o.textContent = currentVal;
-          sel.appendChild(o);
-        }
-        sel.value = currentVal;
-        block.appendChild(sel);
+      } else if (col.type === 'unit' || col.type === 'origin' || col.type === 'marital-status' || col.type === 'sex') {
+        block.appendChild(buildDropdownField(col, i, row.values[i] || ''));
       } else if (col.type === 'tin') {
         const input = document.createElement('input');
         input.type = 'text';
@@ -1043,36 +994,24 @@
    * Disables the Save button for the duration of the async call.
    */
   function saveRow() {
-    let hasDateError = false;
+    const VALIDATORS = {
+      date: { regex: /^\d{2}\.\d{2}\.\d{4}$/, msg: 'Fix date fields (expected format: DD.MM.YYYY) before saving.' },
+      tin:  { regex: /^\d{10}$/,               msg: 'TIN must be exactly 10 digits.' },
+    };
+    let validationError = null;
     schema.columns.forEach((col, i) => {
-      if (col.type !== 'date') return;
+      const validator = VALIDATORS[col.type];
+      if (!validator) return;
       const inp = document.querySelector(`#edit-form input[data-col-index="${i}"]`);
       if (!inp) return;
       const val = inp.value.trim();
-      const valid = !val || /^\d{2}\.\d{2}\.\d{4}$/.test(val);
+      const valid = !val || validator.regex.test(val);
       inp.classList.toggle('input-error', !valid);
-      if (!valid) hasDateError = true;
+      if (!valid && !validationError) validationError = validator.msg;
     });
-    if (hasDateError) {
+    if (validationError) {
       const el = document.getElementById('save-error');
-      el.textContent = 'Fix date fields (expected format: DD.MM.YYYY) before saving.';
-      el.style.display = 'block';
-      return;
-    }
-
-    let hasTinError = false;
-    schema.columns.forEach((col, i) => {
-      if (col.type !== 'tin') return;
-      const inp = document.querySelector(`#edit-form input[data-col-index="${i}"]`);
-      if (!inp) return;
-      const val = inp.value.trim();
-      const valid = !val || /^\d{10}$/.test(val);
-      inp.classList.toggle('input-error', !valid);
-      if (!valid) hasTinError = true;
-    });
-    if (hasTinError) {
-      const el = document.getElementById('save-error');
-      el.textContent = 'TIN must be exactly 10 digits.';
+      el.textContent = validationError;
       el.style.display = 'block';
       return;
     }
@@ -1093,10 +1032,20 @@
     document.getElementById('save-status').textContent = 'Saving…';
     document.getElementById('save-error').style.display = 'none';
 
-    google.script.run
-      .withSuccessHandler(onSaveSuccess)
-      .withFailureHandler(onSaveError)
-      .updateRow(editingRow.rowIndex, newValues, editingRow.spreadsheetId ?? null);
+    if (isNewRow) {
+      google.script.run
+        .withSuccessHandler(newRowIndex => {
+          editingRow.rowIndex = newRowIndex;
+          onSaveSuccess();
+        })
+        .withFailureHandler(onSaveError)
+        .addRowWithData(newValues);
+    } else {
+      google.script.run
+        .withSuccessHandler(onSaveSuccess)
+        .withFailureHandler(onSaveError)
+        .updateRow(editingRow.rowIndex, newValues, editingRow.spreadsheetId ?? null);
+    }
   }
 
   /**
@@ -1118,25 +1067,14 @@
   }
 
   /**
-   * Appends a new empty row to the sheet via the server, then opens the edit
-   * view for it. The row is added to schema.rows only after a successful save.
+   * Creates a local empty row and opens the edit view for it.
+   * The row is written to the sheet only when the user saves.
    */
   function addPerson() {
-    const btn = document.getElementById('btn-add-person');
-    btn.disabled = true;
-    google.script.run
-      .withSuccessHandler(newRowIndex => {
-        const emptyValues = new Array(schema.columns.length).fill('');
-        const newRow = { rowIndex: newRowIndex, values: emptyValues };
-        isNewRow = true;
-        openEditView(newRow);
-        btn.disabled = false;
-      })
-      .withFailureHandler(err => {
-        btn.disabled = false;
-        alert(`Failed to add person: ${err.message || err}`);
-      })
-      .addRow();
+    const emptyValues = new Array(schema.columns.length).fill('');
+    const newRow = { rowIndex: null, values: emptyValues };
+    isNewRow = true;
+    openEditView(newRow);
   }
 
   /**
@@ -1238,7 +1176,7 @@
       progressBar.style.width = `${pct}%`;
     };
 
-    const fire = indices => {
+    const fire = entries => {
       progressBar.classList.add('indeterminate');
       google.script.run
         .withSuccessHandler(response => {
@@ -1276,10 +1214,10 @@
           el.style.display = 'block';
           document.getElementById('btn-export-close').style.display = 'inline-block';
         })
-        [serverFnName](indices);
+        [serverFnName](entries);
     };
 
-    fire(rowsToExport.map(r => r.rowIndex));
+    fire(rowsToExport.map(r => ({ rowIndex: r.rowIndex, spreadsheetId: r.spreadsheetId ?? null })));
   }
 
   /**

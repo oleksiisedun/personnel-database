@@ -1,26 +1,27 @@
 /**
- * Exports an F-1 document for each given row index.
+ * Exports an F-1 document for each given row entry.
  *
- * @param {number[]} rowIndices - 1-based sheet row numbers to export.
- * @returns {Array<{name: string, url: string}>}
+ * @param {Array<{rowIndex: number, spreadsheetId: string|null}>} rowEntries
+ * @returns {{results: Array<{name: string, url: string}>, remaining: Array<{rowIndex: number, spreadsheetId: string|null}>}}
  */
-function exportF1(rowIndices) {
-  return _exportDoc(rowIndices, F1_TEMPLATE_ID, F1_DOC_PREFIX);
+function exportF1(rowEntries) {
+  return _exportDoc(rowEntries, F1_TEMPLATE_ID, F1_DOC_PREFIX);
 }
 
 /**
- * Exports a Wanted Card document for each given row index.
+ * Exports a Wanted Card document for each given row entry.
  *
- * @param {number[]} rowIndices - 1-based sheet row numbers to export.
- * @returns {Array<{name: string, url: string}>}
+ * @param {Array<{rowIndex: number, spreadsheetId: string|null}>} rowEntries
+ * @returns {{results: Array<{name: string, url: string}>, remaining: Array<{rowIndex: number, spreadsheetId: string|null}>}}
  */
-function exportWC(rowIndices) {
-  return _exportDoc(rowIndices, WC_TEMPLATE_ID, WC_DOC_PREFIX);
+function exportWC(rowEntries) {
+  return _exportDoc(rowEntries, WC_TEMPLATE_ID, WC_DOC_PREFIX);
 }
 
 /**
- * Copies a Google Docs template for each given row, fills all placeholders
- * with row data, and saves the result to the export folder.
+ * Copies a Google Docs template for each given row entry, fills all placeholders
+ * with row data, and saves the result to the export folder. Each source spreadsheet
+ * is read at most once per call (cached by spreadsheet ID).
  *
  * Four passes run in order:
  *   1. Image-type columns — placeholder replaced with the actual image blob.
@@ -31,38 +32,61 @@ function exportWC(rowIndices) {
  * Placeholders with no match are left untouched. The marital status line is
  * underlined based on the COL_MARITAL_STATUS value.
  *
- * @param {number[]} rowIndices - 1-based sheet row numbers to export.
+ * @param {Array<{rowIndex: number, spreadsheetId: string|null}>} rowEntries
  * @param {string} templateId - Google Drive file ID of the Docs template.
  * @param {string} docPrefix - Prefix prepended to the first-column value to form the document name.
- * @returns {Array<{name: string, url: string}>} Names and URLs of created documents.
+ * @returns {{results: Array<{name: string, url: string}>, remaining: Array<{rowIndex: number, spreadsheetId: string|null}>}}
  */
-function _exportDoc(rowIndices, templateId, docPrefix) {
-  const ss = SpreadsheetApp.getActiveSpreadsheet();
-  const sheet = ss.getSheetByName(SHEET_DATABASE);
-  if (!sheet) throw new Error('Sheet "Database" not found.');
-  const all = sheet.getDataRange().getValues();
-  const columns = all[0].map((name, i) => ({
-    name: String(name),
-    type: String(all[1][i]).toLowerCase()
-  }));
+function _exportDoc(rowEntries, templateId, docPrefix) {
   const exportFolder = DriveApp.getFolderById(EXPORT_FOLDER_ID);
-
-  const handbookSheet = ss.getSheetByName(SHEET_HANDBOOK);
+  const localSs = SpreadsheetApp.getActiveSpreadsheet();
+  const handbookSheet = localSs.getSheetByName(SHEET_HANDBOOK);
   const mappings = handbookSheet ? _loadCorrespondenceTable(handbookSheet) : [];
+
+  // Cache sheet data per spreadsheet to avoid redundant reads within the same export call.
+  const sheetCache = new Map();
+  /**
+   * Returns cached { all, columns } for the given spreadsheet, or null if inaccessible.
+   * @param {string|null} spreadsheetId
+   * @returns {{all: Array, columns: Array}|null}
+   */
+  const getSheetData = spreadsheetId => {
+    const key = spreadsheetId ?? '';
+    if (!sheetCache.has(key)) {
+      try {
+        const ss = spreadsheetId ? SpreadsheetApp.openById(spreadsheetId) : localSs;
+        const sheet = ss.getSheetByName(SHEET_DATABASE);
+        if (!sheet) { sheetCache.set(key, null); return null; }
+        const all = sheet.getDataRange().getValues();
+        const columns = all[0].map((name, i) => ({
+          name: String(name),
+          type: String(all[1][i]).toLowerCase()
+        }));
+        sheetCache.set(key, { all, columns });
+      } catch (e) {
+        sheetCache.set(key, null);
+      }
+    }
+    return sheetCache.get(key);
+  };
 
   const results = [];
   const startTime = new Date();
   let remaining = [];
 
-  for (let i = 0; i < rowIndices.length; i++) {
-    const now = new Date();
-    if (now - startTime > EXPORT_TIME_LIMIT_MS) {
-      remaining = rowIndices.slice(i);
+  for (let i = 0; i < rowEntries.length; i++) {
+    if (new Date() - startTime > EXPORT_TIME_LIMIT_MS) {
+      remaining = rowEntries.slice(i);
       break;
     }
 
-    const rowIndex = rowIndices[i];
+    const { rowIndex, spreadsheetId } = rowEntries[i];
+    const sheetData = getSheetData(spreadsheetId ?? null);
+    if (!sheetData) continue;
+    const { all, columns } = sheetData;
+
     const rowValues = all[rowIndex - 1];
+    if (!rowValues) continue;
     const data = {};
     columns.forEach((col, j) => { data[col.name] = String(rowValues[j] == null ? '' : rowValues[j]); });
 
@@ -75,7 +99,7 @@ function _exportDoc(rowIndices, templateId, docPrefix) {
     columns.forEach(col => {
       if (col.type !== 'image') return;
       const placeholder = '{' + col.name + '}';
-      const fileId = _extractDriveId(data[col.name] || '');
+      const fileId = parseDriveId(data[col.name] || '');
       if (fileId) {
         try {
           _replacePlaceholderWithImage(body, placeholder, DriveApp.getFileById(fileId).getBlob());
@@ -436,30 +460,6 @@ function _pluralizeUk(count, unit) {
   return `${count} ${word}`;
 }
 
-/**
- * Extracts a Google Drive file ID from a sharing URL or returns the input
- * unchanged if it already looks like a bare file ID.
- * Supported formats:
- *   https://drive.google.com/file/d/FILE_ID/view
- *   https://drive.google.com/open?id=FILE_ID
- *   FILE_ID (bare alphanumeric string ≥ 10 chars)
- *
- * @param {string} url - Drive sharing URL or raw file ID.
- * @returns {string|null} Extracted file ID, or null if not parseable.
- */
-function _extractDriveId(url) {
-  if (!url) return null;
-  const patterns = [
-    /\/file\/d\/([a-zA-Z0-9_-]+)/,
-    /[?&]id=([a-zA-Z0-9_-]+)/,
-  ];
-  for (const pattern of patterns) {
-    const m = url.match(pattern);
-    if (m) return m[1];
-  }
-  if (/^[a-zA-Z0-9_-]{10,}$/.test(url.trim())) return url.trim();
-  return null;
-}
 
 /**
  * Escapes all Java regex metacharacters in a string so it can be passed as a

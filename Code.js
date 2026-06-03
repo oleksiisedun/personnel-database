@@ -276,40 +276,17 @@ function getSchemaAndData() {
     if (col.type.endsWith('-table')) col.tableHeaders = tableHeadersMap[col.type] || [];
   });
 
-  let unitOptions = [];
-  if (handbookSheet) {
-    unitOptions = handbookSheet.getRange(HANDBOOK_UNIT_RANGE).getValues()
-      .map(r => String(r[0])).filter(v => v !== '');
-  }
-  columns.forEach(col => {
-    if (col.type === 'unit') col.unitOptions = unitOptions;
-  });
-
-  let originOptions = [];
-  if (handbookSheet) {
-    originOptions = handbookSheet.getRange(HANDBOOK_ORIGIN_RANGE).getValues()
-      .map(r => String(r[0])).filter(v => v !== '');
-  }
-  columns.forEach(col => {
-    if (col.type === 'origin') col.originOptions = originOptions;
-  });
-
-  let maritalStatusOptions = [];
-  if (handbookSheet) {
-    maritalStatusOptions = handbookSheet.getRange(HANDBOOK_MARITAL_STATUS_RANGE).getValues()
-      .map(r => String(r[0])).filter(v => v !== '');
-  }
-  columns.forEach(col => {
-    if (col.type === 'marital-status') col.maritalStatusOptions = maritalStatusOptions;
-  });
-
-  let sexOptions = [];
-  if (handbookSheet) {
-    sexOptions = handbookSheet.getRange(HANDBOOK_SEX_RANGE).getValues()
-      .map(r => String(r[0])).filter(v => v !== '');
-  }
-  columns.forEach(col => {
-    if (col.type === 'sex') col.sexOptions = sexOptions;
+  const DROPDOWN_TYPES = [
+    { type: 'unit',           range: HANDBOOK_UNIT_RANGE,           key: 'unitOptions' },
+    { type: 'origin',         range: HANDBOOK_ORIGIN_RANGE,         key: 'originOptions' },
+    { type: 'marital-status', range: HANDBOOK_MARITAL_STATUS_RANGE, key: 'maritalStatusOptions' },
+    { type: 'sex',            range: HANDBOOK_SEX_RANGE,            key: 'sexOptions' },
+  ];
+  DROPDOWN_TYPES.forEach(({ type, range, key }) => {
+    const options = handbookSheet
+      ? handbookSheet.getRange(range).getValues().map(r => String(r[0])).filter(v => v !== '')
+      : [];
+    columns.forEach(col => { if (col.type === type) col[key] = options; });
   });
 
   const masterSources = masterMode ? getSourceSpreadsheetInfos() : undefined;
@@ -351,16 +328,20 @@ function getImagesDataUrls(fileIds) {
 }
 
 /**
- * Appends a new empty row to the "Database" sheet and returns its 1-based row index.
+ * Appends a new row populated with the given values to the "Database" sheet
+ * and returns its 1-based row index. Always writes to the active (local) spreadsheet.
  *
+ * @param {string[]} values - Array of cell values, one per column.
  * @returns {number} 1-based row index of the newly created row.
  */
-function addRow() {
+function addRowWithData(values) {
   const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(SHEET_DATABASE);
   if (!sheet) throw new Error('Sheet "Database" not found.');
   const newRowIndex = sheet.getLastRow() + 1;
   const numCols = sheet.getLastColumn();
-  sheet.getRange(newRowIndex, 1, 1, numCols).setValues([new Array(numCols).fill('')]);
+  const padded = values.slice(0, numCols);
+  while (padded.length < numCols) padded.push('');
+  sheet.getRange(newRowIndex, 1, 1, numCols).setValues([padded]);
   return newRowIndex;
 }
 
