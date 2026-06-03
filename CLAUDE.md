@@ -64,7 +64,7 @@ The client-side code in `WebEditor.js.html` is not a module — all functions ar
 
 When `Handbook!M2` is `true`, `getSchemaAndData()` reads spreadsheet IDs from `Handbook!N2:N` and appends rows from each remote spreadsheet's `Database` sheet to the local rows. Remote rows carry a `spreadsheetId` property; local rows do not.
 
-`updateRow(rowIndex, values, spreadsheetId)` and `deleteRow(rowIndex, spreadsheetId)` route to the correct spreadsheet based on `spreadsheetId` — `SpreadsheetApp.openById()` for remote, `getActiveSpreadsheet()` for local. New rows (`addRow()`) always go to the local `Database` sheet. Editing is never restricted by Master Mode state.
+`updateRow(rowIndex, values, spreadsheetId)` and `deleteRow(rowIndex, spreadsheetId)` route to the correct spreadsheet based on `spreadsheetId` — `SpreadsheetApp.openById()` for remote, `getActiveSpreadsheet()` for local. New rows (`addRowWithData(values)`) always go to the local `Database` sheet. Editing is never restricted by Master Mode state.
 
 When masterMode is true, `getSchemaAndData()` also calls `getSourceSpreadsheetInfos()` and includes the result as `masterSources: Array<{id, name}>` in the return value (current spreadsheet has `id: null`). The client uses this to populate the Move destination dropdown.
 
@@ -85,9 +85,9 @@ When masterMode is true, `getSchemaAndData()` also calls `getSourceSpreadsheetIn
 
 `unit`, `origin`, `marital-status`, and `sex` columns each read their allowed values from a dedicated Handbook range at load time. The pattern for adding a new dropdown type is:
 1. Add a `HANDBOOK_XYZ_RANGE` constant in `Config.js`
-2. Read and attach `col.xyzOptions` in `getSchemaAndData()` (same pattern as `unitOptions`)
-3. Render a `<select>` in `openEditView()` in `WebEditor.js.html`
-4. Add the type to the filter input condition in `buildListView()`
+2. Add an entry to the `DROPDOWN_TYPES` table in `getSchemaAndData()` — `{ type, range, key }` — one line
+3. No change needed in `openEditView()` — `buildDropdownField()` handles all dropdown types automatically via the `col.xyzOptions` key
+4. No change needed in `buildListView()` — filter inputs are rendered unconditionally for all column types
 
 ### Image loading
 
@@ -102,9 +102,9 @@ Loading uses a **concurrency pool** controlled by `IMAGE_FETCH_CONCURRENCY` and 
 
 ### Document export (`Export.js`)
 
-Export is triggered from the toolbar. The Export F-1 and Export WC buttons are disabled until at least one row is checked via the selection checkbox column. `runExport()` collects `rowIndex` values only from `selectedKeys`-checked rows and passes them as `rowIndices` to the server.
+Export is triggered from the toolbar. The Export F-1 and Export WC buttons are disabled until at least one row is checked via the selection checkbox column. `runExport()` collects `{ rowIndex, spreadsheetId }` entries from `selectedKeys`-checked rows and passes them to the server (Master Mode rows carry a non-null `spreadsheetId`).
 
-`exportF1(rowIndices)` and `exportWC(rowIndices)` copy Google Docs templates into the export folder and fill placeholders with row data. Both delegate to `_exportDoc()`, which runs four passes in strict order:
+`exportF1(rowEntries)` and `exportWC(rowEntries)` copy Google Docs templates into the export folder and fill placeholders with row data. Both delegate to `_exportDoc()`, which caches sheet data per `spreadsheetId` (so each remote spreadsheet is read at most once per export call) and runs four passes in strict order:
 
 1. **Image columns** — `{Column Name}` placeholder replaced with the actual image blob.
 2. **Service history table** — `{Проходження служби}` placeholder row expanded into one table row per service entry. Must run before pass 3 or the placeholder text would be consumed before the table handler can locate it.
