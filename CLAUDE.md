@@ -34,6 +34,8 @@ The `Handbook` sheet holds schema metadata, dropdown option lists, the Master Mo
 Key Handbook cells:
 - `M2` (`MASTER_MODE_CELL`) — Master Mode checkbox
 - `M4` (`DATA_FOLDER`) — Google Drive folder ID containing person images and PDFs
+- `M6` (`ACTUAL_PERSONNEL_SPREADSHEET_CELL`) — link/ID of the spreadsheet containing the actual personnel list
+- `M7` (`ACTUAL_PERSONNEL_RANGE_CELL`) — range address within that spreadsheet (e.g. `Sheet1!A:A`) holding full names
 - `N2:N` (`MASTER_MODE_SOURCES_RANGE`) — source spreadsheet IDs for Master Mode
 
 ### How the HTML template works
@@ -67,6 +69,12 @@ When `Handbook!M2` is `true`, `getSchemaAndData()` reads spreadsheet IDs from `H
 `updateRow(rowIndex, values, spreadsheetId)` and `deleteRow(rowIndex, spreadsheetId)` route to the correct spreadsheet based on `spreadsheetId` — `SpreadsheetApp.openById()` for remote, `getActiveSpreadsheet()` for local. New rows (`addRowWithData(values)`) always go to the local `Database` sheet. Editing is never restricted by Master Mode state.
 
 When masterMode is true, `getSchemaAndData()` also calls `getSourceSpreadsheetInfos()` and includes the result as `masterSources: Array<{id, name}>` in the return value (current spreadsheet has `id: null`). The client uses this to populate the Move destination dropdown.
+
+### Actual personnel filter
+
+`getActualPersonnelNames()` reads the spreadsheet link from `Handbook!M6` and the range address from `Handbook!M7`, opens the spreadsheet with `SpreadsheetApp.openById()`, and returns the flat list of non-empty name strings. Returns `null` if either cell is empty or the spreadsheet is inaccessible.
+
+`getSchemaAndData()` includes the result as `actualPersonnelNames: string[]|null` in its return value. The client enables the **"Actual personnel"** toolbar checkbox only when the array is non-null and non-empty; otherwise the checkbox stays disabled. When the checkbox is checked, `applyFilters()` additionally requires that `row.values[0]` (first column = full name) is present in `actualPersonnelNames`. The filter composes with all existing column text filters and the regex toggle.
 
 ### Move personnel (`movePersonnel`)
 

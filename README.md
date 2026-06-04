@@ -38,6 +38,8 @@ Same structure as `Database` (row 1 = column names, row 2 = column types, row 3+
 | `A2:K15` (`HANDBOOK_TYPES_RANGE`) | Sub-column headers for each `*-table` type; col A = type name, col B onward = headers |
 | `M2` (`MASTER_MODE_CELL`) | Master Mode toggle (checkbox) — when checked, the webview aggregates data from all source spreadsheets listed in `N2:N` |
 | `M4` (`DATA_FOLDER`) | Google Drive folder ID that contains person images and PDFs |
+| `M6` (`ACTUAL_PERSONNEL_SPREADSHEET_CELL`) | Link or bare ID of the spreadsheet that holds the authoritative personnel list |
+| `M7` (`ACTUAL_PERSONNEL_RANGE_CELL`) | Range address within that spreadsheet (e.g. `Sheet1!A:A`) containing full names |
 | `N2:N` (`MASTER_MODE_SOURCES_RANGE`) | Source spreadsheet IDs — one per row; used when Master Mode is ON |
 | `A17:C40` (`HANDBOOK_CORR_RANGE`) | Placeholder correspondence table for document exports |
 | `D17:D40` (`HANDBOOK_UNIT_RANGE`) | Allowed values for `unit`-type columns |
@@ -144,6 +146,7 @@ After a successful move the rows reappear in the list immediately under their ne
 
 - **List view** — full-screen table with all columns and data
 - **Filtering** — debounced live filter input above every column; supports plain text and regular expressions (toggle per session); for `image` columns the search matches the raw Drive URL/ID (`""` to filter empty); for `*-table` columns the search runs against the raw encoded cell content, so any sub-field value is matched
+- **Actual personnel filter** — "Actual personnel" checkbox in the toolbar (enabled only when `Handbook!M6`/`M7` are configured and accessible); when checked, only rows whose first-column value (full name) appears in the external personnel list are shown; composes with all other filters
 - **Add person** — appends a new empty row to the local `Database` sheet and opens it in the edit view immediately
 - **Delete** — red "Delete" button in the edit view moves the record to the `Trash` sheet of its source spreadsheet (not available for unsaved new rows)
 - **Column visibility** — "Columns ▾" button to hide/show individual columns; first column is always visible
@@ -218,6 +221,8 @@ Exports run in automatic batches capped at `EXPORT_TIME_LIMIT_MS` (5 minutes) to
 | `HANDBOOK_ORIGIN_RANGE` | `'E17:E40'` | Range of allowed values for `origin`-type columns |
 | `HANDBOOK_MARITAL_STATUS_RANGE` | `'F17:F40'` | Range of allowed values for `marital-status`-type columns |
 | `HANDBOOK_SEX_RANGE` | `'G17:G40'` | Range of allowed values for `sex`-type columns |
+| `ACTUAL_PERSONNEL_SPREADSHEET_CELL` | `'M6'` | Cell holding the link/ID of the external spreadsheet with the actual personnel list |
+| `ACTUAL_PERSONNEL_RANGE_CELL` | `'M7'` | Cell holding the range address within that spreadsheet (e.g. `Sheet1!A:A`) |
 | `F1_TEMPLATE_ID` | — | Google Docs template ID for F-1 export |
 | `WC_TEMPLATE_ID` | — | Google Docs template ID for Wanted Card export |
 | `EXPORT_FOLDER_ID` | — | Google Drive folder ID for exported documents |
