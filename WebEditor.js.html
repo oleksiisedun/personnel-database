@@ -10,8 +10,9 @@
   let imageCache = {};     // fileId → { type:'image', dataUrl } | { type:'pdf', viewUrl } | null
   let pendingImages = new Set(); // fileIds currently being fetched to avoid duplicate requests
   let isNewRow = false;    // true when the edit view holds a freshly appended row
-  let useRegex = false;    // true when filter inputs are treated as regular expressions
-  let dbPromise = null;    // Promise<IDBDatabase> — opened once in init(), reused thereafter
+  let useRegex = false;              // true when filter inputs are treated as regular expressions
+  let filterActualPersonnel = false; // true when only names in the actual personnel list are shown
+  let dbPromise = null;              // Promise<IDBDatabase> — opened once in init(), reused thereafter
   const selectedKeys = new Set(); // compound "spreadsheetId:rowIndex" keys of rows checked for export
 
   /**
@@ -196,6 +197,14 @@
     if (data.masterMode) {
       document.getElementById('btn-move').style.display = '';
     }
+    const chkActual = document.getElementById('chk-actual');
+    if (data.actualPersonnelNames?.length) {
+      chkActual.disabled = false;
+      chkActual.addEventListener('change', () => {
+        filterActualPersonnel = chkActual.checked;
+        applyFilters();
+      });
+    }
     buildListView();
     applyFilters();
     document.getElementById('data-table').style.display = 'table';
@@ -294,15 +303,19 @@
         filters[inp.dataset.colIndex] = val.toLowerCase();
       }
     });
-    filteredRows = schema.rows.filter(row =>
-      Object.keys(filters).every(colIdx => {
+    filteredRows = schema.rows.filter(row => {
+      if (!Object.keys(filters).every(colIdx => {
         const cell = row.values[colIdx] || '';
         const f = filters[colIdx];
         if (f?.empty) return !cell.trim();
         if (f?.notEmpty) return !!cell.trim();
         return useRegex ? f.test(cell) : cell.toLowerCase().includes(f);
-      })
-    );
+      })) return false;
+      if (filterActualPersonnel) {
+        return schema.actualPersonnelNames.includes((row.values[0] ?? '').trim());
+      }
+      return true;
+    });
 
     renderList();
   }

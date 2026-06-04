@@ -28,6 +28,10 @@ const HANDBOOK_MARITAL_STATUS_RANGE = 'F17:F40';
 // Handbook layout — allowed values for "sex" type columns
 const HANDBOOK_SEX_RANGE = 'G17:G40';
 
+// Handbook layout — actual personnel list (external spreadsheet link and range address)
+const ACTUAL_PERSONNEL_SPREADSHEET_CELL = 'M6';
+const ACTUAL_PERSONNEL_RANGE_CELL = 'M7';
+
 // Database column names
 const COL_DRAFT_DATE = 'Дата призову';
 const COL_SERVICE_HISTORY = 'Проходження служби';

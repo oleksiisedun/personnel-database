@@ -94,6 +94,28 @@ function parseDriveId(value) {
   return m ? m[1] : value;
 }
 
+/**
+ * Reads the actual personnel name list from the external spreadsheet configured
+ * in Handbook M6 (spreadsheet link/ID) and M7 (range address).
+ * Returns null if not configured or if the spreadsheet is inaccessible.
+ *
+ * @returns {string[]|null}
+ */
+function getActualPersonnelNames() {
+  const handbook = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(SHEET_HANDBOOK);
+  if (!handbook) return null;
+  const link  = String(handbook.getRange(ACTUAL_PERSONNEL_SPREADSHEET_CELL).getValue()).trim();
+  const range = String(handbook.getRange(ACTUAL_PERSONNEL_RANGE_CELL).getValue()).trim();
+  const id = parseDriveId(link);
+  if (!id || !range) return null;
+  try {
+    return SpreadsheetApp.openById(id).getRange(range).getValues()
+      .map(r => String(r[0]).trim()).filter(v => v !== '');
+  } catch (e) {
+    return null;
+  }
+}
+
 
 /**
  * Moves rows from their source spreadsheets into the destination spreadsheet.
@@ -290,7 +312,9 @@ function getSchemaAndData() {
   });
 
   const masterSources = masterMode ? getSourceSpreadsheetInfos() : undefined;
-  return { columns, rows, masterMode, masterSources, filterDebounceMs: FILTER_DEBOUNCE_MS,
+  return { columns, rows, masterMode, masterSources,
+           actualPersonnelNames: getActualPersonnelNames(),
+           filterDebounceMs: FILTER_DEBOUNCE_MS,
            imageFetchBatchSize: IMAGE_FETCH_BATCH_SIZE, imageFetchConcurrency: IMAGE_FETCH_CONCURRENCY,
            imageCacheTtlDays: IMAGE_CACHE_TTL_DAYS };
 }
