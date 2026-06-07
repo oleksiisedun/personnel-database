@@ -933,7 +933,7 @@
     if ((headers || []).length > 0) {
       const maxLens = headers.map(h => {
         const dataMax = (rows || []).reduce((m, r) => Math.max(m, (r[h] || '').length), 0);
-        return Math.max(h.length, dataMax, 8);
+        return Math.sqrt(Math.max(h.length, dataMax, 8));
       });
       const total = maxLens.reduce((a, b) => a + b, 0);
       const colgroup = document.createElement('colgroup');
