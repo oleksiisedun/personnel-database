@@ -95,7 +95,7 @@ When masterMode is true, `getSchemaAndData()` also calls `getSourceSpreadsheetIn
 
 ### `*-table` editor column widths
 
-`buildTableEditor()` prepends a `<colgroup>` to the editor `<table>` with each `<col>` width set as a percentage proportional to the maximum string length found in that column (header text or any data value, whichever is longer, minimum 8 chars). This mirrors the natural content-based auto-sizing that the read-only `mini-table` gets for free from `table-layout: auto` on text nodes — inputs with `width: 100%` would otherwise force equal-width columns.
+`buildTableEditor()` prepends a `<colgroup>` to the editor `<table>` with each `<col>` width set as a percentage proportional to the **square root** of the maximum string length found in that column (header text or any data value, whichever is longer, minimum 8 chars). The sqrt scaling prevents very long columns (e.g. address) from dominating and squeezing short but important ones (e.g. phone). This mirrors the natural content-based auto-sizing that the read-only `mini-table` gets for free from `table-layout: auto` on text nodes — inputs with `width: 100%` would otherwise force equal-width columns.
 
 ### Dropdown column types
 
