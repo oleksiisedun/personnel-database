@@ -889,6 +889,20 @@
   function buildMiniTable(rows, headers) {
     const table = document.createElement('table');
     table.className = 'mini-table';
+    if ((headers || []).length > 0) {
+      const scaledLens = headers.map(h => {
+        const dataMax = (rows || []).reduce((m, r) => Math.max(m, (r[h] || '').length), 0);
+        return Math.sqrt(Math.max(h.length, dataMax, 8));
+      });
+      const total = scaledLens.reduce((a, b) => a + b, 0);
+      const colgroup = document.createElement('colgroup');
+      scaledLens.forEach(len => {
+        const col = document.createElement('col');
+        col.style.width = `${(len / total * 100).toFixed(1)}%`;
+        colgroup.appendChild(col);
+      });
+      table.appendChild(colgroup);
+    }
     const thead = document.createElement('thead');
     const trHead = document.createElement('tr');
     (headers || []).forEach(h => {
