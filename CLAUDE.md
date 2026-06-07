@@ -89,6 +89,14 @@ When masterMode is true, `getSchemaAndData()` also calls `getSourceSpreadsheetIn
 
 `deleteRow()` never permanently removes data. It copies the row to the `Trash` sheet and then deletes it from `Database`. If `Trash` doesn't exist yet, it is created with the same two header rows as `Database`. There is no restore UI — recovery requires manually moving rows back in Sheets.
 
+### Edit view layout
+
+`#edit-form` is a two-column CSS grid (`grid-template-columns: 1fr 1fr`). Most field blocks occupy one column. Table-type fields get the additional class `field-block--full` (→ `grid-column: 1 / -1`) so they span the full width, since their multi-row editors are too wide for a half-width cell.
+
+### `*-table` editor column widths
+
+`buildTableEditor()` prepends a `<colgroup>` to the editor `<table>` with each `<col>` width set as a percentage proportional to the maximum string length found in that column (header text or any data value, whichever is longer, minimum 8 chars). This mirrors the natural content-based auto-sizing that the read-only `mini-table` gets for free from `table-layout: auto` on text nodes — inputs with `width: 100%` would otherwise force equal-width columns.
+
 ### Dropdown column types
 
 `unit`, `origin`, `marital-status`, and `sex` columns each read their allowed values from a dedicated Handbook range at load time. The pattern for adding a new dropdown type is:
