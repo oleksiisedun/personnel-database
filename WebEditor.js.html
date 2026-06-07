@@ -721,6 +721,7 @@
       block.appendChild(label);
 
       if (isTableType(col)) {
+        block.classList.add('field-block--full');
         block.appendChild(buildTableEditor(i, parseData(row.values[i] || '', col.tableHeaders || []), col.tableHeaders || []));
       } else if (col.type === 'unit' || col.type === 'origin' || col.type === 'marital-status' || col.type === 'sex') {
         block.appendChild(buildDropdownField(col, i, row.values[i] || ''));
@@ -926,6 +927,25 @@
     wrapper.className = 'table-editor';
     wrapper.dataset.colIndex = colIndex;
     const table = document.createElement('table');
+
+    // Set column widths proportional to max content length so the editor
+    // matches the natural auto-sizing of the read-only mini-table.
+    if ((headers || []).length > 0) {
+      const maxLens = headers.map(h => {
+        const dataMax = (rows || []).reduce((m, r) => Math.max(m, (r[h] || '').length), 0);
+        return Math.max(h.length, dataMax, 8);
+      });
+      const total = maxLens.reduce((a, b) => a + b, 0);
+      const colgroup = document.createElement('colgroup');
+      maxLens.forEach(len => {
+        const col = document.createElement('col');
+        col.style.width = `${(len / total * 100).toFixed(1)}%`;
+        colgroup.appendChild(col);
+      });
+      colgroup.appendChild(document.createElement('col')); // delete column — width from CSS
+      table.appendChild(colgroup);
+    }
+
     const thead = document.createElement('thead');
     const trHead = document.createElement('tr');
     (headers || []).forEach(h => {

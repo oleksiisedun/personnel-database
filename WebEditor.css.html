@@ -176,6 +176,8 @@
   /* ── Edit view ── */
   #view-edit { height: 100%; overflow-y: scroll; padding: 16px; }
   #edit-header { display: flex; align-items: center; gap: 12px; margin-bottom: 20px; }
+  #edit-form { display: grid; grid-template-columns: 1fr 1fr; column-gap: 24px; }
+  .field-block--full { grid-column: 1 / -1; }
   #btn-back {
     background: none; border: 1px solid #ccc; border-radius: 4px;
     padding: 6px 14px; cursor: pointer; font-size: 14px; color: #555;
