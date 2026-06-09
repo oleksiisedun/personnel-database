@@ -40,6 +40,9 @@ Same structure as `Database` (row 1 = column names, row 2 = column types, row 3+
 | `M4` (`DATA_FOLDER`) | Google Drive folder ID that contains person images and PDFs |
 | `M6` (`ACTUAL_PERSONNEL_SPREADSHEET_CELL`) | Link or bare ID of the spreadsheet that holds the authoritative personnel list |
 | `M7` (`ACTUAL_PERSONNEL_RANGE_CELL`) | Range address within that spreadsheet (e.g. `Sheet1!A:A`) containing full names |
+| `M9` (`EXPORT_F1_TEMPLATE_CELL`) | Google Drive file ID (or shareable link) of the F-1 Docs template |
+| `M11` (`EXPORT_WC_TEMPLATE_CELL`) | Google Drive file ID (or shareable link) of the Wanted Card Docs template |
+| `M13` (`EXPORT_FOLDER_CELL`) | Google Drive folder ID (or shareable link) where exported documents are saved |
 | `N2:N` (`MASTER_MODE_SOURCES_RANGE`) | Source spreadsheet IDs — one per row; used when Master Mode is ON |
 | `A17:C40` (`HANDBOOK_CORR_RANGE`) | Placeholder correspondence table for document exports |
 | `D17:D40` (`HANDBOOK_UNIT_RANGE`) | Allowed values for `unit`-type columns |
@@ -160,12 +163,12 @@ After a successful move the rows reappear in the list immediately under their ne
 
 Two export types are available from the toolbar. Both operate on the **selected** rows (rows checked via the checkbox column). The export buttons are disabled until at least one row is selected.
 
-| Button | Template | Output prefix |
-|--------|----------|---------------|
-| Export F-1 | `F1_TEMPLATE_ID` | `Ф-1 ` |
-| Export WC | `WC_TEMPLATE_ID` | `Розшукова картка ` |
+| Button | Template cell | Output prefix |
+|--------|---------------|---------------|
+| Export F-1 | `Handbook!M9` (`EXPORT_F1_TEMPLATE_CELL`) | `Ф-1 ` |
+| Export WC | `Handbook!M11` (`EXPORT_WC_TEMPLATE_CELL`) | `Розшукова картка ` |
 
-Exported files are saved to the Google Drive folder defined by `EXPORT_FOLDER_ID`.
+Exported files are saved to the Google Drive folder configured in `Handbook!M13` (`EXPORT_FOLDER_CELL`). Each cell accepts either a bare Drive ID or a full shareable link.
 
 ### How export works
 
@@ -223,9 +226,9 @@ Exports run in automatic batches capped at `EXPORT_TIME_LIMIT_MS` (5 minutes) to
 | `HANDBOOK_SEX_RANGE` | `'G17:G40'` | Range of allowed values for `sex`-type columns |
 | `ACTUAL_PERSONNEL_SPREADSHEET_CELL` | `'M6'` | Cell holding the link/ID of the external spreadsheet with the actual personnel list |
 | `ACTUAL_PERSONNEL_RANGE_CELL` | `'M7'` | Cell holding the range address within that spreadsheet (e.g. `Sheet1!A:A`) |
-| `F1_TEMPLATE_ID` | — | Google Docs template ID for F-1 export |
-| `WC_TEMPLATE_ID` | — | Google Docs template ID for Wanted Card export |
-| `EXPORT_FOLDER_ID` | — | Google Drive folder ID for exported documents |
+| `EXPORT_F1_TEMPLATE_CELL` | `'M9'` | Cell holding the Drive ID or link of the F-1 Docs template |
+| `EXPORT_WC_TEMPLATE_CELL` | `'M11'` | Cell holding the Drive ID or link of the Wanted Card Docs template |
+| `EXPORT_FOLDER_CELL` | `'M13'` | Cell holding the Drive ID or link of the folder for exported documents |
 | `EXPORT_TIME_LIMIT_MS` | `300000` | Max server execution time per batch (ms) |
 | `F1_DOC_PREFIX` | `'Ф-1 '` | Filename prefix for F-1 exports |
 | `WC_DOC_PREFIX` | `'Розшукова картка '` | Filename prefix for Wanted Card exports |

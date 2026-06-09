@@ -36,6 +36,9 @@ Key Handbook cells:
 - `M4` (`DATA_FOLDER`) — Google Drive folder ID containing person images and PDFs
 - `M6` (`ACTUAL_PERSONNEL_SPREADSHEET_CELL`) — link/ID of the spreadsheet containing the actual personnel list
 - `M7` (`ACTUAL_PERSONNEL_RANGE_CELL`) — range address within that spreadsheet (e.g. `Sheet1!A:A`) holding full names
+- `M9` (`EXPORT_F1_TEMPLATE_CELL`) — Google Drive file ID of the F-1 Docs template
+- `M11` (`EXPORT_WC_TEMPLATE_CELL`) — Google Drive file ID of the Wanted Card Docs template
+- `M13` (`EXPORT_FOLDER_CELL`) — Google Drive folder ID where exported documents are saved
 - `N2:N` (`MASTER_MODE_SOURCES_RANGE`) — source spreadsheet IDs for Master Mode
 
 ### How the HTML template works
