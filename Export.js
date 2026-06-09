@@ -5,7 +5,7 @@
  * @returns {{results: Array<{name: string, url: string}>, remaining: Array<{rowIndex: number, spreadsheetId: string|null}>}}
  */
 function exportF1(rowEntries) {
-  return _exportDoc(rowEntries, F1_TEMPLATE_ID, F1_DOC_PREFIX);
+  return _exportDoc(rowEntries, EXPORT_F1_TEMPLATE_CELL, F1_DOC_PREFIX);
 }
 
 /**
@@ -15,7 +15,7 @@ function exportF1(rowEntries) {
  * @returns {{results: Array<{name: string, url: string}>, remaining: Array<{rowIndex: number, spreadsheetId: string|null}>}}
  */
 function exportWC(rowEntries) {
-  return _exportDoc(rowEntries, WC_TEMPLATE_ID, WC_DOC_PREFIX);
+  return _exportDoc(rowEntries, EXPORT_WC_TEMPLATE_CELL, WC_DOC_PREFIX);
 }
 
 /**
@@ -33,14 +33,16 @@ function exportWC(rowEntries) {
  * underlined based on the COL_MARITAL_STATUS value.
  *
  * @param {Array<{rowIndex: number, spreadsheetId: string|null}>} rowEntries
- * @param {string} templateId - Google Drive file ID of the Docs template.
+ * @param {string} templateCell - Handbook cell address (e.g. 'M9') holding the Docs template Drive ID.
  * @param {string} docPrefix - Prefix prepended to the first-column value to form the document name.
  * @returns {{results: Array<{name: string, url: string}>, remaining: Array<{rowIndex: number, spreadsheetId: string|null}>}}
  */
-function _exportDoc(rowEntries, templateId, docPrefix) {
-  const exportFolder = DriveApp.getFolderById(EXPORT_FOLDER_ID);
+function _exportDoc(rowEntries, templateCell, docPrefix) {
   const localSs = SpreadsheetApp.getActiveSpreadsheet();
   const handbookSheet = localSs.getSheetByName(SHEET_HANDBOOK);
+  const templateId = handbookSheet ? parseDriveId(String(handbookSheet.getRange(templateCell).getValue())) : '';
+  const exportFolderId = handbookSheet ? parseDriveId(String(handbookSheet.getRange(EXPORT_FOLDER_CELL).getValue())) : '';
+  const exportFolder = DriveApp.getFolderById(exportFolderId);
   const mappings = handbookSheet ? _loadCorrespondenceTable(handbookSheet) : [];
 
   // Cache sheet data per spreadsheet to avoid redundant reads within the same export call.

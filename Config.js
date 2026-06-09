@@ -32,17 +32,17 @@ const HANDBOOK_SEX_RANGE = 'G17:G40';
 const ACTUAL_PERSONNEL_SPREADSHEET_CELL = 'M6';
 const ACTUAL_PERSONNEL_RANGE_CELL = 'M7';
 
+// Handbook layout — export template and destination folder IDs
+const EXPORT_F1_TEMPLATE_CELL = 'M9';
+const EXPORT_WC_TEMPLATE_CELL = 'M11';
+const EXPORT_FOLDER_CELL = 'M13';
+
 // Database column names
 const COL_DRAFT_DATE = 'Дата призову';
 const COL_SERVICE_HISTORY = 'Проходження служби';
 const COL_CLOSE_RELATIVES = 'Близькі родичі';
 const COL_MARITAL_STATUS = 'Сімейний стан';
 const COL_CONTRACT_UNTIL = 'Контракт укладено до';
-
-// Google Drive IDs
-const F1_TEMPLATE_ID = '16yktSuOPgjNxQap-SCQZkmcISOftxWPZuSovVcAFkYI';
-const WC_TEMPLATE_ID = '10WKfn_cUP-T_C_TWr3pPeR3sELLVgUFFDan8VFpCoPo';
-const EXPORT_FOLDER_ID = '1mG3vDgV9fCIYAt1S4Aj-IEUhKTw9O-Ki';
 
 // Export / document settings
 const EXPORT_TIME_LIMIT_MS = 5 * 60 * 1000; // 5 min — 1 min safety margin before GAS 6-min hard limit
