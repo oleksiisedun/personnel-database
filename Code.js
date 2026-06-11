@@ -7,9 +7,13 @@
 function getMasterSources() {
   const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(SHEET_HANDBOOK);
   if (!sheet) return [];
-  return sheet.getRange(MASTER_MODE_SOURCES_RANGE).getValues()
-    .map(r => parseDriveId(String(r[0]).trim()))
-    .filter(v => v !== '');
+  try {
+    return sheet.getRange(MASTER_MODE_SOURCES_RANGE).getValues()
+      .map(r => parseDriveId(String(r[0]).trim()))
+      .filter(v => v !== '');
+  } catch (e) {
+    return [];
+  }
 }
 
 /**
@@ -21,7 +25,11 @@ function getMasterSources() {
 function getMasterMode() {
   const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(SHEET_HANDBOOK);
   if (!sheet) return false;
-  return sheet.getRange(MASTER_MODE_CELL).getValue() === true;
+  try {
+    return sheet.getRange(MASTER_MODE_CELL).getValue() === true;
+  } catch (e) {
+    return false;
+  }
 }
 
 /**
@@ -286,12 +294,16 @@ function getSchemaAndData() {
   const tableHeadersMap = {};
   const handbookSheet = ss.getSheetByName(SHEET_HANDBOOK);
   if (handbookSheet) {
-    const hbData = handbookSheet.getRange(HANDBOOK_TYPES_RANGE).getValues();
-    for (let r = 0; r < hbData.length; r++) {
-      const dataType = String(hbData[r][0]).trim().toLowerCase();
-      if (!dataType) continue;
-      const headers = hbData[r].slice(1).map(h => String(h)).filter(h => h !== '');
-      if (headers.length) tableHeadersMap[dataType] = headers;
+    try {
+      const hbData = handbookSheet.getRange(HANDBOOK_TYPES_RANGE).getValues();
+      for (let r = 0; r < hbData.length; r++) {
+        const dataType = String(hbData[r][0]).trim().toLowerCase();
+        if (!dataType) continue;
+        const headers = hbData[r].slice(1).map(h => String(h)).filter(h => h !== '');
+        if (headers.length) tableHeadersMap[dataType] = headers;
+      }
+    } catch (e) {
+      // skip if Handbook table-types range is inaccessible
     }
   }
   columns.forEach(col => {
@@ -305,9 +317,14 @@ function getSchemaAndData() {
     { type: 'sex',            range: HANDBOOK_SEX_RANGE,            key: 'sexOptions' },
   ];
   DROPDOWN_TYPES.forEach(({ type, range, key }) => {
-    const options = handbookSheet
-      ? handbookSheet.getRange(range).getValues().map(r => String(r[0])).filter(v => v !== '')
-      : [];
+    let options = [];
+    if (handbookSheet) {
+      try {
+        options = handbookSheet.getRange(range).getValues().map(r => String(r[0])).filter(v => v !== '');
+      } catch (e) {
+        // skip if this Handbook range is inaccessible
+      }
+    }
     columns.forEach(col => { if (col.type === type) col[key] = options; });
   });
 
