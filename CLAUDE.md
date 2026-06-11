@@ -31,6 +31,8 @@ The `Database` sheet has this fixed structure:
 
 The `Handbook` sheet holds schema metadata, dropdown option lists, the Master Mode toggle, the data folder cell, and export correspondence tables. Constants in `Config.js` define each range address.
 
+Every Handbook range read inside `getSchemaAndData()` (`getMasterMode()`, `getMasterSources()`, `HANDBOOK_TYPES_RANGE`, and the dropdown-option ranges) is wrapped in try/catch with a safe fallback (`false`, `[]`, `{}`, or `[]`). This keeps the editor usable even if a particular Handbook range is unreadable for some user. New Handbook reads added to `getSchemaAndData()` should follow the same pattern.
+
 Key Handbook cells:
 - `M2` (`MASTER_MODE_CELL`) — Master Mode checkbox
 - `M4` (`DATA_FOLDER`) — Google Drive folder ID containing person images and PDFs
