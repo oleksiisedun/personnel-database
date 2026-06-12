@@ -78,11 +78,8 @@ function getSourceSpreadsheetInfos() {
   const currentSs = SpreadsheetApp.getActiveSpreadsheet();
   const result = [{ id: null, name: currentSs.getName() }];
   getMasterSources().forEach(id => {
-    try {
-      result.push({ id, name: SpreadsheetApp.openById(id).getName() });
-    } catch (e) {
-      result.push({ id, name: id });
-    }
+    const ss = openSpreadsheetSafely(id);
+    result.push({ id, name: ss ? ss.getName() : id });
   });
   return result;
 }
@@ -103,6 +100,27 @@ function parseDriveId(value) {
 }
 
 /**
+ * Opens a spreadsheet by ID, first probing Drive access so a permission error
+ * on an inaccessible spreadsheet can't poison the overall execution status
+ * (see CLAUDE.md "Actual personnel filter" for background).
+ *
+ * @param {string} id - Spreadsheet (Drive file) ID.
+ * @returns {GoogleAppsScript.Spreadsheet.Spreadsheet|null} The opened spreadsheet, or null if inaccessible.
+ */
+function openSpreadsheetSafely(id) {
+  try {
+    DriveApp.getFileById(id);
+  } catch (e) {
+    return null;
+  }
+  try {
+    return SpreadsheetApp.openById(id);
+  } catch (e) {
+    return null;
+  }
+}
+
+/**
  * Reads the actual personnel name list from the external spreadsheet configured
  * in Handbook M6 (spreadsheet link/ID) and M7 (range address).
  * Returns null if not configured or if the spreadsheet is inaccessible.
@@ -116,13 +134,10 @@ function getActualPersonnelNames() {
   const range = String(handbook.getRange(ACTUAL_PERSONNEL_RANGE_CELL).getValue()).trim();
   const id = parseDriveId(link);
   if (!id || !range) return null;
+  const ss = openSpreadsheetSafely(id);
+  if (!ss) return null;
   try {
-    DriveApp.getFileById(id);
-  } catch (e) {
-    return null;
-  }
-  try {
-    return SpreadsheetApp.openById(id).getRange(range).getValues()
+    return ss.getRange(range).getValues()
       .map(r => String(r[0]).trim()).filter(v => v !== '');
   } catch (e) {
     return null;
@@ -147,8 +162,9 @@ function getActualPersonnelNames() {
  */
 function movePersonnel(rowEntries, destinationSpreadsheetId) {
   const destSs = destinationSpreadsheetId
-    ? SpreadsheetApp.openById(destinationSpreadsheetId)
+    ? openSpreadsheetSafely(destinationSpreadsheetId)
     : SpreadsheetApp.getActiveSpreadsheet();
+  if (!destSs) throw new Error('Destination spreadsheet is not accessible.');
   const destSheet = destSs.getSheetByName(SHEET_DATABASE);
   if (!destSheet) throw new Error('Destination sheet "Database" not found.');
 
@@ -171,8 +187,12 @@ function movePersonnel(rowEntries, destinationSpreadsheetId) {
 
   groups.forEach((entries, spreadsheetId) => {
     const srcSs = spreadsheetId
-      ? SpreadsheetApp.openById(spreadsheetId)
+      ? openSpreadsheetSafely(spreadsheetId)
       : SpreadsheetApp.getActiveSpreadsheet();
+    if (!srcSs) {
+      entries.forEach(() => log.push({ name: '?', folderNote: 'Source spreadsheet not accessible — skipped' }));
+      return;
+    }
     const srcSheet = srcSs.getSheetByName(SHEET_DATABASE);
     if (!srcSheet) {
       entries.forEach(() => log.push({ name: '?', folderNote: 'Source sheet not found — skipped' }));
@@ -281,8 +301,10 @@ function getSchemaAndData() {
   const masterMode = getMasterMode();
   if (masterMode) {
     getMasterSources().forEach(spreadsheetId => {
+      const remoteSs = openSpreadsheetSafely(spreadsheetId);
+      if (!remoteSs) return;
       try {
-        const remoteSheet = SpreadsheetApp.openById(spreadsheetId).getSheetByName(SHEET_DATABASE);
+        const remoteSheet = remoteSs.getSheetByName(SHEET_DATABASE);
         if (!remoteSheet) return;
         const remoteAll = remoteSheet.getDataRange().getValues();
         for (let i = 2; i < remoteAll.length; i++) {
@@ -402,8 +424,9 @@ function addRowWithData(values) {
  */
 function updateRow(rowIndex, values, spreadsheetId) {
   const ss = spreadsheetId
-    ? SpreadsheetApp.openById(spreadsheetId)
+    ? openSpreadsheetSafely(spreadsheetId)
     : SpreadsheetApp.getActiveSpreadsheet();
+  if (!ss) throw new Error('Spreadsheet is not accessible.');
   const sheet = ss.getSheetByName(SHEET_DATABASE);
   if (!sheet) throw new Error('Sheet "Database" not found.');
   sheet.getRange(rowIndex, 1, 1, values.length).setValues([values]);
@@ -422,8 +445,9 @@ function updateRow(rowIndex, values, spreadsheetId) {
  */
 function deleteRow(rowIndex, spreadsheetId) {
   const ss = spreadsheetId
-    ? SpreadsheetApp.openById(spreadsheetId)
+    ? openSpreadsheetSafely(spreadsheetId)
     : SpreadsheetApp.getActiveSpreadsheet();
+  if (!ss) throw new Error('Spreadsheet is not accessible.');
   const dbSheet = ss.getSheetByName(SHEET_DATABASE);
   if (!dbSheet) throw new Error('Sheet "Database" not found.');
 

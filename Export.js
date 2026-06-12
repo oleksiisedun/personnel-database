@@ -55,18 +55,25 @@ function _exportDoc(rowEntries, templateCell, docPrefix) {
   const getSheetData = spreadsheetId => {
     const key = spreadsheetId ?? '';
     if (!sheetCache.has(key)) {
-      try {
-        const ss = spreadsheetId ? SpreadsheetApp.openById(spreadsheetId) : localSs;
-        const sheet = ss.getSheetByName(SHEET_DATABASE);
-        if (!sheet) { sheetCache.set(key, null); return null; }
-        const all = sheet.getDataRange().getValues();
-        const columns = all[0].map((name, i) => ({
-          name: String(name),
-          type: String(all[1][i]).toLowerCase()
-        }));
-        sheetCache.set(key, { all, columns });
-      } catch (e) {
+      const ss = spreadsheetId ? openSpreadsheetSafely(spreadsheetId) : localSs;
+      if (!ss) {
         sheetCache.set(key, null);
+      } else {
+        try {
+          const sheet = ss.getSheetByName(SHEET_DATABASE);
+          if (!sheet) {
+            sheetCache.set(key, null);
+          } else {
+            const all = sheet.getDataRange().getValues();
+            const columns = all[0].map((name, i) => ({
+              name: String(name),
+              type: String(all[1][i]).toLowerCase()
+            }));
+            sheetCache.set(key, { all, columns });
+          }
+        } catch (e) {
+          sheetCache.set(key, null);
+        }
       }
     }
     return sheetCache.get(key);

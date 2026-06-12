@@ -67,19 +67,23 @@ google.script.run
 
 The client-side code in `WebEditor.js.html` is not a module — all functions are globals within the `HtmlService` sandbox.
 
+### Opening remote spreadsheets safely (`openSpreadsheetSafely`)
+
+If a `SpreadsheetApp.openById(id)` call throws because the current user can't access `id`, that permission error — even when caught with try/catch — still causes the *overall* enclosing execution to fail (e.g. the whole `getSchemaAndData()` RPC fails with "У вас немає дозволу на доступ до потрібного документа" / "You do not have permission to access the required document"). This is an Apps Script runtime quirk where a caught `SpreadsheetApp.openById()` permission error poisons the execution's final status regardless of being handled in JS.
+
+`openSpreadsheetSafely(id)` (in `Code.js`) avoids this: it first probes accessibility with `DriveApp.getFileById(id)` (caught, returns `null` on failure — the same safe pattern `getImagesDataUrls()` uses for "no-access" images) and only calls `SpreadsheetApp.openById(id)` if that probe succeeds, returning `null` on any failure. **Every** call site that opens a spreadsheet by an ID that isn't guaranteed accessible to the current user — `Handbook!N2:N` master sources, `Handbook!M6` actual-personnel link, and client-supplied `spreadsheetId`s in `movePersonnel`/`updateRow`/`deleteRow`/`Export.js` — uses this helper instead of calling `SpreadsheetApp.openById()` directly. New code that opens a spreadsheet by such an ID should do the same.
+
 ### Master Mode
 
-When `Handbook!M2` is `true`, `getSchemaAndData()` reads spreadsheet IDs from `Handbook!N2:N` and appends rows from each remote spreadsheet's `Database` sheet to the local rows. Remote rows carry a `spreadsheetId` property; local rows do not.
+When `Handbook!M2` is `true`, `getSchemaAndData()` reads spreadsheet IDs from `Handbook!N2:N` and appends rows from each remote spreadsheet's `Database` sheet to the local rows via `openSpreadsheetSafely()`, skipping any source that's inaccessible. Remote rows carry a `spreadsheetId` property; local rows do not.
 
-`updateRow(rowIndex, values, spreadsheetId)` and `deleteRow(rowIndex, spreadsheetId)` route to the correct spreadsheet based on `spreadsheetId` — `SpreadsheetApp.openById()` for remote, `getActiveSpreadsheet()` for local. New rows (`addRowWithData(values)`) always go to the local `Database` sheet. Editing is never restricted by Master Mode state.
+`updateRow(rowIndex, values, spreadsheetId)` and `deleteRow(rowIndex, spreadsheetId)` route to the correct spreadsheet based on `spreadsheetId` — `openSpreadsheetSafely()` for remote (throwing a clean `Error` if inaccessible), `getActiveSpreadsheet()` for local. New rows (`addRowWithData(values)`) always go to the local `Database` sheet. Editing is never restricted by Master Mode state.
 
-When masterMode is true, `getSchemaAndData()` also calls `getSourceSpreadsheetInfos()` and includes the result as `masterSources: Array<{id, name}>` in the return value (current spreadsheet has `id: null`). The client uses this to populate the Move destination dropdown.
+When masterMode is true, `getSchemaAndData()` also calls `getSourceSpreadsheetInfos()` and includes the result as `masterSources: Array<{id, name}>` in the return value (current spreadsheet has `id: null`; inaccessible sources fall back to showing the raw ID as the name). The client uses this to populate the Move destination dropdown.
 
 ### Actual personnel filter
 
-`getActualPersonnelNames()` reads the spreadsheet link from `Handbook!M6` and the range address from `Handbook!M7`, opens the spreadsheet with `SpreadsheetApp.openById()`, and returns the flat list of non-empty name strings. Returns `null` if either cell is empty or the spreadsheet is inaccessible.
-
-**Important:** if `Handbook!M6` points to a spreadsheet the current user cannot access, calling `SpreadsheetApp.openById()` on it throws a permission error that — even when caught with try/catch — still causes the *overall* `getSchemaAndData()` execution to fail for that user (the entire web editor fails to load with "У вас немає дозволу на доступ до потрібного документа" / "You do not have permission to access the required document"). This is an Apps Script runtime quirk where a caught `SpreadsheetApp.openById()` permission error poisons the execution's final status regardless of being handled in JS. To avoid this, `getActualPersonnelNames()` first probes accessibility with `DriveApp.getFileById(id)` (caught, returns `null` on failure — the same safe pattern `getImagesDataUrls()` uses for "no-access" images) and only calls `SpreadsheetApp.openById(id)` if that probe succeeds. Any new code that calls `SpreadsheetApp.openById()` on a Handbook-configured spreadsheet ID that might not be accessible to all users should follow this same `DriveApp.getFileById()` pre-check pattern.
+`getActualPersonnelNames()` reads the spreadsheet link from `Handbook!M6` and the range address from `Handbook!M7`, opens the spreadsheet via `openSpreadsheetSafely()`, and returns the flat list of non-empty name strings. Returns `null` if either cell is empty or the spreadsheet is inaccessible.
 
 `getSchemaAndData()` includes the result as `actualPersonnelNames: string[]|null` in its return value. The client enables the **"Actual personnel"** toolbar checkbox only when the array is non-null and non-empty; otherwise the checkbox stays disabled. When the checkbox is checked, `applyFilters()` additionally requires that `row.values[0]` (first column = full name) is present in `actualPersonnelNames`. The filter composes with all existing column text filters and the regex toggle.
 
