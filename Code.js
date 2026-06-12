@@ -117,6 +117,11 @@ function getActualPersonnelNames() {
   const id = parseDriveId(link);
   if (!id || !range) return null;
   try {
+    DriveApp.getFileById(id);
+  } catch (e) {
+    return null;
+  }
+  try {
     return SpreadsheetApp.openById(id).getRange(range).getValues()
       .map(r => String(r[0]).trim()).filter(v => v !== '');
   } catch (e) {
