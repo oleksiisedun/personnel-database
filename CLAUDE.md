@@ -98,6 +98,8 @@ The client uses `masterSources: Array<{id, name}>` to populate the Move destinat
 3. Rows where source === destination spreadsheet are skipped (logged but not moved or deleted).
 4. After each row move, tries to move the person's Drive folder (named after the first column value) from the source `DATA_FOLDER` to the destination `DATA_FOLDER` using `DriveApp.getFolderById()` / `getFoldersByName()` / `moveTo()`. If either `DATA_FOLDER` is not configured, or the named folder is not found, the row move still completes and a note is logged. `parseDriveId(value)` strips any Drive URL wrapper from the cell value to get a bare folder ID.
 
+`WebEditor.js.html` has a parallel client-side implementation, `extractDriveId()` (used for image-field preview/lightbox). Its URL-matching patterns are kept aligned with `parseDriveId()`'s — update both together when changing supported Drive URL formats. They still differ in fallback behavior: `parseDriveId()` returns trusted Handbook config values unchanged if no pattern matches, while `extractDriveId()` validates untrusted user-typed text against a bare-ID length check and returns `null` on failure.
+
 ### Soft delete (Trash sheet)
 
 `deleteRow()` never permanently removes data. It copies the row to the `Trash` sheet and then deletes it from `Database`. If `Trash` doesn't exist yet, it is created with the same two header rows as `Database`. There is no restore UI — recovery requires manually moving rows back in Sheets.

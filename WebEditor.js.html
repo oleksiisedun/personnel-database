@@ -637,6 +637,7 @@
    * unchanged if it looks like a bare file ID already.
    * Supported formats:
    *   https://drive.google.com/file/d/FILE_ID/view
+   *   https://drive.google.com/drive/u/0/folders/FOLDER_ID (or without the /u/0/ account segment)
    *   https://drive.google.com/open?id=FILE_ID
    *   FILE_ID (bare alphanumeric string ≥ 10 chars)
    * @param {string} url
@@ -645,8 +646,8 @@
   function extractDriveId(url) {
     if (!url) return null;
     const patterns = [
-      /\/file\/d\/([a-zA-Z0-9_-]+)/,
-      /\/drive\/folders\/([a-zA-Z0-9_-]+)/,
+      /\/folders\/([a-zA-Z0-9_-]+)/,
+      /\/d\/([a-zA-Z0-9_-]+)/,
       /[?&]id=([a-zA-Z0-9_-]+)/,
     ];
     for (const pattern of patterns) {
