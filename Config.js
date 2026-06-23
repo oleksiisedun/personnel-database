@@ -43,6 +43,7 @@ const COL_SERVICE_HISTORY = 'Проходження служби';
 const COL_CLOSE_RELATIVES = 'Близькі родичі';
 const COL_MARITAL_STATUS = 'Сімейний стан';
 const COL_CONTRACT_UNTIL = 'Контракт укладено до';
+const COL_PHONE_NUMBER = 'Номер телефону';
 
 // Export / document settings
 const EXPORT_TIME_LIMIT_MS = 5 * 60 * 1000; // 5 min — 1 min safety margin before GAS 6-min hard limit

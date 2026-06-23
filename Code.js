@@ -54,6 +54,7 @@ function onOpen() {
   SpreadsheetApp.getUi()
     .createMenu('More... ⭐️')
     .addItem('Open Web Editor', 'openWebEditor')
+    .addItem('Fix phone numbers', 'fixPhoneNumbers')
     .addToUi();
 }
 
@@ -65,6 +66,54 @@ function onOpen() {
 function openWebEditor() {
   const html = HtmlService.createTemplateFromFile('WebEditor').evaluate();
   SpreadsheetApp.getUi().showModalDialog(html, 'Web Editor');
+}
+
+/**
+ * Normalizes phone numbers in the Database sheet's "Номер телефону" column:
+ * adds a leading zero to bare 9-digit numbers, and strips the "38" country
+ * prefix from 12-digit numbers. Triggered only from the custom menu.
+ * @returns {void}
+ */
+function fixPhoneNumbers() {
+  const ui = SpreadsheetApp.getUi();
+  const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(SHEET_DATABASE);
+  if (!sheet) {
+    ui.alert(`Sheet "${SHEET_DATABASE}" not found.`);
+    return;
+  }
+
+  const headers = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
+  const colIndex = headers.findIndex(h => String(h).trim() === COL_PHONE_NUMBER);
+  if (colIndex === -1) {
+    ui.alert(`Column "${COL_PHONE_NUMBER}" not found in row 1.`);
+    return;
+  }
+
+  const numRows = sheet.getLastRow() - 2;
+  if (numRows <= 0) {
+    ui.alert('No data rows to process.');
+    return;
+  }
+
+  const range = sheet.getRange(3, colIndex + 1, numRows, 1);
+  const values = range.getValues();
+  let fixedCount = 0;
+
+  const result = values.map(row => {
+    const phone = String(row[0]).trim();
+    if (/^\d{9}$/.test(phone) && phone[0] !== '0') {
+      fixedCount++;
+      return ['0' + phone];
+    }
+    if (/^38\d{10}$/.test(phone)) {
+      fixedCount++;
+      return [phone.slice(2)];
+    }
+    return row;
+  });
+
+  range.setValues(result);
+  ui.alert(`Fixed ${fixedCount} phone number(s).`);
 }
 
 /**
