@@ -75,11 +75,13 @@ If a `SpreadsheetApp.openById(id)` call throws because the current user can't ac
 
 ### Master Mode
 
-When `Handbook!M2` is `true`, `getSchemaAndData()` reads spreadsheet IDs from `Handbook!N2:N` and appends rows from each remote spreadsheet's `Database` sheet to the local rows via `openSpreadsheetSafely()`, skipping any source that's inaccessible. Remote rows carry a `spreadsheetId` property; local rows do not.
+When `Handbook!M2` is `true`, `getSchemaAndData()` reads source spreadsheet IDs from `Handbook!N2:N` via `getMasterSources()` and returns them as `masterSourceIds: string[]` — it does **not** open any remote spreadsheet itself. Local rows have no `spreadsheetId` property; `masterSources` is seeded with just the local entry (`{ id: null, name: <current spreadsheet name> }`).
+
+After the initial render, the client (`onDataLoaded()` in `WebEditor.js.html`) calls `queueMasterSourceFetch()`, which fetches each remote source's rows one at a time through a worker pool (size `masterModeFetchConcurrency`/`MASTER_MODE_FETCH_CONCURRENCY`, mirroring the image-fetch concurrency pool below) via the server function `getMasterSourceRows(spreadsheetId)`. Each result's rows (carrying a `spreadsheetId` property) are pushed onto `schema.rows`, its `{id, name}` is pushed onto `schema.masterSources`, and the list is silently re-filtered/re-rendered (debounced via `schema.filterDebounceMs`) — so remote rows stream in after the local-only data is already visible instead of blocking the initial load. Inaccessible sources are skipped silently, same as before. New code that needs "all master-mode rows" should be aware that, on the client, they may still be arriving for a short time after `onDataLoaded()` fires.
 
 `updateRow(rowIndex, values, spreadsheetId)` and `deleteRow(rowIndex, spreadsheetId)` route to the correct spreadsheet based on `spreadsheetId` — `openSpreadsheetSafely()` for remote (throwing a clean `Error` if inaccessible), `getActiveSpreadsheet()` for local. New rows (`addRowWithData(values)`) always go to the local `Database` sheet. Editing is never restricted by Master Mode state.
 
-When masterMode is true, `getSchemaAndData()` also calls `getSourceSpreadsheetInfos()` and includes the result as `masterSources: Array<{id, name}>` in the return value (current spreadsheet has `id: null`; inaccessible sources fall back to showing the raw ID as the name). The client uses this to populate the Move destination dropdown.
+The client uses `masterSources: Array<{id, name}>` to populate the Move destination dropdown (current spreadsheet has `id: null`; inaccessible sources fall back to showing the raw ID as the name) — it grows as remote sources resolve.
 
 ### Actual personnel filter
 

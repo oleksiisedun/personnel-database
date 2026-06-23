@@ -65,5 +65,10 @@ const FILTER_DEBOUNCE_MS = 500;
 const IMAGE_FETCH_BATCH_SIZE = 10;
 const IMAGE_FETCH_CONCURRENCY = 3;
 
+// Master Mode source fetch concurrency — how many remote spreadsheets are
+// opened in parallel while streaming in their rows after the initial
+// (local-only) row set has already rendered.
+const MASTER_MODE_FETCH_CONCURRENCY = 3;
+
 // Persistent IndexedDB image cache — how long an entry is kept before re-fetching from Drive.
 const IMAGE_CACHE_TTL_DAYS = 7;

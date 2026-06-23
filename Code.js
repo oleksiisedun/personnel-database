@@ -68,20 +68,33 @@ function openWebEditor() {
 }
 
 /**
- * Returns an array of { id, name } for the current spreadsheet (id = null) and
- * every source listed in MASTER_MODE_SOURCES_RANGE. Falls back to the raw ID
- * string if a remote spreadsheet cannot be opened.
+ * Reads one Master Mode source spreadsheet's name and Database rows. Called
+ * by the client once per source, after the initial local-only render, so
+ * remote rows stream in instead of blocking getSchemaAndData(). Falls back to
+ * the raw ID as the name and an empty row list if the spreadsheet is
+ * inaccessible or has no Database sheet.
  *
- * @returns {Array<{id: string|null, name: string}>}
+ * @param {string} spreadsheetId
+ * @returns {{ id: string, name: string, rows: Array<{rowIndex: number, values: string[], spreadsheetId: string}> }}
  */
-function getSourceSpreadsheetInfos() {
-  const currentSs = SpreadsheetApp.getActiveSpreadsheet();
-  const result = [{ id: null, name: currentSs.getName() }];
-  getMasterSources().forEach(id => {
-    const ss = openSpreadsheetSafely(id);
-    result.push({ id, name: ss ? ss.getName() : id });
-  });
-  return result;
+function getMasterSourceRows(spreadsheetId) {
+  const remoteSs = openSpreadsheetSafely(spreadsheetId);
+  if (!remoteSs) return { id: spreadsheetId, name: spreadsheetId, rows: [] };
+  try {
+    const name = remoteSs.getName();
+    const remoteSheet = remoteSs.getSheetByName(SHEET_DATABASE);
+    if (!remoteSheet) return { id: spreadsheetId, name, rows: [] };
+    const remoteAll = remoteSheet.getDataRange().getValues();
+    const rows = [];
+    for (let i = 2; i < remoteAll.length; i++) {
+      const values = remoteAll[i].map(c => String(c == null ? '' : c));
+      if (values.every(v => v === '')) continue;
+      rows.push({ rowIndex: i + 1, values, spreadsheetId });
+    }
+    return { id: spreadsheetId, name, rows };
+  } catch (e) {
+    return { id: spreadsheetId, name: spreadsheetId, rows: [] };
+  }
 }
 
 /**
@@ -274,10 +287,12 @@ function movePersonnel(rowEntries, destinationSpreadsheetId) {
  *   columns: Array<{name: string, type: string, tableHeaders?: string[]}>,
  *   rows: Array<{rowIndex: number, values: string[]}>,
  *   masterMode: boolean,
+ *   masterSourceIds: string[],
  *   masterSources: Array<{id: string|null, name: string}>|undefined,
  *   filterDebounceMs: number,
  *   imageFetchBatchSize: number,
  *   imageFetchConcurrency: number,
+ *   masterModeFetchConcurrency: number,
  *   imageCacheTtlDays: number
  * }}
  */
@@ -299,24 +314,7 @@ function getSchemaAndData() {
   }
 
   const masterMode = getMasterMode();
-  if (masterMode) {
-    getMasterSources().forEach(spreadsheetId => {
-      const remoteSs = openSpreadsheetSafely(spreadsheetId);
-      if (!remoteSs) return;
-      try {
-        const remoteSheet = remoteSs.getSheetByName(SHEET_DATABASE);
-        if (!remoteSheet) return;
-        const remoteAll = remoteSheet.getDataRange().getValues();
-        for (let i = 2; i < remoteAll.length; i++) {
-          const values = remoteAll[i].map(c => String(c == null ? '' : c));
-          if (values.every(v => v === '')) continue;
-          rows.push({ rowIndex: i + 1, values, spreadsheetId });
-        }
-      } catch (e) {
-        // skip inaccessible spreadsheets
-      }
-    });
-  }
+  const masterSourceIds = masterMode ? getMasterSources() : [];
 
   const tableHeadersMap = {};
   const handbookSheet = ss.getSheetByName(SHEET_HANDBOOK);
@@ -355,11 +353,12 @@ function getSchemaAndData() {
     columns.forEach(col => { if (col.type === type) col[key] = options; });
   });
 
-  const masterSources = masterMode ? getSourceSpreadsheetInfos() : undefined;
-  return { columns, rows, masterMode, masterSources,
+  const masterSources = masterMode ? [{ id: null, name: ss.getName() }] : undefined;
+  return { columns, rows, masterMode, masterSourceIds, masterSources,
            actualPersonnelNames: getActualPersonnelNames(),
            filterDebounceMs: FILTER_DEBOUNCE_MS,
            imageFetchBatchSize: IMAGE_FETCH_BATCH_SIZE, imageFetchConcurrency: IMAGE_FETCH_CONCURRENCY,
+           masterModeFetchConcurrency: MASTER_MODE_FETCH_CONCURRENCY,
            imageCacheTtlDays: IMAGE_CACHE_TTL_DAYS };
 }
 

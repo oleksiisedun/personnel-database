@@ -209,6 +209,7 @@
     applyFilters();
     document.getElementById('data-table').style.display = 'table';
     updateStickyOffsets();
+    if (data.masterMode && data.masterSourceIds?.length) queueMasterSourceFetch();
   }
 
   /**
@@ -500,6 +501,37 @@
         .getImagesDataUrls(batch);
     };
     const workers = Math.min(concurrency, Math.ceil(ids.length / batchSize));
+    for (let i = 0; i < workers; i++) fetchNext();
+  }
+
+  /**
+   * Streams in additional Master Mode source spreadsheets' rows after the
+   * initial (local-only) render, via a worker pool over getMasterSourceRows()
+   * (mirrors queueImageFetch()'s concurrency pattern). Newly-arrived rows and
+   * source names are merged into schema and the list is silently re-filtered;
+   * inaccessible sources are skipped, same as the previous synchronous loop.
+   */
+  function queueMasterSourceFetch() {
+    const ids = schema.masterSourceIds.slice();
+    const concurrency = schema.masterModeFetchConcurrency;
+    const debouncedApplyFilters = debounce(applyFilters, schema.filterDebounceMs);
+    let offset = 0;
+    const fetchNext = () => {
+      if (offset >= ids.length) return;
+      const id = ids[offset++];
+      google.script.run
+        .withSuccessHandler(result => {
+          schema.rows.push(...result.rows);
+          schema.masterSources.push({ id: result.id, name: result.name });
+          debouncedApplyFilters();
+          fetchNext();
+        })
+        .withFailureHandler(() => {
+          fetchNext();
+        })
+        .getMasterSourceRows(id);
+    };
+    const workers = Math.min(concurrency, ids.length);
     for (let i = 0; i < workers; i++) fetchNext();
   }
 
