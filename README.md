@@ -128,7 +128,9 @@ Same behaviour as `unit`, but the allowed values come from Handbook `G17:G40`.
 
 ## Master Mode
 
-When the **Master Mode** checkbox (`Handbook!M2`) is checked, `getSchemaAndData()` opens every spreadsheet ID listed in `Handbook!N2:N` and appends their `Database` rows to the local ones. Each remote row carries a `spreadsheetId` property so saves and deletes are routed back to the correct spreadsheet.
+When the **Master Mode** checkbox (`Handbook!M2`) is checked, `getSchemaAndData()` returns the source spreadsheet IDs listed in `Handbook!N2:N` (`masterSourceIds`) without opening any of them itself, so the local `Database` rows render immediately. The client then calls `queueMasterSourceFetch()`, which fetches each source's rows one at a time through a concurrency-limited worker pool (`MASTER_MODE_FETCH_CONCURRENCY` in `Config.js`) via `getMasterSourceRows(spreadsheetId)`. Each remote row carries a `spreadsheetId` property so saves and deletes are routed back to the correct spreadsheet. As each source resolves, its rows are appended to the list and the view is silently re-filtered — so remote rows stream in over the following seconds while the local-only list is already visible. Inaccessible sources are skipped silently.
+
+The **"All units"** toolbar checkbox (visible only in Master Mode, checked by default) hides all streamed-in remote rows so only the local `Database` sheet's own rows are shown.
 
 When Master Mode is **OFF**, only the local `Database` sheet is shown. Editing (add / edit / delete) is always available regardless of Master Mode.
 
@@ -145,11 +147,21 @@ What happens on the server:
 
 After a successful move the rows reappear in the list immediately under their new spreadsheet, without reopening the webview.
 
+## Custom menu
+
+The Sheets **More... ⭐️** menu (added by `onOpen()`) has two items:
+
+| Item | Action |
+|------|--------|
+| Open Web Editor | Opens the web editor dialog described below |
+| Fix phone numbers | Scans the `Database` sheet's `Номер телефону` column and rewrites two malformed shapes in place: bare 9-digit numbers missing the leading `0`, and 12-digit numbers carrying a `38` country-code prefix. Numbers already in canonical 10-digit form are left untouched. Runs synchronously over the whole sheet and reports the fixed count via a dialog. No undo beyond manual edit or `Trash` recovery. |
+
 ## Web editor features
 
 - **List view** — full-screen table with all columns and data
 - **Filtering** — debounced live filter input above every column; supports plain text and regular expressions (toggle per session); for `image` columns the search matches the raw Drive URL/ID (`""` to filter empty); for `*-table` columns the search runs against the raw encoded cell content, so any sub-field value is matched
 - **Actual personnel filter** — "Actual personnel" checkbox in the toolbar (enabled only when `Handbook!M6`/`M7` are configured and accessible); when checked, only rows whose first-column value (full name) appears in the external personnel list are shown; composes with all other filters
+- **All units filter** (Master Mode only) — "All units" checkbox in the toolbar, checked by default; uncheck to hide rows streamed in from Master Mode source spreadsheets and show only the local `Database` sheet's rows; composes with all other filters
 - **Add person** — appends a new empty row to the local `Database` sheet and opens it in the edit view immediately
 - **Delete** — red "Delete" button in the edit view moves the record to the `Trash` sheet of its source spreadsheet (not available for unsaved new rows)
 - **Column visibility** — "Columns ▾" button to hide/show individual columns; first column is always visible
@@ -252,12 +264,17 @@ flowchart LR
   doGet --> getSchema --> getRows --> getMasterMode --> renderList
   renderList --> applyFilters
   renderList --> loadImageBatch
+  renderList -->|Master Mode| queueMasterSourceFetch
+  queueMasterSourceFetch --> gsr[google.script.run]
+  gsr --> getMasterSourceRows --> appendRemoteRows --> applyFilters
 
   classDef code   fill:#EEEDFE,stroke:#534AB7,color:#26215C
   classDef client fill:#E1F5EE,stroke:#0F6E56,color:#04342C
+  classDef api    fill:#F1EFE8,stroke:#5F5E5A,color:#2C2C2A
 
-  class doGet,getSchema,getRows,getMasterMode code
-  class renderList,applyFilters,loadImageBatch client
+  class doGet,getSchema,getRows,getMasterMode,getMasterSourceRows code
+  class renderList,applyFilters,loadImageBatch,queueMasterSourceFetch,appendRemoteRows client
+  class gsr api
 ```
 
 ### 2 · Open record
