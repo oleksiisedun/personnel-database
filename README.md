@@ -6,7 +6,66 @@ A Google Sheets–based personnel database with a built-in web editor. Data live
 
 The project is a [Google Apps Script](https://developers.google.com/apps-script) bound to a Google Spreadsheet, deployed locally with [CLASP](https://github.com/google/clasp).
 
-![Architecture](architecture.svg)
+```mermaid
+flowchart TD
+    subgraph client["Browser (client)"]
+        html["WebEditor.html<br/>App shell"]
+        js["WebEditor.js.html<br/>Filter, edit, export UI"]
+        css["WebEditor.css.html<br/>Styles"]
+        html --> js
+        html --> css
+    end
+
+    subgraph server["Server — Google Apps Script"]
+        config["Config.js<br/>Constants & IDs"]
+        code["Code.js<br/>Menu, data access, image proxy, openSpreadsheetSafely"]
+        export["Export.js<br/>F-1 & Wanted Card docs"]
+    end
+
+    subgraph workspace["Google Workspace"]
+        subgraph sheets["Google Sheets (data store)"]
+            database["Database<br/>Personnel rows + column types"]
+            handbook["Handbook<br/>Schema, dropdowns, Master Mode config"]
+            trash["Trash<br/>Soft-deleted records"]
+        end
+        drive["Google Drive<br/>Photos, F-1/WC templates, exported docs"]
+    end
+
+    remote["Remote spreadsheets<br/>(Master Mode sources)"]
+
+    subgraph devtools["Local dev tooling"]
+        clasp["CLASP<br/>Push / pull to GAS"]
+        claspPush["clasp-push.sh<br/>Multi-spreadsheet deploy"]
+        manifest["appsscript.json<br/>Manifest & OAuth scopes"]
+    end
+
+    js -- "google.script.run" --> code
+    code -. return data .-> js
+    code --> config
+    code --> database
+    code --> handbook
+    code --> trash
+    code --> drive
+    code -. "Master Mode read" .-> remote
+    code -- "batch export" --> export
+    export --> drive
+
+    clasp -.->|push/pull| code
+    claspPush --> clasp
+    manifest -.-> code
+
+    classDef code   fill:#EEEDFE,stroke:#534AB7,color:#26215C
+    classDef client fill:#E1F5EE,stroke:#0F6E56,color:#04342C
+    classDef store  fill:#FFF8E1,stroke:#F9A825,color:#3E2723
+    classDef export fill:#FAECE7,stroke:#993C1D,color:#4A1B0C
+    classDef devtools fill:#F1EFE8,stroke:#5F5E5A,color:#2C2C2A
+
+    class html,js,css client
+    class config,code code
+    class database,handbook,trash,drive,remote store
+    class export export
+    class clasp,claspPush,manifest devtools
+```
 
 | File | Purpose |
 |------|---------|
