@@ -220,7 +220,11 @@ function getActualPersonnelNames() {
  *
  * @param {Array<{rowIndex: number, spreadsheetId: string|null}>} rowEntries
  * @param {string|null} destinationSpreadsheetId
- * @returns {{ log: Array<{name: string, folderNote: string}> }}
+ * @returns {{
+ *   log: Array<{name: string, folderNote: string}>,
+ *   movedRows: Array<{rowIndex: number, values: string[], spreadsheetId?: string}>,
+ *   skippedEntries: Array<{rowIndex: number, spreadsheetId: string|null}>
+ * }}
  */
 function movePersonnel(rowEntries, destinationSpreadsheetId) {
   const destSs = destinationSpreadsheetId
@@ -246,18 +250,25 @@ function movePersonnel(rowEntries, destinationSpreadsheetId) {
 
   const log = [];
   const movedRows = [];
+  const skippedEntries = [];
 
   groups.forEach((entries, spreadsheetId) => {
     const srcSs = spreadsheetId
       ? openSpreadsheetSafely(spreadsheetId)
       : SpreadsheetApp.getActiveSpreadsheet();
     if (!srcSs) {
-      entries.forEach(() => log.push({ name: '?', folderNote: 'Source spreadsheet not accessible — skipped' }));
+      entries.forEach(({ rowIndex }) => {
+        log.push({ name: '?', folderNote: 'Source spreadsheet not accessible — skipped' });
+        skippedEntries.push({ rowIndex, spreadsheetId });
+      });
       return;
     }
     const srcSheet = srcSs.getSheetByName(SHEET_DATABASE);
     if (!srcSheet) {
-      entries.forEach(() => log.push({ name: '?', folderNote: 'Source sheet not found — skipped' }));
+      entries.forEach(({ rowIndex }) => {
+        log.push({ name: '?', folderNote: 'Source sheet not found — skipped' });
+        skippedEntries.push({ rowIndex, spreadsheetId });
+      });
       return;
     }
 
@@ -275,6 +286,7 @@ function movePersonnel(rowEntries, destinationSpreadsheetId) {
 
       if (spreadsheetId === destinationSpreadsheetId) {
         log.push({ name: fullName, folderNote: 'Same spreadsheet — skipped' });
+        skippedEntries.push({ rowIndex, spreadsheetId });
         return;
       }
 
@@ -316,7 +328,7 @@ function movePersonnel(rowEntries, destinationSpreadsheetId) {
     });
   });
 
-  return { log, movedRows };
+  return { log, movedRows, skippedEntries };
 }
 
 /**

@@ -14,6 +14,7 @@
   let filterActualPersonnel = false; // true when only names in the actual personnel list are shown
   let showAllUnits = true;           // true when master-mode remote rows are included alongside local ones
   let dbPromise = null;              // Promise<IDBDatabase> — opened once in init(), reused thereafter
+  let pendingMoveEntries = null;     // rowEntries[] sent to movePersonnel(), consumed by onMoveSuccess()
   const selectedKeys = new Set(); // compound "spreadsheetId:rowIndex" keys of rows checked for export
 
   /**
@@ -1361,6 +1362,7 @@
       .map(r => ({ rowIndex: r.rowIndex, spreadsheetId: r.spreadsheetId ?? null }));
 
     if (!rowEntries.length) return;
+    pendingMoveEntries = rowEntries;
 
     const rawDestId = document.getElementById('move-destination').value;
     const destinationSpreadsheetId = rawDestId === '' ? null : rawDestId;
@@ -1381,16 +1383,45 @@
   /**
    * Success handler for movePersonnel. Updates local schema, clears selection,
    * re-renders list, and shows per-person log.
-   * @param {{ log: Array<{name: string, folderNote: string}> }} response
+   * @param {{
+   *   log: Array<{name: string, folderNote: string}>,
+   *   movedRows: Array<{rowIndex: number, values: string[], spreadsheetId?: string}>,
+   *   skippedEntries: Array<{rowIndex: number, spreadsheetId: string|null}>
+   * }} response
    */
   function onMoveSuccess(response) {
+    // Entries the server actually skipped (same spreadsheet as destination, or source
+    // inaccessible) were never deleted — exclude them so they aren't dropped from the
+    // local cache and don't throw off the rowIndex shift below.
+    const skippedKeys = new Set(
+      (response.skippedEntries ?? []).map(({ rowIndex, spreadsheetId }) => `${spreadsheetId ?? ''}:${rowIndex}`)
+    );
+    const movedEntries = pendingMoveEntries.filter(
+      ({ rowIndex, spreadsheetId }) => !skippedKeys.has(`${spreadsheetId ?? ''}:${rowIndex}`)
+    );
     const movedKeys = new Set(
-      filteredRows
-        .filter(r => selectedKeys.has(rowKey(r)))
-        .map(rowKey)
+      movedEntries.map(({ rowIndex, spreadsheetId }) => `${spreadsheetId ?? ''}:${rowIndex}`)
     );
     schema.rows = schema.rows.filter(r => !movedKeys.has(rowKey(r)));
     movedKeys.forEach(k => selectedKeys.delete(k));
+
+    // The server hard-deletes moved rows from their source sheet, shifting every
+    // subsequent row's real sheet row number up by one per deletion. Decrement the
+    // cached rowIndex of remaining same-source rows so later actions (edit/delete/
+    // move) target the correct physical row instead of a stale one.
+    const deletedBySource = new Map();
+    movedEntries.forEach(({ rowIndex, spreadsheetId }) => {
+      const key = spreadsheetId ?? null;
+      if (!deletedBySource.has(key)) deletedBySource.set(key, []);
+      deletedBySource.get(key).push(rowIndex);
+    });
+    schema.rows.forEach(r => {
+      const deletedIndexes = deletedBySource.get(r.spreadsheetId ?? null);
+      if (!deletedIndexes) return;
+      r.rowIndex -= deletedIndexes.filter(idx => idx < r.rowIndex).length;
+    });
+    pendingMoveEntries = null;
+
     (response.movedRows ?? []).forEach(r => schema.rows.push(r));
     applyFilters();
 
@@ -1415,6 +1446,7 @@
    * @param {Error} err
    */
   function onMoveError(err) {
+    pendingMoveEntries = null;
     const errEl = document.getElementById('move-error');
     errEl.textContent = `Move failed: ${err.message || err}`;
     errEl.style.display = 'block';
