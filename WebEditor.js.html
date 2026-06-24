@@ -12,6 +12,7 @@
   let isNewRow = false;    // true when the edit view holds a freshly appended row
   let useRegex = false;              // true when filter inputs are treated as regular expressions
   let filterActualPersonnel = false; // true when only names in the actual personnel list are shown
+  let showAllUnits = true;           // true when master-mode remote rows are included alongside local ones
   let dbPromise = null;              // Promise<IDBDatabase> — opened once in init(), reused thereafter
   const selectedKeys = new Set(); // compound "spreadsheetId:rowIndex" keys of rows checked for export
 
@@ -196,6 +197,12 @@
     document.getElementById('loading').style.display = 'none';
     if (data.masterMode) {
       document.getElementById('btn-move').style.display = '';
+      document.getElementById('all-units-label').style.display = '';
+      const chkAllUnits = document.getElementById('chk-all-units');
+      chkAllUnits.addEventListener('change', () => {
+        showAllUnits = chkAllUnits.checked;
+        applyFilters();
+      });
     }
     const chkActual = document.getElementById('chk-actual');
     if (data.actualPersonnelNames?.length) {
@@ -312,6 +319,7 @@
         if (f?.notEmpty) return !!cell.trim();
         return useRegex ? f.test(cell) : cell.toLowerCase().includes(f);
       })) return false;
+      if (!showAllUnits && row.spreadsheetId) return false;
       if (filterActualPersonnel) {
         return schema.actualPersonnelNames.includes((row.values[0] ?? '').trim());
       }
