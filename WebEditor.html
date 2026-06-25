@@ -21,47 +21,47 @@
     <div id="error-msg" style="display:none"></div>
     <div id="toolbar">
       <div id="toolbar-left">
-        <button id="btn-add-person">Add person</button>
-        <button id="btn-export-f1" disabled>Export F-1</button>
-        <button id="btn-export-wc" disabled>Export WC</button>
-        <button id="btn-move" disabled style="display:none">Move personnel</button>
+        <button id="btn-add-person" class="btn-secondary">Add person</button>
+        <button id="btn-export-f1" class="btn-secondary" disabled>Export F-1</button>
+        <button id="btn-export-wc" class="btn-secondary" disabled>Export WC</button>
+        <button id="btn-move" class="btn-secondary" disabled style="display:none">Move personnel</button>
       </div>
       <div id="toolbar-right">
         <label id="all-units-label" style="display:none"><input type="checkbox" id="chk-all-units" checked> All units</label>
         <label id="actual-label"><input type="checkbox" id="chk-actual" disabled> Actual personnel</label>
         <label id="regex-label"><input type="checkbox" id="chk-regex"> Search using REGEX</label>
         <div id="col-toggle-wrap">
-          <button id="btn-columns">Columns ▾</button>
+          <button id="btn-columns" class="btn-secondary">Columns ▾</button>
           <div id="col-panel" style="display:none"></div>
         </div>
       </div>
     </div>
 
     <!-- Move overlay -->
-    <div id="move-overlay" style="display:none">
-      <div id="move-dialog">
+    <div id="move-overlay" class="overlay" style="display:none">
+      <div id="move-dialog" class="overlay-dialog">
         <div id="move-dialog-title">Move selected persons to:</div>
         <select id="move-destination"></select>
         <div id="move-status" style="display:none"></div>
         <div id="move-log" style="display:none"></div>
         <div id="move-error" style="display:none"></div>
         <div id="move-actions">
-          <button id="btn-move-cancel">Cancel</button>
-          <button id="btn-move-confirm">Move</button>
+          <button id="btn-move-cancel" class="btn-secondary">Cancel</button>
+          <button id="btn-move-confirm" class="btn-primary">Move</button>
         </div>
       </div>
     </div>
 
     <!-- Export progress/result overlay -->
-    <div id="export-overlay" style="display:none">
-      <div id="export-dialog">
+    <div id="export-overlay" class="overlay" style="display:none">
+      <div id="export-dialog" class="overlay-dialog">
         <div id="export-progress-wrap" style="display:none">
           <div id="export-progress-bar"></div>
         </div>
         <div id="export-msg"></div>
         <ul id="export-links" style="display:none"></ul>
         <div id="export-error" style="display:none"></div>
-        <button id="btn-export-close" style="display:none">Close</button>
+        <button id="btn-export-close" class="btn-primary" style="display:none">Close</button>
       </div>
     </div>
 
@@ -79,13 +79,13 @@
   <!-- Edit View -->
   <div id="view-edit" style="display:none">
     <div id="edit-header">
-      <button id="btn-back">← Back</button>
+      <button id="btn-back" class="btn-secondary">← Back</button>
       <div id="edit-title"></div>
       <div id="edit-header-actions">
         <span id="save-status"></span>
         <span id="save-error" style="display:none"></span>
         <button id="btn-delete" style="display:none">Delete</button>
-        <button id="btn-save">Save</button>
+        <button id="btn-save" class="btn-primary">Save</button>
       </div>
     </div>
     <div id="edit-form"></div>

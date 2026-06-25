@@ -14,6 +14,18 @@ There is no build step, linter, or test suite.
 
 JS style and JSDoc rules are in the global `~/.claude/CLAUDE.md`. Project-specific rule: all tuneable constants belong in `Config.js` (see below).
 
+### CSS design system (`WebEditor.css.html`)
+
+Colors, radii, and common component patterns are centralized — reuse them instead of writing new literal values or copy-pasting a rule block:
+
+- **Color/radius variables** (defined on `:root`): `--color-primary`, `--color-primary-hover`, `--color-focus`, `--color-focus-shadow`, `--color-danger`, `--color-danger-hover`, `--color-border`, `--radius`. Any new accent, danger, or focus-ring color should reference one of these, not a new hex literal. If a genuinely new semantic color is needed, add it as a new `--color-*` variable rather than inlining a hex value.
+- **`.btn-primary`** — filled accent button (Save/Move/Close-style confirmations). **`.btn-secondary`** — outline button (Back/Cancel/toolbar actions). Apply these classes on new buttons instead of writing per-ID `background`/`border`/`color` rules; only put padding/font-size on the ID selector if a button needs a non-default size.
+- **`button:disabled`** is styled globally (`opacity: 0.5; cursor: default;`) — don't add a per-ID `:disabled` rule unless a button genuinely needs a different disabled treatment.
+- **`.overlay`** / **`.overlay-dialog`** — shared scaffolding for full-screen modal overlays (export progress, move dialog). A new modal should reuse these two classes and only add its own ID rule for size/text-align differences, rather than redefining the fixed-position/flex-centering/box-shadow rules again.
+- All focus states on text inputs/selects use `border-color: var(--color-focus); box-shadow: 0 0 0 2px var(--color-focus-shadow);` — keep new inputs consistent with this rather than border-color-only or a different shadow.
+
+Before adding a new CSS rule, check whether an existing variable or shared class already covers it. The goal is one definition per visual pattern — duplicating a rule block under a new ID is the main way this stylesheet drifts out of sync with itself.
+
 ## Architecture
 
 This is a **Google Apps Script** project (V8 runtime) bound to a Google Spreadsheet. The web editor runs inside an `HtmlService` modal dialog opened from the Sheets menu.
