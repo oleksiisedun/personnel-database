@@ -145,7 +145,7 @@ Loading uses a **concurrency pool** controlled by `IMAGE_FETCH_CONCURRENCY` and 
 
 ### Document export (`Export.js`)
 
-Export is triggered from the toolbar. The Export F-1 and Export WC buttons are disabled until at least one row is checked via the selection checkbox column. `runExport()` collects `{ rowIndex, spreadsheetId }` entries from `selectedKeys`-checked rows and passes them to the server (Master Mode rows carry a non-null `spreadsheetId`).
+Export is triggered from the toolbar. The Export F-1 and Export WC buttons are disabled until at least one row is checked via the selection checkbox column. `runExport()` collects `{ rowIndex, spreadsheetId }` entries from `selectedKeys`-checked rows. When the count exceeds `EXPORT_CONFIRM_THRESHOLD`, it shows a confirmation dialog (with a time estimate derived from `EXPORT_SECONDS_PER_DOC`) before starting; otherwise it proceeds immediately. The actual progress/batching logic lives in `startExportProgress()`, which `runExport()` calls either directly (small batch) or from the confirm dialog's "Export" button handler (large batch).
 
 `exportF1(rowEntries)` and `exportWC(rowEntries)` copy Google Docs templates into the export folder and fill placeholders with row data. Both delegate to `_exportDoc()`, which caches sheet data per `spreadsheetId` (so each remote spreadsheet is read at most once per export call) and runs four passes in strict order:
 

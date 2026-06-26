@@ -341,7 +341,9 @@ function movePersonnel(rowEntries, destinationSpreadsheetId) {
  *   imageFetchBatchSize: number,
  *   imageFetchConcurrency: number,
  *   masterModeFetchConcurrency: number,
- *   imageCacheTtlDays: number
+ *   imageCacheTtlDays: number,
+ *   exportConfirmThreshold: number,
+ *   exportSecondsPerDoc: number
  * }}
  */
 function getSchemaAndData() {
@@ -398,7 +400,9 @@ function getSchemaAndData() {
            filterDebounceMs: FILTER_DEBOUNCE_MS,
            imageFetchBatchSize: IMAGE_FETCH_BATCH_SIZE, imageFetchConcurrency: IMAGE_FETCH_CONCURRENCY,
            masterModeFetchConcurrency: MASTER_MODE_FETCH_CONCURRENCY,
-           imageCacheTtlDays: IMAGE_CACHE_TTL_DAYS };
+           imageCacheTtlDays: IMAGE_CACHE_TTL_DAYS,
+           exportConfirmThreshold: EXPORT_CONFIRM_THRESHOLD,
+           exportSecondsPerDoc: EXPORT_SECONDS_PER_DOC };
 }
 
 /**

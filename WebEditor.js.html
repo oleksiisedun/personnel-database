@@ -15,6 +15,7 @@
   let showAllUnits = true;           // true when master-mode remote rows are included alongside local ones
   let dbPromise = null;              // Promise<IDBDatabase> — opened once in init(), reused thereafter
   let pendingMoveEntries = null;     // rowEntries[] sent to movePersonnel(), consumed by onMoveSuccess()
+  let pendingExportState = null;     // { btnId, serverFnName, entries } staged when confirm dialog is shown
   const selectedKeys = new Set(); // compound "spreadsheetId:rowIndex" keys of rows checked for export
 
   /**
@@ -245,6 +246,20 @@
     document.getElementById('btn-export-wc').addEventListener('click', () => runExport('btn-export-wc', 'exportWC'));
     document.getElementById('btn-export-close').addEventListener('click', () => {
       document.getElementById('export-overlay').style.display = 'none';
+    });
+    document.getElementById('btn-export-cancel').addEventListener('click', () => {
+      if (pendingExportState) {
+        document.getElementById(pendingExportState.btnId).disabled = false;
+        pendingExportState = null;
+      }
+      document.getElementById('export-overlay').style.display = 'none';
+    });
+    document.getElementById('btn-export-proceed').addEventListener('click', () => {
+      if (!pendingExportState) return;
+      const { btnId, serverFnName, entries, total } = pendingExportState;
+      pendingExportState = null;
+      document.getElementById('export-confirm-wrap').style.display = 'none';
+      startExportProgress(btnId, serverFnName, entries, total);
     });
     document.getElementById('btn-move').addEventListener('click', openMoveOverlay);
     document.getElementById('btn-move-cancel').addEventListener('click', closeMoveOverlay);
@@ -1337,9 +1352,44 @@
     if (!rowsToExport.length) return; // safety guard — buttons should already be disabled
 
     const total = rowsToExport.length;
+    const entries = rowsToExport.map(r => ({ rowIndex: r.rowIndex, spreadsheetId: r.spreadsheetId ?? null }));
+    const btn = document.getElementById(btnId);
+    btn.disabled = true;
+
+    if (total > schema.exportConfirmThreshold) {
+      pendingExportState = { btnId, serverFnName, entries, total };
+      const estSecs = total * schema.exportSecondsPerDoc;
+      const estStr = estSecs < 90
+        ? `about ${Math.round(estSecs / 10) * 10} seconds`
+        : `about ${Math.round(estSecs / 60)} minutes`;
+      document.getElementById('export-confirm-msg').textContent =
+        `You are about to export ${total} documents. Export cannot be cancelled once started.`;
+      document.getElementById('export-confirm-estimate').textContent = `Estimated time: ${estStr}.`;
+      document.getElementById('export-confirm-wrap').style.display = 'block';
+      document.getElementById('export-progress-wrap').style.display = 'none';
+      document.getElementById('export-msg').textContent = '';
+      document.getElementById('export-links').style.display = 'none';
+      document.getElementById('export-error').style.display = 'none';
+      document.getElementById('btn-export-close').style.display = 'none';
+      document.getElementById('export-overlay').style.display = 'flex';
+      return;
+    }
+
+    startExportProgress(btnId, serverFnName, entries, total);
+  }
+
+  /**
+   * Resets the export overlay to its progress state and begins the export.
+   * @param {string} btnId
+   * @param {string} serverFnName
+   * @param {Array<{rowIndex: number, spreadsheetId: string|null}>} entries
+   * @param {number} total
+   */
+  function startExportProgress(btnId, serverFnName, entries, total) {
     const btn = document.getElementById(btnId);
     const ul = document.getElementById('export-links');
 
+    document.getElementById('export-confirm-wrap').style.display = 'none';
     document.getElementById('export-msg').textContent = `Exporting ${total} document${total !== 1 ? 's' : ''}…`;
     ul.style.display = 'none';
     ul.innerHTML = '';
@@ -1347,7 +1397,6 @@
     document.getElementById('btn-export-close').style.display = 'none';
     document.getElementById('export-progress-wrap').style.display = 'block';
     document.getElementById('export-overlay').style.display = 'flex';
-    btn.disabled = true;
 
     let doneCount = 0;
     const progressBar = document.getElementById('export-progress-bar');
@@ -1357,7 +1406,7 @@
       progressBar.style.width = `${pct}%`;
     };
 
-    const fire = entries => {
+    const fire = batch => {
       progressBar.classList.add('indeterminate');
       google.script.run
         .withSuccessHandler(response => {
@@ -1393,10 +1442,10 @@
           showError('export-error', 'Export failed', err);
           document.getElementById('btn-export-close').style.display = 'inline-block';
         })
-        [serverFnName](entries);
+        [serverFnName](batch);
     };
 
-    fire(rowsToExport.map(r => ({ rowIndex: r.rowIndex, spreadsheetId: r.spreadsheetId ?? null })));
+    fire(entries);
   }
 
   /**

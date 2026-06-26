@@ -277,6 +277,8 @@ These keys can be placed in column C of the correspondence table:
 
 ### Large exports
 
+When more than `EXPORT_CONFIRM_THRESHOLD` (default 10) rows are selected, clicking an export button shows a confirmation dialog with a time estimate before the export begins. This prevents accidental long-running exports, since there is no way to cancel once started. The estimate is computed as `total × EXPORT_SECONDS_PER_DOC` (default 6 s/doc, so 5 docs ≈ 30 s).
+
 Exports run in automatic batches capped at `EXPORT_TIME_LIMIT_MS` (5 minutes) to stay within the Google Apps Script execution limit. The client automatically fires the next batch until all rows are done — no user interaction required. The progress bar in the export dialog shows real-time progress across batches.
 
 ## Configuration (`Config.js`)
@@ -301,6 +303,8 @@ Exports run in automatic batches capped at `EXPORT_TIME_LIMIT_MS` (5 minutes) to
 | `EXPORT_WC_TEMPLATE_CELL` | `'M11'` | Cell holding the Drive ID or link of the Wanted Card Docs template |
 | `EXPORT_FOLDER_CELL` | `'M13'` | Cell holding the Drive ID or link of the folder for exported documents |
 | `EXPORT_TIME_LIMIT_MS` | `300000` | Max server execution time per batch (ms) |
+| `EXPORT_CONFIRM_THRESHOLD` | `10` | Row count above which a confirmation dialog is shown before export starts |
+| `EXPORT_SECONDS_PER_DOC` | `6` | Seconds per document used to estimate export duration in the confirmation dialog |
 | `F1_DOC_PREFIX` | `'Ф-1 '` | Filename prefix for F-1 exports |
 | `WC_DOC_PREFIX` | `'Розшукова картка '` | Filename prefix for Wanted Card exports |
 | `DEFAULT_UNIT_NUMBER` | `'3102'` | Fallback military unit number for `contractSignDate` |

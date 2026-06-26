@@ -47,6 +47,8 @@ const COL_PHONE_NUMBER = 'Номер телефону';
 
 // Export / document settings
 const EXPORT_TIME_LIMIT_MS = 5 * 60 * 1000; // 5 min — 1 min safety margin before GAS 6-min hard limit
+const EXPORT_CONFIRM_THRESHOLD = 10; // show confirmation dialog when exporting more than this many docs
+const EXPORT_SECONDS_PER_DOC = 6;    // rough time estimate shown in the confirmation dialog (5 docs ≈ 30 s)
 const F1_DOC_PREFIX = 'Ф-1 ';
 const WC_DOC_PREFIX = 'Розшукова картка ';
 const DEFAULT_UNIT_NUMBER = '3102';

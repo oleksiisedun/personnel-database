@@ -56,6 +56,14 @@
     <!-- Export progress/result overlay -->
     <div id="export-overlay" class="overlay" style="display:none">
       <div id="export-dialog" class="overlay-dialog">
+        <div id="export-confirm-wrap" style="display:none">
+          <div id="export-confirm-msg"></div>
+          <div id="export-confirm-estimate"></div>
+          <div id="export-confirm-actions">
+            <button id="btn-export-cancel" class="btn-secondary">Cancel</button>
+            <button id="btn-export-proceed" class="btn-primary">Export</button>
+          </div>
+        </div>
         <div id="export-progress-wrap" style="display:none">
           <div id="export-progress-bar"></div>
         </div>
