@@ -536,3 +536,44 @@ function deleteRow(rowIndex, spreadsheetId) {
   dbSheet.deleteRow(rowIndex);
   return true;
 }
+
+/**
+ * Moves multiple rows to the Trash sheet (soft delete), processing each spreadsheet's rows
+ * in descending rowIndex order to avoid row-shift bugs during sequential deletion.
+ * @param {Array<{rowIndex: number, spreadsheetId: string|null}>} rowEntries
+ * @returns {boolean} Always true; thrown errors propagate to the client failure handler.
+ */
+function deleteRows(rowEntries) {
+  const groups = new Map();
+  for (const entry of rowEntries) {
+    const key = entry.spreadsheetId ?? null;
+    if (!groups.has(key)) groups.set(key, []);
+    groups.get(key).push(entry);
+  }
+
+  for (const [spreadsheetId, entries] of groups) {
+    const ss = spreadsheetId
+      ? openSpreadsheetSafely(spreadsheetId)
+      : SpreadsheetApp.getActiveSpreadsheet();
+    if (!ss) throw new Error('Spreadsheet is not accessible.');
+    const dbSheet = ss.getSheetByName(SHEET_DATABASE);
+    if (!dbSheet) throw new Error('Sheet "Database" not found.');
+
+    const numCols = dbSheet.getLastColumn();
+    let trashSheet = ss.getSheetByName(SHEET_TRASH);
+
+    entries.sort((a, b) => b.rowIndex - a.rowIndex);
+    for (const { rowIndex } of entries) {
+      const rowData = dbSheet.getRange(rowIndex, 1, 1, numCols).getValues()[0];
+      if (!trashSheet) {
+        trashSheet = ss.insertSheet(SHEET_TRASH);
+        const headers = dbSheet.getRange(1, 1, 2, numCols).getValues();
+        trashSheet.getRange(1, 1, 2, numCols).setValues(headers);
+      }
+      const trashLastRow = Math.max(trashSheet.getLastRow(), 2);
+      trashSheet.getRange(trashLastRow + 1, 1, 1, numCols).setValues([rowData]);
+      dbSheet.deleteRow(rowIndex);
+    }
+  }
+  return true;
+}

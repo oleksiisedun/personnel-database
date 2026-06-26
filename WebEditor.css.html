@@ -23,6 +23,11 @@
     cursor: pointer; font-weight: 600;
   }
   .btn-primary:hover:not(:disabled) { background: var(--color-primary-hover); }
+  .btn-danger {
+    background: none; border: 1px solid var(--color-danger); border-radius: var(--radius);
+    cursor: pointer; font-size: 13px; color: var(--color-danger);
+  }
+  .btn-danger:hover:not(:disabled) { background: #ffebee; }
   button:disabled { opacity: 0.5; cursor: default; }
 
   /* ── Shared overlay styles ── */
@@ -79,7 +84,7 @@
   #toolbar-right { display: flex; align-items: center; gap: 8px; }
   #col-toggle-wrap { position: relative; display: inline-block; }
   #regex-label, #actual-label, #all-units-label { font-size: 13px; color: #555; cursor: pointer; display: flex; align-items: center; gap: 4px; user-select: none; }
-  #btn-columns, #btn-add-person, #btn-export-f1, #btn-export-wc, #btn-move { padding: 5px 12px; }
+  #btn-columns, #btn-add-person, #btn-export-f1, #btn-export-wc, #btn-move, #btn-delete-bulk { padding: 5px 12px; }
 
   /* ── Export overlay ── */
   #export-dialog { min-width: 300px; text-align: center; }
@@ -208,11 +213,7 @@
     padding: 7px 10px; border: 1px solid var(--color-border);
     border-radius: var(--radius); font-size: 13px; color: #333;
   }
-  #btn-delete {
-    background: none; border: 1px solid var(--color-danger); border-radius: var(--radius);
-    padding: 9px 24px; cursor: pointer; font-size: 14px; font-weight: 600; color: var(--color-danger);
-  }
-  #btn-delete:hover:not(:disabled) { background: #ffebee; }
+  #btn-delete { padding: 9px 24px; font-size: 14px; font-weight: 600; }
 
   /* ── PDF rendering ── */
   .pdf-link { display:inline-block; background:#e53935; color:#fff; font-size:11px; font-weight:700; letter-spacing:.5px; padding:4px 8px; border-radius:4px; text-decoration:none; line-height:1; }

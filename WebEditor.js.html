@@ -167,6 +167,7 @@
     document.getElementById('btn-move').addEventListener('click', openMoveOverlay);
     document.getElementById('btn-move-cancel').addEventListener('click', closeMoveOverlay);
     document.getElementById('btn-move-confirm').addEventListener('click', runMove);
+    document.getElementById('btn-delete-bulk').addEventListener('click', deletePersonnelBulk);
     document.getElementById('btn-columns').addEventListener('click', e => {
       e.stopPropagation();
       const panel = document.getElementById('col-panel');
@@ -425,6 +426,7 @@
     document.getElementById('btn-export-f1').disabled = selectedInView === 0;
     document.getElementById('btn-export-wc').disabled = selectedInView === 0;
     document.getElementById('btn-move').disabled = selectedInView === 0;
+    document.getElementById('btn-delete-bulk').disabled = selectedInView === 0;
 
     const chkAll = document.getElementById('chk-select-all');
     if (!chkAll) return;
@@ -1238,6 +1240,57 @@
     const el = document.getElementById('save-error');
     el.textContent = `Delete failed: ${err.message || err}`;
     el.style.display = 'block';
+  }
+
+  /**
+   * Asks for confirmation then moves all selected rows to Trash via the server.
+   */
+  function deletePersonnelBulk() {
+    const rowEntries = filteredRows
+      .filter(r => selectedKeys.has(rowKey(r)))
+      .map(r => ({ rowIndex: r.rowIndex, spreadsheetId: r.spreadsheetId ?? null }));
+    if (!rowEntries.length) return;
+    const count = rowEntries.length;
+    if (!confirm(`Move ${count} person${count !== 1 ? 's' : ''} to Trash?`)) return;
+    document.getElementById('btn-delete-bulk').disabled = true;
+    google.script.run
+      .withSuccessHandler(onBulkDeleteSuccess.bind(null, rowEntries))
+      .withFailureHandler(onBulkDeleteError)
+      .deleteRows(rowEntries);
+  }
+
+  /**
+   * Success handler for deletePersonnelBulk(). Removes deleted rows from schema,
+   * adjusts rowIndexes for remaining rows in the same spreadsheet, and re-renders.
+   * @param {Array<{rowIndex: number, spreadsheetId: string|null}>} deletedEntries
+   */
+  function onBulkDeleteSuccess(deletedEntries) {
+    const deletedKeys = new Set(deletedEntries.map(({ rowIndex, spreadsheetId }) => `${spreadsheetId ?? ''}:${rowIndex}`));
+    schema.rows = schema.rows.filter(r => !deletedKeys.has(rowKey(r)));
+    deletedKeys.forEach(k => selectedKeys.delete(k));
+
+    const deletedBySource = new Map();
+    deletedEntries.forEach(({ rowIndex, spreadsheetId }) => {
+      const key = spreadsheetId ?? null;
+      if (!deletedBySource.has(key)) deletedBySource.set(key, []);
+      deletedBySource.get(key).push(rowIndex);
+    });
+    schema.rows.forEach(r => {
+      const deletedIndexes = deletedBySource.get(r.spreadsheetId ?? null);
+      if (!deletedIndexes) return;
+      r.rowIndex -= deletedIndexes.filter(idx => idx < r.rowIndex).length;
+    });
+
+    applyFilters();
+  }
+
+  /**
+   * Failure handler for deletePersonnelBulk(). Re-enables the button and logs the error.
+   * @param {Error} err
+   */
+  function onBulkDeleteError(err) {
+    document.getElementById('btn-delete-bulk').disabled = false;
+    console.error('Bulk delete failed:', err.message || err);
   }
 
   /**
