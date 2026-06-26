@@ -139,6 +139,88 @@
   function isTableType(col) { return col.type.endsWith('-table'); }
 
   /**
+   * Validation rules for column types that have format constraints. Defined at
+   * module scope so both real-time input handlers and saveRow() share the same regex.
+   */
+  const VALIDATORS = {
+    date: { regex: /^\d{2}\.\d{2}\.\d{4}$/, msg: 'Fix date fields (expected format: DD.MM.YYYY) before saving.' },
+    tin:  { regex: /^\d{10}$/,               msg: 'TIN must be exactly 10 digits.' },
+  };
+
+  /**
+   * Sets the text of an error element and makes it visible.
+   * @param {string} elementId - ID of the error display element.
+   * @param {string} prefix - Message prefix, e.g. "Save failed".
+   * @param {Error|string} err - Error object or message string.
+   */
+  function showError(elementId, prefix, err) {
+    const el = document.getElementById(elementId);
+    el.textContent = `${prefix}: ${err.message || err}`;
+    el.style.display = 'block';
+  }
+
+  /**
+   * Builds a <colgroup> element with proportional widths for a *-table column.
+   * Column widths are proportional to the square root of the max content length
+   * (header or any data value, minimum 8 chars). Returns null when headers is empty.
+   * @param {Object[]} rows - Decoded table row objects.
+   * @param {string[]} headers - Sub-column header names.
+   * @param {boolean} [extraCol=false] - When true, appends an unsized <col> for the delete button column.
+   * @returns {HTMLTableColElement|null}
+   */
+  function buildTableColgroup(rows, headers, extraCol = false) {
+    if (!(headers || []).length) return null;
+    const scaledLens = headers.map(h => {
+      const dataMax = (rows || []).reduce((m, r) => Math.max(m, (r[h] || '').length), 0);
+      return Math.sqrt(Math.max(h.length, dataMax, 8));
+    });
+    const total = scaledLens.reduce((a, b) => a + b, 0);
+    const colgroup = document.createElement('colgroup');
+    scaledLens.forEach(len => {
+      const col = document.createElement('col');
+      col.style.width = `${(len / total * 100).toFixed(1)}%`;
+      colgroup.appendChild(col);
+    });
+    if (extraCol) colgroup.appendChild(document.createElement('col'));
+    return colgroup;
+  }
+
+  /**
+   * Builds a <thead> element with a single header row populated from the given headers.
+   * @param {string[]} headers - Sub-column header names.
+   * @param {boolean} [extraTh=false] - When true, appends an empty <th> for the delete button column.
+   * @returns {HTMLTableSectionElement}
+   */
+  function buildTableHeaderRow(headers, extraTh = false) {
+    const thead = document.createElement('thead');
+    const trHead = document.createElement('tr');
+    (headers || []).forEach(h => {
+      const th = document.createElement('th');
+      th.textContent = h;
+      trHead.appendChild(th);
+    });
+    if (extraTh) trHead.appendChild(document.createElement('th'));
+    thead.appendChild(trHead);
+    return thead;
+  }
+
+  /**
+   * Decrements the cached rowIndex of remaining rows in schema.rows when one or
+   * more rows have been hard-deleted from a source sheet. Rows above the deletion
+   * point in the same spreadsheet have their sheet row numbers shifted up by one
+   * per deletion, so the cached indexes must be adjusted to match the new reality.
+   * @param {Map<string|null, number[]>} deletedBySource - Map of spreadsheetId (null=local)
+   *   to the array of deleted rowIndexes within that spreadsheet.
+   */
+  function adjustRowIndexesAfterDelete(deletedBySource) {
+    schema.rows.forEach(r => {
+      const deletedIndexes = deletedBySource.get(r.spreadsheetId ?? null);
+      if (!deletedIndexes) return;
+      r.rowIndex -= deletedIndexes.filter(idx => idx < r.rowIndex).length;
+    });
+  }
+
+  /**
    * Entry point. Wires up all static event listeners and kicks off the
    * initial data load from the server via google.script.run.
    */
@@ -228,9 +310,7 @@
    */
   function onLoadError(err) {
     document.getElementById('loading').style.display = 'none';
-    const el = document.getElementById('error-msg');
-    el.textContent = `Error loading data: ${err.message || err}`;
-    el.style.display = 'block';
+    showError('error-msg', 'Error loading data', err);
   }
 
   /**
@@ -785,7 +865,7 @@
 
         input.addEventListener('input', () => {
           const val = input.value.trim();
-          const valid = !val || /^\d{10}$/.test(val);
+          const valid = !val || VALIDATORS.tin.regex.test(val);
           input.classList.toggle('input-error', !valid);
           errHint.style.display = valid ? 'none' : 'block';
         });
@@ -805,7 +885,7 @@
 
         input.addEventListener('input', () => {
           const val = input.value.trim();
-          const valid = !val || /^\d{2}\.\d{2}\.\d{4}$/.test(val);
+          const valid = !val || VALIDATORS.date.regex.test(val);
           input.classList.toggle('input-error', !valid);
           errHint.style.display = valid ? 'none' : 'block';
         });
@@ -946,29 +1026,9 @@
   function buildMiniTable(rows, headers) {
     const table = document.createElement('table');
     table.className = 'mini-table';
-    if ((headers || []).length > 0) {
-      const scaledLens = headers.map(h => {
-        const dataMax = (rows || []).reduce((m, r) => Math.max(m, (r[h] || '').length), 0);
-        return Math.sqrt(Math.max(h.length, dataMax, 8));
-      });
-      const total = scaledLens.reduce((a, b) => a + b, 0);
-      const colgroup = document.createElement('colgroup');
-      scaledLens.forEach(len => {
-        const col = document.createElement('col');
-        col.style.width = `${(len / total * 100).toFixed(1)}%`;
-        colgroup.appendChild(col);
-      });
-      table.appendChild(colgroup);
-    }
-    const thead = document.createElement('thead');
-    const trHead = document.createElement('tr');
-    (headers || []).forEach(h => {
-      const th = document.createElement('th');
-      th.textContent = h;
-      trHead.appendChild(th);
-    });
-    thead.appendChild(trHead);
-    table.appendChild(thead);
+    const colgroup = buildTableColgroup(rows, headers);
+    if (colgroup) table.appendChild(colgroup);
+    table.appendChild(buildTableHeaderRow(headers));
     const tbody = document.createElement('tbody');
     (rows || []).forEach(rowObj => {
       const tr = document.createElement('tr');
@@ -999,34 +1059,9 @@
     wrapper.dataset.colIndex = colIndex;
     const table = document.createElement('table');
 
-    // Set column widths proportional to max content length so the editor
-    // matches the natural auto-sizing of the read-only mini-table.
-    if ((headers || []).length > 0) {
-      const maxLens = headers.map(h => {
-        const dataMax = (rows || []).reduce((m, r) => Math.max(m, (r[h] || '').length), 0);
-        return Math.sqrt(Math.max(h.length, dataMax, 8));
-      });
-      const total = maxLens.reduce((a, b) => a + b, 0);
-      const colgroup = document.createElement('colgroup');
-      maxLens.forEach(len => {
-        const col = document.createElement('col');
-        col.style.width = `${(len / total * 100).toFixed(1)}%`;
-        colgroup.appendChild(col);
-      });
-      colgroup.appendChild(document.createElement('col')); // delete column — width from CSS
-      table.appendChild(colgroup);
-    }
-
-    const thead = document.createElement('thead');
-    const trHead = document.createElement('tr');
-    (headers || []).forEach(h => {
-      const th = document.createElement('th');
-      th.textContent = h;
-      trHead.appendChild(th);
-    });
-    trHead.appendChild(document.createElement('th')); // placeholder for delete column
-    thead.appendChild(trHead);
-    table.appendChild(thead);
+    const colgroup = buildTableColgroup(rows, headers, true);
+    if (colgroup) table.appendChild(colgroup);
+    table.appendChild(buildTableHeaderRow(headers, true));
     const tbody = document.createElement('tbody');
     (rows || []).forEach(rowObj => addTableEditorRow(tbody, headers, rowObj));
     table.appendChild(tbody);
@@ -1098,10 +1133,6 @@
    * Disables the Save button for the duration of the async call.
    */
   function saveRow() {
-    const VALIDATORS = {
-      date: { regex: /^\d{2}\.\d{2}\.\d{4}$/, msg: 'Fix date fields (expected format: DD.MM.YYYY) before saving.' },
-      tin:  { regex: /^\d{10}$/,               msg: 'TIN must be exactly 10 digits.' },
-    };
     let validationError = null;
     schema.columns.forEach((col, i) => {
       const validator = VALIDATORS[col.type];
@@ -1194,9 +1225,7 @@
   function onSaveError(err) {
     document.getElementById('btn-save').disabled = false;
     document.getElementById('save-status').textContent = '';
-    const el = document.getElementById('save-error');
-    el.textContent = `Save failed: ${err.message || err}`;
-    el.style.display = 'block';
+    showError('save-error', 'Save failed', err);
   }
 
   /**
@@ -1222,9 +1251,7 @@
     const deletedIndex = editingRow.rowIndex;
     const deletedSpreadsheetId = editingRow.spreadsheetId ?? null;
     schema.rows = schema.rows.filter(r => r !== editingRow);
-    schema.rows.forEach(r => {
-      if ((r.spreadsheetId ?? null) === deletedSpreadsheetId && r.rowIndex > deletedIndex) r.rowIndex--;
-    });
+    adjustRowIndexesAfterDelete(new Map([[deletedSpreadsheetId, [deletedIndex]]]));
     editingRow = null;
     applyFilters();
     showView('list');
@@ -1237,9 +1264,7 @@
   function onDeleteError(err) {
     document.getElementById('btn-delete').disabled = false;
     document.getElementById('btn-save').disabled = false;
-    const el = document.getElementById('save-error');
-    el.textContent = `Delete failed: ${err.message || err}`;
-    el.style.display = 'block';
+    showError('save-error', 'Delete failed', err);
   }
 
   /**
@@ -1265,7 +1290,7 @@
    * @param {Array<{rowIndex: number, spreadsheetId: string|null}>} deletedEntries
    */
   function onBulkDeleteSuccess(deletedEntries) {
-    const deletedKeys = new Set(deletedEntries.map(({ rowIndex, spreadsheetId }) => `${spreadsheetId ?? ''}:${rowIndex}`));
+    const deletedKeys = new Set(deletedEntries.map(e => rowKey(e)));
     schema.rows = schema.rows.filter(r => !deletedKeys.has(rowKey(r)));
     deletedKeys.forEach(k => selectedKeys.delete(k));
 
@@ -1275,11 +1300,7 @@
       if (!deletedBySource.has(key)) deletedBySource.set(key, []);
       deletedBySource.get(key).push(rowIndex);
     });
-    schema.rows.forEach(r => {
-      const deletedIndexes = deletedBySource.get(r.spreadsheetId ?? null);
-      if (!deletedIndexes) return;
-      r.rowIndex -= deletedIndexes.filter(idx => idx < r.rowIndex).length;
-    });
+    adjustRowIndexesAfterDelete(deletedBySource);
 
     applyFilters();
   }
@@ -1369,9 +1390,7 @@
           progressBar.classList.remove('indeterminate');
           document.getElementById('export-msg').textContent =
             doneCount > 0 ? `Exported ${doneCount} before error:` : '';
-          const el = document.getElementById('export-error');
-          el.textContent = `Export failed: ${err.message || err}`;
-          el.style.display = 'block';
+          showError('export-error', 'Export failed', err);
           document.getElementById('btn-export-close').style.display = 'inline-block';
         })
         [serverFnName](entries);
@@ -1464,15 +1483,9 @@
     // Entries the server actually skipped (same spreadsheet as destination, or source
     // inaccessible) were never deleted — exclude them so they aren't dropped from the
     // local cache and don't throw off the rowIndex shift below.
-    const skippedKeys = new Set(
-      (response.skippedEntries ?? []).map(({ rowIndex, spreadsheetId }) => `${spreadsheetId ?? ''}:${rowIndex}`)
-    );
-    const movedEntries = pendingMoveEntries.filter(
-      ({ rowIndex, spreadsheetId }) => !skippedKeys.has(`${spreadsheetId ?? ''}:${rowIndex}`)
-    );
-    const movedKeys = new Set(
-      movedEntries.map(({ rowIndex, spreadsheetId }) => `${spreadsheetId ?? ''}:${rowIndex}`)
-    );
+    const skippedKeys = new Set((response.skippedEntries ?? []).map(e => rowKey(e)));
+    const movedEntries = pendingMoveEntries.filter(e => !skippedKeys.has(rowKey(e)));
+    const movedKeys = new Set(movedEntries.map(e => rowKey(e)));
     schema.rows = schema.rows.filter(r => !movedKeys.has(rowKey(r)));
     movedKeys.forEach(k => selectedKeys.delete(k));
 
@@ -1486,11 +1499,7 @@
       if (!deletedBySource.has(key)) deletedBySource.set(key, []);
       deletedBySource.get(key).push(rowIndex);
     });
-    schema.rows.forEach(r => {
-      const deletedIndexes = deletedBySource.get(r.spreadsheetId ?? null);
-      if (!deletedIndexes) return;
-      r.rowIndex -= deletedIndexes.filter(idx => idx < r.rowIndex).length;
-    });
+    adjustRowIndexesAfterDelete(deletedBySource);
     pendingMoveEntries = null;
 
     (response.movedRows ?? []).forEach(r => schema.rows.push(r));
@@ -1518,9 +1527,7 @@
    */
   function onMoveError(err) {
     pendingMoveEntries = null;
-    const errEl = document.getElementById('move-error');
-    errEl.textContent = `Move failed: ${err.message || err}`;
-    errEl.style.display = 'block';
+    showError('move-error', 'Move failed', err);
     document.getElementById('move-status').style.display = 'none';
     document.getElementById('btn-move-confirm').disabled = false;
     document.getElementById('btn-move-cancel').disabled = false;
