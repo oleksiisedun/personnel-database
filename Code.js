@@ -101,11 +101,11 @@ function fixPhoneNumbers() {
 
   const result = values.map(row => {
     const phone = String(row[0]).trim();
-    if (/^\d{9}$/.test(phone) && phone[0] !== '0') {
+    if (PHONE_REGEX_9DIGIT.test(phone) && phone[0] !== '0') {
       fixedCount++;
       return ['0' + phone];
     }
-    if (/^38\d{10}$/.test(phone)) {
+    if (PHONE_REGEX_COUNTRY.test(phone)) {
       fixedCount++;
       return [phone.slice(2)];
     }
@@ -136,7 +136,7 @@ function getMasterSourceRows(spreadsheetId) {
     const remoteAll = remoteSheet.getDataRange().getValues();
     const rows = [];
     for (let i = 2; i < remoteAll.length; i++) {
-      const values = remoteAll[i].map(c => String(c == null ? '' : c));
+      const values = stringifyRowValues(remoteAll[i]);
       if (values.every(v => v === '')) continue;
       rows.push({ rowIndex: i + 1, values, spreadsheetId });
     }
@@ -227,9 +227,7 @@ function getActualPersonnelNames() {
  * }}
  */
 function movePersonnel(rowEntries, destinationSpreadsheetId) {
-  const destSs = destinationSpreadsheetId
-    ? openSpreadsheetSafely(destinationSpreadsheetId)
-    : SpreadsheetApp.getActiveSpreadsheet();
+  const destSs = resolveSpreadsheet(destinationSpreadsheetId);
   if (!destSs) throw new Error('Destination spreadsheet is not accessible.');
   const destSheet = destSs.getSheetByName(SHEET_DATABASE);
   if (!destSheet) throw new Error('Destination sheet "Database" not found.');
@@ -239,23 +237,14 @@ function movePersonnel(rowEntries, destinationSpreadsheetId) {
     ? String(destHandbook.getRange(DATA_FOLDER).getValue()).trim()
     : '');
 
-  // Group entries by source spreadsheetId, sort each group descending by rowIndex.
-  const groups = new Map();
-  rowEntries.forEach(entry => {
-    const key = entry.spreadsheetId ?? null;
-    if (!groups.has(key)) groups.set(key, []);
-    groups.get(key).push(entry);
-  });
-  groups.forEach(entries => entries.sort((a, b) => b.rowIndex - a.rowIndex));
+  const groups = groupAndSortBySpreadsheetId(rowEntries);
 
   const log = [];
   const movedRows = [];
   const skippedEntries = [];
 
   groups.forEach((entries, spreadsheetId) => {
-    const srcSs = spreadsheetId
-      ? openSpreadsheetSafely(spreadsheetId)
-      : SpreadsheetApp.getActiveSpreadsheet();
+    const srcSs = resolveSpreadsheet(spreadsheetId);
     if (!srcSs) {
       entries.forEach(({ rowIndex }) => {
         log.push({ name: '?', folderNote: 'Source spreadsheet not accessible — skipped' });
@@ -290,16 +279,14 @@ function movePersonnel(rowEntries, destinationSpreadsheetId) {
         return;
       }
 
-      // Pad or trim row to match destination column count.
-      const paddedData = rowData.slice(0, destNumCols);
-      while (paddedData.length < destNumCols) paddedData.push('');
+      const paddedData = padRowToColumnCount(rowData, destNumCols);
 
       const newRowIndex = Math.max(destSheet.getLastRow(), 2) + 1;
       destSheet.getRange(newRowIndex, 1, 1, destNumCols).setValues([paddedData]);
 
       srcSheet.deleteRow(rowIndex);
 
-      const newRow = { rowIndex: newRowIndex, values: paddedData.map(c => String(c == null ? '' : c)) };
+      const newRow = { rowIndex: newRowIndex, values: stringifyRowValues(paddedData) };
       if (destinationSpreadsheetId) newRow.spreadsheetId = destinationSpreadsheetId;
       movedRows.push(newRow);
 
@@ -363,13 +350,10 @@ function getSchemaAndData() {
   if (!sheet) throw new Error('Sheet "Database" not found.');
   const all = sheet.getDataRange().getValues();
   if (all.length < 2) throw new Error('Sheet must have at least 2 rows (names + types).');
-  const columns = all[0].map((name, i) => ({
-    name: String(name),
-    type: String(all[1][i]).toLowerCase()
-  }));
+  const columns = extractColumnSchema(all);
   const rows = [];
   for (let i = 2; i < all.length; i++) {
-    const values = all[i].map(c => String(c == null ? '' : c));
+    const values = stringifyRowValues(all[i]);
     if (values.every(v => v === '')) continue;
     rows.push({ rowIndex: i + 1, values });
   }
@@ -396,12 +380,6 @@ function getSchemaAndData() {
     if (col.type.endsWith('-table')) col.tableHeaders = tableHeadersMap[col.type] || [];
   });
 
-  const DROPDOWN_TYPES = [
-    { type: 'unit',           range: HANDBOOK_UNIT_RANGE,           key: 'unitOptions' },
-    { type: 'origin',         range: HANDBOOK_ORIGIN_RANGE,         key: 'originOptions' },
-    { type: 'marital-status', range: HANDBOOK_MARITAL_STATUS_RANGE, key: 'maritalStatusOptions' },
-    { type: 'sex',            range: HANDBOOK_SEX_RANGE,            key: 'sexOptions' },
-  ];
   DROPDOWN_TYPES.forEach(({ type, range, key }) => {
     let options = [];
     if (handbookSheet) {
@@ -465,19 +443,13 @@ function getImagesDataUrls(fileIds) {
  * @returns {number} 1-based row index of the newly created row.
  */
 function addRowWithData(values, spreadsheetId) {
-  let ss;
-  if (spreadsheetId) {
-    ss = openSpreadsheetSafely(spreadsheetId);
-    if (!ss) throw new Error('Cannot access spreadsheet.');
-  } else {
-    ss = SpreadsheetApp.getActiveSpreadsheet();
-  }
+  const ss = resolveSpreadsheet(spreadsheetId);
+  if (!ss) throw new Error('Cannot access spreadsheet.');
   const sheet = ss.getSheetByName(SHEET_DATABASE);
   if (!sheet) throw new Error('Sheet "Database" not found.');
   const newRowIndex = sheet.getLastRow() + 1;
   const numCols = sheet.getLastColumn();
-  const padded = values.slice(0, numCols);
-  while (padded.length < numCols) padded.push('');
+  const padded = padRowToColumnCount(values, numCols);
   sheet.getRange(newRowIndex, 1, 1, numCols).setValues([padded]);
   return newRowIndex;
 }
@@ -492,9 +464,7 @@ function addRowWithData(values, spreadsheetId) {
  * @returns {boolean} Always true; thrown errors propagate to the client failure handler.
  */
 function updateRow(rowIndex, values, spreadsheetId) {
-  const ss = spreadsheetId
-    ? openSpreadsheetSafely(spreadsheetId)
-    : SpreadsheetApp.getActiveSpreadsheet();
+  const ss = resolveSpreadsheet(spreadsheetId);
   if (!ss) throw new Error('Spreadsheet is not accessible.');
   const sheet = ss.getSheetByName(SHEET_DATABASE);
   if (!sheet) throw new Error('Sheet "Database" not found.');
@@ -513,9 +483,7 @@ function updateRow(rowIndex, values, spreadsheetId) {
  * @returns {boolean} Always true; thrown errors propagate to the client failure handler.
  */
 function deleteRow(rowIndex, spreadsheetId) {
-  const ss = spreadsheetId
-    ? openSpreadsheetSafely(spreadsheetId)
-    : SpreadsheetApp.getActiveSpreadsheet();
+  const ss = resolveSpreadsheet(spreadsheetId);
   if (!ss) throw new Error('Spreadsheet is not accessible.');
   const dbSheet = ss.getSheetByName(SHEET_DATABASE);
   if (!dbSheet) throw new Error('Sheet "Database" not found.');
@@ -523,13 +491,7 @@ function deleteRow(rowIndex, spreadsheetId) {
   const numCols = dbSheet.getLastColumn();
   const rowData = dbSheet.getRange(rowIndex, 1, 1, numCols).getValues()[0];
 
-  let trashSheet = ss.getSheetByName(SHEET_TRASH);
-  if (!trashSheet) {
-    trashSheet = ss.insertSheet(SHEET_TRASH);
-    const headers = dbSheet.getRange(1, 1, 2, numCols).getValues();
-    trashSheet.getRange(1, 1, 2, numCols).setValues(headers);
-  }
-
+  const trashSheet = ensureTrashSheetExists(ss, dbSheet, numCols);
   const trashLastRow = Math.max(trashSheet.getLastRow(), 2);
   trashSheet.getRange(trashLastRow + 1, 1, 1, numCols).setValues([rowData]);
 
@@ -544,32 +506,17 @@ function deleteRow(rowIndex, spreadsheetId) {
  * @returns {boolean} Always true; thrown errors propagate to the client failure handler.
  */
 function deleteRows(rowEntries) {
-  const groups = new Map();
-  for (const entry of rowEntries) {
-    const key = entry.spreadsheetId ?? null;
-    if (!groups.has(key)) groups.set(key, []);
-    groups.get(key).push(entry);
-  }
-
+  const groups = groupAndSortBySpreadsheetId(rowEntries);
   for (const [spreadsheetId, entries] of groups) {
-    const ss = spreadsheetId
-      ? openSpreadsheetSafely(spreadsheetId)
-      : SpreadsheetApp.getActiveSpreadsheet();
+    const ss = resolveSpreadsheet(spreadsheetId);
     if (!ss) throw new Error('Spreadsheet is not accessible.');
     const dbSheet = ss.getSheetByName(SHEET_DATABASE);
     if (!dbSheet) throw new Error('Sheet "Database" not found.');
 
     const numCols = dbSheet.getLastColumn();
-    let trashSheet = ss.getSheetByName(SHEET_TRASH);
-
-    entries.sort((a, b) => b.rowIndex - a.rowIndex);
+    const trashSheet = ensureTrashSheetExists(ss, dbSheet, numCols);
     for (const { rowIndex } of entries) {
       const rowData = dbSheet.getRange(rowIndex, 1, 1, numCols).getValues()[0];
-      if (!trashSheet) {
-        trashSheet = ss.insertSheet(SHEET_TRASH);
-        const headers = dbSheet.getRange(1, 1, 2, numCols).getValues();
-        trashSheet.getRange(1, 1, 2, numCols).setValues(headers);
-      }
       const trashLastRow = Math.max(trashSheet.getLastRow(), 2);
       trashSheet.getRange(trashLastRow + 1, 1, 1, numCols).setValues([rowData]);
       dbSheet.deleteRow(rowIndex);
