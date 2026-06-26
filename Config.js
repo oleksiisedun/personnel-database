@@ -73,3 +73,23 @@ const MASTER_MODE_FETCH_CONCURRENCY = 3;
 
 // Persistent IndexedDB image cache — how long an entry is kept before re-fetching from Drive.
 const IMAGE_CACHE_TTL_DAYS = 7;
+
+// Dropdown column type definitions used by both getSchemaAndData() and (via schema) the client.
+// Each entry maps a column type to its Handbook options range and the key name on the column object.
+/** @type {Array<{type: string, range: string, key: string}>} */
+const DROPDOWN_TYPES = [
+  { type: 'unit',           range: HANDBOOK_UNIT_RANGE,           key: 'unitOptions' },
+  { type: 'origin',         range: HANDBOOK_ORIGIN_RANGE,         key: 'originOptions' },
+  { type: 'marital-status', range: HANDBOOK_MARITAL_STATUS_RANGE, key: 'maritalStatusOptions' },
+  { type: 'sex',            range: HANDBOOK_SEX_RANGE,            key: 'sexOptions' },
+];
+
+// Regex patterns shared between server-side phone normalization and export logic.
+const PHONE_REGEX_9DIGIT  = /^\d{9}$/;
+const PHONE_REGEX_COUNTRY = /^38\d{10}$/;
+
+// DD.MM.YYYY date pattern (global flag — safe to reuse with String.prototype.match()).
+const DATE_REGEX = /\d{2}\.\d{2}\.\d{4}/g;
+
+// First 4-digit sequence in a string, used to extract military unit numbers.
+const UNIT_NUMBER_REGEX = /\b(\d{4})\b/;
