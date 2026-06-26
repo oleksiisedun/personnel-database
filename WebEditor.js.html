@@ -851,6 +851,19 @@
     const deleteBtn = document.getElementById('btn-delete');
     deleteBtn.style.display = isNewRow ? 'none' : 'inline-block';
     deleteBtn.disabled = false;
+    const ssSelect = document.getElementById('add-spreadsheet-select');
+    if (isNewRow && schema.masterMode && showAllUnits) {
+      ssSelect.innerHTML = '';
+      (schema.masterSources ?? []).forEach(({ id, name }) => {
+        const opt = document.createElement('option');
+        opt.value = id ?? '';
+        opt.textContent = name;
+        ssSelect.appendChild(opt);
+      });
+      ssSelect.style.display = 'inline-block';
+    } else {
+      ssSelect.style.display = 'none';
+    }
     showView('edit');
   }
 
@@ -1122,13 +1135,18 @@
     document.getElementById('save-error').style.display = 'none';
 
     if (isNewRow) {
+      const ssSelect = document.getElementById('add-spreadsheet-select');
+      const targetId = (schema.masterMode && showAllUnits && ssSelect.style.display !== 'none')
+        ? ssSelect.value || null
+        : null;
       google.script.run
         .withSuccessHandler(newRowIndex => {
           editingRow.rowIndex = newRowIndex;
+          if (targetId) editingRow.spreadsheetId = targetId;
           onSaveSuccess();
         })
         .withFailureHandler(onSaveError)
-        .addRowWithData(newValues);
+        .addRowWithData(newValues, targetId);
     } else {
       google.script.run
         .withSuccessHandler(onSaveSuccess)

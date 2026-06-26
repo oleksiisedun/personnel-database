@@ -457,13 +457,22 @@ function getImagesDataUrls(fileIds) {
 
 /**
  * Appends a new row populated with the given values to the "Database" sheet
- * and returns its 1-based row index. Always writes to the active (local) spreadsheet.
+ * and returns its 1-based row index. When spreadsheetId is provided, writes to
+ * that remote spreadsheet via openSpreadsheetSafely(); otherwise writes locally.
  *
  * @param {string[]} values - Array of cell values, one per column.
+ * @param {string|null} [spreadsheetId] - Remote spreadsheet ID, or null/omitted for local.
  * @returns {number} 1-based row index of the newly created row.
  */
-function addRowWithData(values) {
-  const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(SHEET_DATABASE);
+function addRowWithData(values, spreadsheetId) {
+  let ss;
+  if (spreadsheetId) {
+    ss = openSpreadsheetSafely(spreadsheetId);
+    if (!ss) throw new Error('Cannot access spreadsheet.');
+  } else {
+    ss = SpreadsheetApp.getActiveSpreadsheet();
+  }
+  const sheet = ss.getSheetByName(SHEET_DATABASE);
   if (!sheet) throw new Error('Sheet "Database" not found.');
   const newRowIndex = sheet.getLastRow() + 1;
   const numCols = sheet.getLastColumn();
