@@ -65,10 +65,7 @@ function _exportDoc(rowEntries, templateCell, docPrefix) {
             sheetCache.set(key, null);
           } else {
             const all = sheet.getDataRange().getValues();
-            const columns = all[0].map((name, i) => ({
-              name: String(name),
-              type: String(all[1][i]).toLowerCase()
-            }));
+            const columns = extractColumnSchema(all);
             sheetCache.set(key, { all, columns });
           }
         } catch (e) {
@@ -97,7 +94,8 @@ function _exportDoc(rowEntries, templateCell, docPrefix) {
     const rowValues = all[rowIndex - 1];
     if (!rowValues) continue;
     const data = {};
-    columns.forEach((col, j) => { data[col.name] = String(rowValues[j] == null ? '' : rowValues[j]); });
+    const strValues = stringifyRowValues(rowValues);
+    columns.forEach((col, j) => { data[col.name] = strValues[j]; });
 
     const docName = docPrefix + (data[columns[0].name] || 'Unknown');
     const copy = DriveApp.getFileById(templateId).makeCopy(docName, exportFolder);
@@ -199,6 +197,34 @@ function _computeValue(name, data) {
 }
 
 /**
+ * Parses the service history sub-table for the given row data.
+ * @param {Object.<string, string>} data - Row data map.
+ * @returns {string[][]}
+ */
+function _getServiceHistoryRows(data) {
+  return _parseSubTable(data[COL_SERVICE_HISTORY] || '');
+}
+
+/**
+ * Parses the close relatives sub-table for the given row data.
+ * @param {Object.<string, string>} data - Row data map.
+ * @returns {string[][]}
+ */
+function _getRelativesRows(data) {
+  return _parseSubTable(data[COL_CLOSE_RELATIVES] || '');
+}
+
+/**
+ * Filters a relatives table row array to only rows where the first field starts
+ * with "дитина" (case-insensitive).
+ * @param {string[][]} rows - Parsed relatives sub-table rows.
+ * @returns {string[][]}
+ */
+function _filterChildrenRows(rows) {
+  return rows.filter(fields => (fields[0] || '').trim().toLowerCase().startsWith('дитина'));
+}
+
+/**
  * Computes total military service length from the "Дата призову" column value.
  * Extracts the last DD.MM.YYYY date found in the cell, then calculates the
  * calendar-accurate duration from that date to today.
@@ -209,7 +235,7 @@ function _computeValue(name, data) {
  */
 function _computeTotalServiceLength(data) {
   const raw = data[COL_DRAFT_DATE] || '';
-  const matches = raw.match(/\d{2}\.\d{2}\.\d{4}/g);
+  const matches = raw.match(DATE_REGEX);
   if (!matches) return '';
 
   const parts = matches[matches.length - 1].split('.');
@@ -252,13 +278,13 @@ function _computeContractSignDate(data) {
   const contractField = (data[COL_CONTRACT_UNTIL] || '').toLowerCase();
   if (contractField.includes('мобілізований') || contractField.includes('мобілізована')) return '';
 
-  const dateMatch = (data[COL_DRAFT_DATE] || '').match(/\d{2}\.\d{2}\.\d{4}/);
+  const dateMatch = (data[COL_DRAFT_DATE] || '').match(DATE_REGEX);
   if (!dateMatch) return '';
 
-  const rows = _parseSubTable(data[COL_SERVICE_HISTORY] || '');
+  const rows = _getServiceHistoryRows(data);
   let unitNumber = DEFAULT_UNIT_NUMBER;
   if (rows.length) {
-    const unitMatch = (rows[0][1] || '').match(/\b(\d{4})\b/);
+    const unitMatch = (rows[0][1] || '').match(UNIT_NUMBER_REGEX);
     if (unitMatch) unitNumber = unitMatch[1];
   }
 
@@ -273,10 +299,10 @@ function _computeContractSignDate(data) {
  * @returns {string} Date string e.g. "01.01.2025", or empty string if not found.
  */
 function _computeCurrentPositionStartDate(data) {
-  const rows = _parseSubTable(data[COL_SERVICE_HISTORY] || '');
+  const rows = _getServiceHistoryRows(data);
   if (!rows.length) return '';
   const period = rows[rows.length - 1][0] || '';
-  const m = period.match(/\d{2}\.\d{2}\.\d{4}/);
+  const m = period.match(DATE_REGEX);
   return m ? m[0] : '';
 }
 
@@ -289,7 +315,7 @@ function _computeCurrentPositionStartDate(data) {
  * @returns {string} Trimmed position title, or empty string if not found.
  */
 function _computeCurrentPosition(data) {
-  const rows = _parseSubTable(data[COL_SERVICE_HISTORY] || '');
+  const rows = _getServiceHistoryRows(data);
   if (!rows.length) return '';
   return (rows[rows.length - 1][1] || '').trim();
 }
@@ -302,9 +328,7 @@ function _computeCurrentPosition(data) {
  * @returns {string} e.g. "0671234567, 0991234567", or empty string if none.
  */
 function _computeChildrenPhoneNumbers(data) {
-  const rows = _parseSubTable(data[COL_CLOSE_RELATIVES] || '');
-  return rows
-    .filter(fields => (fields[0] || '').trim().toLowerCase().startsWith('дитина'))
+  return _filterChildrenRows(_getRelativesRows(data))
     .map(fields => (fields[3] || '').trim())
     .filter(phone => phone)
     .join(', ');
@@ -320,8 +344,7 @@ function _computeChildrenPhoneNumbers(data) {
  *                   or empty string if no children found.
  */
 function _computeChildrenNamesBirthDates(data) {
-  const rows = _parseSubTable(data[COL_CLOSE_RELATIVES] || '');
-  const children = rows.filter(fields => (fields[0] || '').trim().toLowerCase().startsWith('дитина'));
+  const children = _filterChildrenRows(_getRelativesRows(data));
   if (!children.length) return '';
   return children.map((fields, i) => {
     const name = (fields[1] || '').trim();
@@ -339,7 +362,7 @@ function _computeChildrenNamesBirthDates(data) {
  *                   or empty string if no relatives have a phone number.
  */
 function _computeRelativesWithPhoneNumbers(data) {
-  const rows = _parseSubTable(data[COL_CLOSE_RELATIVES] || '');
+  const rows = _getRelativesRows(data);
   return rows
     .filter(fields => (fields[3] || '').trim())
     .map(fields => [fields[0], fields[1], fields[2], fields[3]].map(f => (f || '').trim()).join(', '))
@@ -381,7 +404,7 @@ function _underlineMaritalStatus(body, data) {
  * @param {Object.<string, string>} data - Row data map.
  */
 function _fillServiceHistoryTable(body, data) {
-  const entries = _parseSubTable(data[COL_SERVICE_HISTORY] || '');
+  const entries = _getServiceHistoryRows(data);
 
   const found = body.findText(_escapeRegex('{' + COL_SERVICE_HISTORY + '}'));
   if (!found) return;
@@ -436,7 +459,7 @@ function _parseSubTable(rawValue) {
  * @returns {string} Trimmed field value, or empty string if not found.
  */
 function _findRelativeField(data, relationType, fieldIndex) {
-  const rows = _parseSubTable(data[COL_CLOSE_RELATIVES] || '');
+  const rows = _getRelativesRows(data);
   const row = rows.find(fields => (fields[0] || '').trim().toLowerCase() === relationType.toLowerCase());
   return row ? (row[fieldIndex] || '').trim() : '';
 }
