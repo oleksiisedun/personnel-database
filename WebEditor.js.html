@@ -347,6 +347,11 @@
   function buildListView() {
     const filterRow = document.getElementById('filter-row');
     const headerRow = document.getElementById('header-row');
+    const dataTable = document.getElementById('data-table');
+    const debouncedFilter = debounce(() => {
+      applyFilters();
+      dataTable.classList.remove('filtering');
+    }, schema.filterDebounceMs);
     filterRow.innerHTML = '';
     headerRow.innerHTML = '';
 
@@ -394,7 +399,8 @@
       input.type = 'text';
       input.placeholder = 'Filter';
       input.dataset.colIndex = i;
-      input.addEventListener('input', debounce(applyFilters, schema.filterDebounceMs));
+      input.addEventListener('input', () => dataTable.classList.add('filtering'));
+      input.addEventListener('input', debouncedFilter);
       fDiv.appendChild(input);
       fth.appendChild(fDiv);
       filterRow.appendChild(fth);
