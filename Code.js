@@ -152,6 +152,7 @@ function getMasterSourceRows(spreadsheetId) {
  *   https://drive.google.com/file/d/<ID>/view
  *   https://drive.google.com/open?id=<ID>
  * Returns the input unchanged when it does not look like a URL.
+ * Client-side counterpart: extractDriveId() in WebEditor.js.html — keep URL patterns aligned.
  *
  * @param {string} value
  * @returns {string}
@@ -227,10 +228,7 @@ function getActualPersonnelNames() {
  * }}
  */
 function movePersonnel(rowEntries, destinationSpreadsheetId) {
-  const destSs = resolveSpreadsheet(destinationSpreadsheetId);
-  if (!destSs) throw new Error('Destination spreadsheet is not accessible.');
-  const destSheet = destSs.getSheetByName(SHEET_DATABASE);
-  if (!destSheet) throw new Error('Destination sheet "Database" not found.');
+  const { ss: destSs, sheet: destSheet } = getDatabaseSheet(destinationSpreadsheetId);
 
   const destHandbook = destSs.getSheetByName(SHEET_HANDBOOK);
   const destFolderId = parseDriveId(destHandbook
@@ -447,10 +445,7 @@ function getImagesDataUrls(fileIds) {
  * @returns {number} 1-based row index of the newly created row.
  */
 function addRowWithData(values, spreadsheetId) {
-  const ss = resolveSpreadsheet(spreadsheetId);
-  if (!ss) throw new Error('Cannot access spreadsheet.');
-  const sheet = ss.getSheetByName(SHEET_DATABASE);
-  if (!sheet) throw new Error('Sheet "Database" not found.');
+  const { sheet } = getDatabaseSheet(spreadsheetId);
   const newRowIndex = sheet.getLastRow() + 1;
   const numCols = sheet.getLastColumn();
   const padded = padRowToColumnCount(values, numCols);
@@ -468,10 +463,7 @@ function addRowWithData(values, spreadsheetId) {
  * @returns {boolean} Always true; thrown errors propagate to the client failure handler.
  */
 function updateRow(rowIndex, values, spreadsheetId) {
-  const ss = resolveSpreadsheet(spreadsheetId);
-  if (!ss) throw new Error('Spreadsheet is not accessible.');
-  const sheet = ss.getSheetByName(SHEET_DATABASE);
-  if (!sheet) throw new Error('Sheet "Database" not found.');
+  const { sheet } = getDatabaseSheet(spreadsheetId);
   sheet.getRange(rowIndex, 1, 1, values.length).setValues([values]);
   return true;
 }
@@ -487,10 +479,7 @@ function updateRow(rowIndex, values, spreadsheetId) {
  * @returns {boolean} Always true; thrown errors propagate to the client failure handler.
  */
 function deleteRow(rowIndex, spreadsheetId) {
-  const ss = resolveSpreadsheet(spreadsheetId);
-  if (!ss) throw new Error('Spreadsheet is not accessible.');
-  const dbSheet = ss.getSheetByName(SHEET_DATABASE);
-  if (!dbSheet) throw new Error('Sheet "Database" not found.');
+  const { ss, sheet: dbSheet } = getDatabaseSheet(spreadsheetId);
 
   const numCols = dbSheet.getLastColumn();
   const rowData = dbSheet.getRange(rowIndex, 1, 1, numCols).getValues()[0];
@@ -512,10 +501,7 @@ function deleteRow(rowIndex, spreadsheetId) {
 function deleteRows(rowEntries) {
   const groups = groupAndSortBySpreadsheetId(rowEntries);
   for (const [spreadsheetId, entries] of groups) {
-    const ss = resolveSpreadsheet(spreadsheetId);
-    if (!ss) throw new Error('Spreadsheet is not accessible.');
-    const dbSheet = ss.getSheetByName(SHEET_DATABASE);
-    if (!dbSheet) throw new Error('Sheet "Database" not found.');
+    const { ss, sheet: dbSheet } = getDatabaseSheet(spreadsheetId);
 
     const numCols = dbSheet.getLastColumn();
     const trashSheet = ensureTrashSheetExists(ss, dbSheet, numCols);

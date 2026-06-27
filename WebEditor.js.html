@@ -144,8 +144,8 @@
    * module scope so both real-time input handlers and saveRow() share the same regex.
    */
   const VALIDATORS = {
-    date: { regex: /^\d{2}\.\d{2}\.\d{4}$/, msg: 'Fix date fields (expected format: DD.MM.YYYY) before saving.' },
-    tin:  { regex: /^\d{10}$/,               msg: 'TIN must be exactly 10 digits.' },
+    date: { regex: /^\d{2}\.\d{2}\.\d{4}$/, placeholder: 'DD.MM.YYYY',  hint: 'Format: DD.MM.YYYY',        msg: 'Fix date fields (expected format: DD.MM.YYYY) before saving.' },
+    tin:  { regex: /^\d{10}$/,               placeholder: '1234567890',  hint: 'Must be exactly 10 digits', msg: 'TIN must be exactly 10 digits.' },
   };
 
   /**
@@ -158,6 +158,33 @@
     const el = document.getElementById(elementId);
     el.textContent = `${prefix}: ${err.message || err}`;
     el.style.display = 'block';
+  }
+
+  /**
+   * Builds a text input with live validation against VALIDATORS[col.type].
+   * @param {{type: string}} col
+   * @param {string} value
+   * @param {number} colIndex
+   * @returns {{ input: HTMLInputElement, errHint: HTMLElement }}
+   */
+  function buildValidatedInput(col, value, colIndex) {
+    const v = VALIDATORS[col.type];
+    const input = document.createElement('input');
+    input.type = 'text';
+    input.value = value;
+    input.dataset.colIndex = colIndex;
+    input.placeholder = v.placeholder;
+    const errHint = document.createElement('div');
+    errHint.className = 'field-hint field-error';
+    errHint.style.display = 'none';
+    errHint.textContent = v.hint;
+    input.addEventListener('input', () => {
+      const val = input.value.trim();
+      const valid = !val || v.regex.test(val);
+      input.classList.toggle('input-error', !valid);
+      errHint.style.display = valid ? 'none' : 'block';
+    });
+    return { input, errHint };
   }
 
   /**
@@ -763,6 +790,7 @@
    *   https://drive.google.com/drive/u/0/folders/FOLDER_ID (or without the /u/0/ account segment)
    *   https://drive.google.com/open?id=FILE_ID
    *   FILE_ID (bare alphanumeric string ≥ 10 chars)
+   * Server-side counterpart: parseDriveId() in Code.js — keep URL patterns aligned.
    * @param {string} url
    * @returns {string|null} File ID, or null if not parseable.
    */
@@ -779,6 +807,33 @@
     }
     if (/^[a-zA-Z0-9_-]{10,}$/.test(url.trim())) return url.trim();
     return null;
+  }
+
+  /**
+   * Applies a server file-fetch result to an image/PDF preview pair.
+   * @param {HTMLImageElement} imgEl
+   * @param {HTMLElement} pdfEl - Container with an <a> child for non-image files.
+   * @param {{type: string, dataUrl?: string, viewUrl?: string}|null} result
+   */
+  function applyFileResult(imgEl, pdfEl, result) {
+    if (!result) { imgEl.style.display = 'none'; return; }
+    if (result.type === 'image') {
+      imgEl.src = result.dataUrl;
+      imgEl.style.display = 'block';
+      pdfEl.style.display = 'none';
+    } else {
+      imgEl.src = '';
+      imgEl.style.display = 'none';
+      const link = pdfEl.querySelector('a');
+      if (result.type === 'no-access') {
+        link.removeAttribute('href');
+        link.textContent = 'No access to this file';
+      } else {
+        link.href = result.viewUrl;
+        link.textContent = result.type === 'folder' ? 'Open Folder in Drive' : 'Open PDF in Drive';
+      }
+      pdfEl.style.display = 'block';
+    }
   }
 
   /**
@@ -881,46 +936,10 @@
         block.appendChild(buildTableEditor(i, parseData(row.values[i] || '', col.tableHeaders || []), col.tableHeaders || []));
       } else if (col.type === 'unit' || col.type === 'origin' || col.type === 'marital-status' || col.type === 'sex') {
         block.appendChild(buildDropdownField(col, i, row.values[i] || ''));
-      } else if (col.type === 'tin') {
-        const input = document.createElement('input');
-        input.type = 'text';
-        input.value = row.values[i] || '';
-        input.dataset.colIndex = i;
-        input.placeholder = '1234567890';
+      } else if (VALIDATORS[col.type]) {
+        const { input, errHint } = buildValidatedInput(col, row.values[i] || '', i);
         block.appendChild(input);
-
-        const errHint = document.createElement('div');
-        errHint.className = 'field-hint field-error';
-        errHint.style.display = 'none';
-        errHint.textContent = 'Must be exactly 10 digits';
         block.appendChild(errHint);
-
-        input.addEventListener('input', () => {
-          const val = input.value.trim();
-          const valid = !val || VALIDATORS.tin.regex.test(val);
-          input.classList.toggle('input-error', !valid);
-          errHint.style.display = valid ? 'none' : 'block';
-        });
-      } else if (col.type === 'date') {
-        const input = document.createElement('input');
-        input.type = 'text';
-        input.value = row.values[i] || '';
-        input.dataset.colIndex = i;
-        input.placeholder = 'DD.MM.YYYY';
-        block.appendChild(input);
-
-        const errHint = document.createElement('div');
-        errHint.className = 'field-hint field-error';
-        errHint.style.display = 'none';
-        errHint.textContent = 'Format: DD.MM.YYYY';
-        block.appendChild(errHint);
-
-        input.addEventListener('input', () => {
-          const val = input.value.trim();
-          const valid = !val || VALIDATORS.date.regex.test(val);
-          input.classList.toggle('input-error', !valid);
-          errHint.style.display = valid ? 'none' : 'block';
-        });
       } else {
         const input = document.createElement('input');
         input.type = 'text';
@@ -998,23 +1017,7 @@
     }
     const cached = imageCache[id];
     if (cached) {
-      if (cached.type === 'image') {
-        pdfEl.style.display = 'none';
-        imgEl.style.display = 'block';
-        imgEl.src = cached.dataUrl;
-      } else if (cached.type === 'no-access') {
-        imgEl.src = ''; imgEl.style.display = 'none';
-        const link = pdfEl.querySelector('a');
-        link.removeAttribute('href');
-        link.textContent = 'No access to this file';
-        pdfEl.style.display = 'block';
-      } else {
-        imgEl.src = ''; imgEl.style.display = 'none';
-        const link = pdfEl.querySelector('a');
-        link.href = cached.viewUrl;
-        link.textContent = cached.type === 'folder' ? 'Open Folder in Drive' : 'Open PDF in Drive';
-        pdfEl.style.display = 'block';
-      }
+      applyFileResult(imgEl, pdfEl, cached);
       return;
     }
     imgEl.src = ''; imgEl.style.display = 'block';
@@ -1024,25 +1027,7 @@
         const result = results[id] ?? null;
         imageCache[id] = result;
         saveToIndexedDB(id, result);
-        if (result?.type === 'image') {
-          imgEl.src = result.dataUrl;
-          imgEl.style.display = 'block';
-          pdfEl.style.display = 'none';
-        } else if (result?.type === 'no-access') {
-          imgEl.src = ''; imgEl.style.display = 'none';
-          const link = pdfEl.querySelector('a');
-          link.removeAttribute('href');
-          link.textContent = 'No access to this file';
-          pdfEl.style.display = 'block';
-        } else if (result) {
-          imgEl.src = ''; imgEl.style.display = 'none';
-          const link = pdfEl.querySelector('a');
-          link.href = result.viewUrl;
-          link.textContent = result.type === 'folder' ? 'Open Folder in Drive' : 'Open PDF in Drive';
-          pdfEl.style.display = 'block';
-        } else {
-          imgEl.style.display = 'none';
-        }
+        applyFileResult(imgEl, pdfEl, result);
       })
       .withFailureHandler(() => { imgEl.style.display = 'none'; })
       .getImagesDataUrls([id]);

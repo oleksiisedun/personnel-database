@@ -14,6 +14,21 @@ function resolveSpreadsheet(spreadsheetId) {
 }
 
 /**
+ * Resolves the "Database" sheet for the given spreadsheet. Throws if the
+ * spreadsheet is inaccessible or the sheet is missing.
+ *
+ * @param {string|null|undefined} spreadsheetId
+ * @returns {{ ss: GoogleAppsScript.Spreadsheet.Spreadsheet, sheet: GoogleAppsScript.Spreadsheet.Sheet }}
+ */
+function getDatabaseSheet(spreadsheetId) {
+  const ss = resolveSpreadsheet(spreadsheetId);
+  if (!ss) throw new Error('Spreadsheet is not accessible.');
+  const sheet = ss.getSheetByName(SHEET_DATABASE);
+  if (!sheet) throw new Error('Sheet "Database" not found.');
+  return { ss, sheet };
+}
+
+/**
  * Converts every cell in a raw sheet row to a string, treating null and undefined
  * as empty string.
  *
