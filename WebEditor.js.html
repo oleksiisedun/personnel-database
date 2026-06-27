@@ -467,6 +467,16 @@
       return true;
     });
 
+    if (schema.masterSourceIds?.length) {
+      const srcOrder = new Map([[undefined, 0], [null, 0]]);
+      schema.masterSourceIds.forEach((id, i) => srcOrder.set(id, i + 1));
+      filteredRows.sort((a, b) => {
+        const ao = srcOrder.get(a.spreadsheetId) ?? srcOrder.size;
+        const bo = srcOrder.get(b.spreadsheetId) ?? srcOrder.size;
+        return ao !== bo ? ao - bo : a.rowIndex - b.rowIndex;
+      });
+    }
+
     renderList();
   }
 

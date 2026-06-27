@@ -189,6 +189,8 @@ Same behaviour as `unit`, but the allowed values come from Handbook `G17:G40`.
 
 When the **Master Mode** checkbox (`Handbook!M2`) is checked, `getSchemaAndData()` returns the source spreadsheet IDs listed in `Handbook!N2:N` (`masterSourceIds`) without opening any of them itself, so the local `Database` rows render immediately. The client then calls `queueMasterSourceFetch()`, which fetches each source's rows one at a time through a concurrency-limited worker pool (`MASTER_MODE_FETCH_CONCURRENCY` in `Config.js`) via `getMasterSourceRows(spreadsheetId)`. Each remote row carries a `spreadsheetId` property so saves and deletes are routed back to the correct spreadsheet. As each source resolves, its rows are appended to the list and the view is silently re-filtered — so remote rows stream in over the following seconds while the local-only list is already visible. Inaccessible sources are skipped silently.
 
+The displayed list is always sorted: local spreadsheet rows first, then each remote source in the order it appears in `Handbook!N2:N`, with rows within each source in their original sheet row order. This sort runs on every filter pass, so the order is stable even while sources are still loading.
+
 The **"All units"** toolbar checkbox (visible only in Master Mode, checked by default) hides all streamed-in remote rows so only the local `Database` sheet's own rows are shown.
 
 When Master Mode is **OFF**, only the local `Database` sheet is shown. Editing (add / edit / delete) is always available regardless of Master Mode.
