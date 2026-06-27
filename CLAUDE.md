@@ -77,6 +77,8 @@ If a `SpreadsheetApp.openById(id)` call throws because the current user can't ac
 
 `openSpreadsheetSafely(id)` (in `Code.js`) avoids this: it first probes accessibility with `DriveApp.getFileById(id)` (caught, returns `null` on failure — the same safe pattern `getImagesDataUrls()` uses for "no-access" images) and only calls `SpreadsheetApp.openById(id)` if that probe succeeds, returning `null` on any failure. **Every** call site that opens a spreadsheet by an ID that isn't guaranteed accessible to the current user — `Handbook!N2:N` master sources, `Handbook!M6` actual-personnel link, and client-supplied `spreadsheetId`s in `movePersonnel`/`updateRow`/`deleteRow`/`Export.js` — uses this helper instead of calling `SpreadsheetApp.openById()` directly. New code that opens a spreadsheet by such an ID should do the same.
 
+All write functions that need the `Database` sheet (`addRowWithData`, `updateRow`, `deleteRow`, `deleteRows`, `movePersonnel` destination) call `getDatabaseSheet(spreadsheetId)` from `Utils.js`, which wraps `resolveSpreadsheet` + `getSheetByName(SHEET_DATABASE)` and throws on failure. It returns `{ ss, sheet }` — destructure only what the caller needs. New write functions should use this helper instead of repeating the four-line pattern inline.
+
 If a user reports this exact `PERMISSION_DENIED` error despite having real access to everything involved, check for multiple signed-in Google accounts in their browser before chasing a code fix — the dialog's `google.script.run` calls can authenticate against the wrong signed-in account, producing the same error as a genuine sharing gap. Confirmed fix in one case: log out of all Google accounts except the one with access.
 
 ### Master Mode
