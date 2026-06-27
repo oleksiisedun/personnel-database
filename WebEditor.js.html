@@ -300,15 +300,26 @@
       const chkAllUnits = document.getElementById('chk-all-units');
       chkAllUnits.addEventListener('change', () => {
         showAllUnits = chkAllUnits.checked;
-        applyFilters();
+        const table = document.getElementById('data-table');
+        table.classList.add('filtering');
+        requestAnimationFrame(() => requestAnimationFrame(() => {
+          applyFilters();
+          table.classList.remove('filtering');
+        }));
       });
     }
     const chkActual = document.getElementById('chk-actual');
     if (data.actualPersonnelNames?.length) {
+      schema.actualPersonnelNamesSet = new Set(data.actualPersonnelNames.map(n => n.trim()));
       chkActual.disabled = false;
       chkActual.addEventListener('change', () => {
         filterActualPersonnel = chkActual.checked;
-        applyFilters();
+        const table = document.getElementById('data-table');
+        table.classList.add('filtering');
+        requestAnimationFrame(() => requestAnimationFrame(() => {
+          applyFilters();
+          table.classList.remove('filtering');
+        }));
       });
     }
     buildListView();
@@ -418,7 +429,7 @@
       })) return false;
       if (!showAllUnits && row.spreadsheetId) return false;
       if (filterActualPersonnel) {
-        return schema.actualPersonnelNames.includes((row.values[0] ?? '').trim());
+        return schema.actualPersonnelNamesSet.has((row.values[0] ?? '').trim());
       }
       return true;
     });
