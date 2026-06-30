@@ -1,4 +1,12 @@
 /**
+ * Returns the Handbook sheet for the active spreadsheet, or null if not found.
+ * @returns {GoogleAppsScript.Spreadsheet.Sheet|null}
+ */
+function getHandbookSheet() {
+  return SpreadsheetApp.getActiveSpreadsheet().getSheetByName(SHEET_HANDBOOK);
+}
+
+/**
  * Resolves a spreadsheet by optional ID. Returns the remote spreadsheet when an
  * ID is supplied (via openSpreadsheetSafely), or the active spreadsheet when ID
  * is null / undefined / empty. Returns null only when a non-empty ID is provided

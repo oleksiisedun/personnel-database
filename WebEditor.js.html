@@ -233,6 +233,22 @@
   }
 
   /**
+   * Groups row indexes from a list of row entries by source spreadsheetId.
+   * Used to build the argument for adjustRowIndexesAfterDelete().
+   * @param {Array<{rowIndex: number, spreadsheetId: string|null}>} entries
+   * @returns {Map<string|null, number[]>}
+   */
+  function groupRowIndexesBySource(entries) {
+    const bySource = new Map();
+    entries.forEach(({ rowIndex, spreadsheetId }) => {
+      const key = spreadsheetId ?? null;
+      if (!bySource.has(key)) bySource.set(key, []);
+      bySource.get(key).push(rowIndex);
+    });
+    return bySource;
+  }
+
+  /**
    * Decrements the cached rowIndex of remaining rows in schema.rows when one or
    * more rows have been hard-deleted from a source sheet. Rows above the deletion
    * point in the same spreadsheet have their sheet row numbers shifted up by one
@@ -1393,13 +1409,7 @@
     schema.rows = schema.rows.filter(r => !deletedKeys.has(rowKey(r)));
     deletedKeys.forEach(k => selectedKeys.delete(k));
 
-    const deletedBySource = new Map();
-    deletedEntries.forEach(({ rowIndex, spreadsheetId }) => {
-      const key = spreadsheetId ?? null;
-      if (!deletedBySource.has(key)) deletedBySource.set(key, []);
-      deletedBySource.get(key).push(rowIndex);
-    });
-    adjustRowIndexesAfterDelete(deletedBySource);
+    adjustRowIndexesAfterDelete(groupRowIndexesBySource(deletedEntries));
 
     applyFilters();
   }
@@ -1626,13 +1636,7 @@
     // subsequent row's real sheet row number up by one per deletion. Decrement the
     // cached rowIndex of remaining same-source rows so later actions (edit/delete/
     // move) target the correct physical row instead of a stale one.
-    const deletedBySource = new Map();
-    movedEntries.forEach(({ rowIndex, spreadsheetId }) => {
-      const key = spreadsheetId ?? null;
-      if (!deletedBySource.has(key)) deletedBySource.set(key, []);
-      deletedBySource.get(key).push(rowIndex);
-    });
-    adjustRowIndexesAfterDelete(deletedBySource);
+    adjustRowIndexesAfterDelete(groupRowIndexesBySource(movedEntries));
     pendingMoveEntries = null;
 
     (response.movedRows ?? []).forEach(r => schema.rows.push(r));

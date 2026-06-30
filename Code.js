@@ -5,7 +5,7 @@
  * @returns {string[]}
  */
 function getMasterSources() {
-  const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(SHEET_HANDBOOK);
+  const sheet = getHandbookSheet();
   if (!sheet) return [];
   try {
     return sheet.getRange(MASTER_MODE_SOURCES_RANGE).getValues()
@@ -23,7 +23,7 @@ function getMasterSources() {
  * @returns {boolean}
  */
 function getMasterMode() {
-  const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(SHEET_HANDBOOK);
+  const sheet = getHandbookSheet();
   if (!sheet) return false;
   try {
     return sheet.getRange(MASTER_MODE_CELL).getValue() === true;
@@ -197,7 +197,7 @@ function openSpreadsheetSafely(id) {
  * @returns {string[]|null}
  */
 function getActualPersonnelNames() {
-  const handbook = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(SHEET_HANDBOOK);
+  const handbook = getHandbookSheet();
   if (!handbook) return null;
   const link  = String(handbook.getRange(ACTUAL_PERSONNEL_SPREADSHEET_CELL).getValue()).trim();
   const range = String(handbook.getRange(ACTUAL_PERSONNEL_RANGE_CELL).getValue()).trim();
