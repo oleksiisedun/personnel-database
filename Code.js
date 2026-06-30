@@ -124,25 +124,31 @@ function fixPhoneNumbers() {
  * inaccessible or has no Database sheet.
  *
  * @param {string} spreadsheetId
- * @returns {{ id: string, name: string, rows: Array<{rowIndex: number, values: string[], spreadsheetId: string}> }}
+ * @returns {{ id: string, name: string, rows: Array<{rowIndex: number, values: string[], spreadsheetId: string}>, columnMismatches: Array<{colIndex: number, localName: string, localType: string, remoteName: string, remoteType: string}>|null }}
  */
 function getMasterSourceRows(spreadsheetId) {
   const remoteSs = openSpreadsheetSafely(spreadsheetId);
-  if (!remoteSs) return { id: spreadsheetId, name: spreadsheetId, rows: [] };
+  if (!remoteSs) return { id: spreadsheetId, name: spreadsheetId, rows: [], columnMismatches: null };
   try {
     const name = remoteSs.getName();
     const remoteSheet = remoteSs.getSheetByName(SHEET_DATABASE);
-    if (!remoteSheet) return { id: spreadsheetId, name, rows: [] };
+    if (!remoteSheet) return { id: spreadsheetId, name, rows: [], columnMismatches: null };
     const remoteAll = remoteSheet.getDataRange().getValues();
+    if (remoteAll.length < 2) return { id: spreadsheetId, name, rows: [], columnMismatches: null };
+    const { sheet: localSheet } = getDatabaseSheet(null);
+    const localSchema = extractColumnSchema(localSheet.getDataRange().getValues());
+    const remoteSchema = extractColumnSchema(remoteAll);
+    const columnMismatches = compareColumnSchemas(localSchema, remoteSchema);
+    if (columnMismatches.length > 0) return { id: spreadsheetId, name, rows: [], columnMismatches };
     const rows = [];
     for (let i = 2; i < remoteAll.length; i++) {
       const values = stringifyRowValues(remoteAll[i]);
       if (values.every(v => v === '')) continue;
       rows.push({ rowIndex: i + 1, values, spreadsheetId });
     }
-    return { id: spreadsheetId, name, rows };
+    return { id: spreadsheetId, name, rows, columnMismatches: null };
   } catch (e) {
-    return { id: spreadsheetId, name: spreadsheetId, rows: [] };
+    return { id: spreadsheetId, name: spreadsheetId, rows: [], columnMismatches: null };
   }
 }
 

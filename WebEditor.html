@@ -28,12 +28,25 @@
         <button id="btn-export-wc" class="btn-secondary" disabled>Export Wanted Card</button>
       </div>
       <div id="toolbar-right">
+        <button id="btn-schema-warning" class="btn-warning" style="display:none" title="Column schema mismatch in one or more sources">⚠</button>
         <label id="all-units-label" style="display:none"><input type="checkbox" id="chk-all-units" checked> All Units</label>
         <label id="actual-label"><input type="checkbox" id="chk-actual" disabled> Actual Personnel</label>
         <label id="regex-label"><input type="checkbox" id="chk-regex"> Use RegEx</label>
         <div id="col-toggle-wrap">
           <button id="btn-columns" class="btn-secondary">Columns ▾</button>
           <div id="col-panel" style="display:none"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Schema warning overlay -->
+    <div id="schema-warning-overlay" class="overlay" style="display:none">
+      <div id="schema-warning-dialog" class="overlay-dialog">
+        <h2 style="font-size:16px;margin-bottom:12px;">Column Schema Mismatch</h2>
+        <p style="font-size:13px;color:#666;margin-bottom:16px;">These remote spreadsheets have a column layout that differs from the local Database sheet. Their rows were not loaded.</p>
+        <div id="schema-warning-content"></div>
+        <div id="schema-warning-actions">
+          <button id="btn-schema-warning-close" class="btn-secondary">Close</button>
         </div>
       </div>
     </div>

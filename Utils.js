@@ -63,8 +63,33 @@ function padRowToColumnCount(values, numCols) {
 function extractColumnSchema(allData) {
   return allData[0].map((name, i) => ({
     name: String(name),
-    type: String(allData[1][i]).toLowerCase(),
+    type: String(allData[1]?.[i] ?? '').toLowerCase(),
   }));
+}
+
+/**
+ * Compares two column schemas and returns an entry for every position where
+ * name or type differs. Positions where both sides have an empty name are
+ * skipped — those are trailing blank columns from getDataRange() expanding
+ * past the real schema extent, not genuine mismatches.
+ *
+ * @param {Array<{name: string, type: string}>} localSchema
+ * @param {Array<{name: string, type: string}>} remoteSchema
+ * @returns {Array<{colIndex: number, localName: string, localType: string, remoteName: string, remoteType: string}>}
+ */
+function compareColumnSchemas(localSchema, remoteSchema) {
+  const len = Math.max(localSchema.length, remoteSchema.length);
+  const mismatches = [];
+  for (let i = 0; i < len; i++) {
+    const local  = localSchema[i]  ?? { name: '', type: '' };
+    const remote = remoteSchema[i] ?? { name: '', type: '' };
+    if (!local.name && !remote.name) continue;
+    if (local.name !== remote.name || local.type !== remote.type) {
+      mismatches.push({ colIndex: i, localName: local.name, localType: local.type,
+                        remoteName: remote.name, remoteType: remote.type });
+    }
+  }
+  return mismatches;
 }
 
 /**

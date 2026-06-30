@@ -288,6 +288,8 @@
       document.getElementById('export-confirm-wrap').style.display = 'none';
       startExportProgress(btnId, serverFnName, entries, total);
     });
+    document.getElementById('btn-schema-warning').addEventListener('click', openSchemaWarningOverlay);
+    document.getElementById('btn-schema-warning-close').addEventListener('click', closeSchemaWarningOverlay);
     document.getElementById('btn-move').addEventListener('click', openMoveOverlay);
     document.getElementById('btn-move-cancel').addEventListener('click', closeMoveOverlay);
     document.getElementById('btn-move-confirm').addEventListener('click', runMove);
@@ -319,6 +321,7 @@
    */
   async function onDataLoaded(data) {
     schema = data;
+    schema.sourceColumnMismatches = {};
     await loadCacheFromIndexedDB();
     document.getElementById('loading').style.display = 'none';
     if (data.masterMode) {
@@ -681,18 +684,87 @@
       const id = ids[offset++];
       google.script.run
         .withSuccessHandler(result => {
-          schema.rows.push(...result.rows);
+          if (result.columnMismatches?.length) {
+            schema.sourceColumnMismatches[result.id] = result.columnMismatches;
+          } else {
+            schema.rows.push(...result.rows);
+          }
           schema.masterSources.push({ id: result.id, name: result.name });
+          updateSchemaWarningIcon();
           debouncedApplyFilters();
           fetchNext();
         })
         .withFailureHandler(() => {
+          updateSchemaWarningIcon();
           fetchNext();
         })
         .getMasterSourceRows(id);
     };
     const workers = Math.min(concurrency, ids.length);
     for (let i = 0; i < workers; i++) fetchNext();
+  }
+
+  /**
+   * Converts a 0-based column index to a spreadsheet letter (A, B, …, Z, AA, …).
+   * @param {number} index
+   * @returns {string}
+   */
+  function colIndexToLetter(index) {
+    let letter = '';
+    let n = index + 1;
+    while (n > 0) {
+      const rem = (n - 1) % 26;
+      letter = String.fromCharCode(65 + rem) + letter;
+      n = Math.floor((n - 1) / 26);
+    }
+    return letter;
+  }
+
+  /**
+   * Shows or hides the schema-warning button based on recorded column mismatches.
+   */
+  function updateSchemaWarningIcon() {
+    const btn = document.getElementById('btn-schema-warning');
+    if (!btn) return;
+    btn.style.display = Object.keys(schema.sourceColumnMismatches).length ? '' : 'none';
+  }
+
+  /**
+   * Populates and opens the schema-warning overlay. Rebuilds content each time
+   * so freshly-arrived mismatches are always reflected.
+   */
+  function openSchemaWarningOverlay() {
+    const sourceMap = new Map(schema.masterSources.map(s => [s.id, s.name]));
+    const content = document.getElementById('schema-warning-content');
+    content.textContent = '';
+    for (const [id, mismatches] of Object.entries(schema.sourceColumnMismatches)) {
+      const heading = document.createElement('h3');
+      heading.textContent = sourceMap.get(id) ?? id;
+      content.appendChild(heading);
+      const table = document.createElement('table');
+      const hRow = table.createTHead().insertRow();
+      ['Column', 'Local', 'Remote'].forEach(text => {
+        const th = document.createElement('th');
+        th.textContent = text;
+        hRow.appendChild(th);
+      });
+      const tbody = table.createTBody();
+      mismatches.forEach(({ colIndex, localName, remoteName }) => {
+        const tr = tbody.insertRow();
+        [colIndexToLetter(colIndex), localName, remoteName].forEach(text => {
+          tr.insertCell().textContent = text;
+        });
+      });
+      content.appendChild(table);
+    }
+    document.getElementById('schema-warning-overlay').style.display = 'flex';
+  }
+
+  /**
+   * Closes the schema-warning overlay.
+   */
+  function closeSchemaWarningOverlay() {
+    document.getElementById('schema-warning-overlay').style.display = 'none';
   }
 
   /**
