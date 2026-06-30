@@ -1069,6 +1069,10 @@
           updatePreview(preview, pdfPreview, input.value);
 
           input.addEventListener('input', () => updatePreview(preview, pdfPreview, input.value));
+          preview.addEventListener('click', () => {
+            const id = extractDriveId(input.value);
+            if (id) openLightbox(id);
+          });
         }
       }
 
