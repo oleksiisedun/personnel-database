@@ -249,12 +249,16 @@ Exported files are saved to the Google Drive folder configured in `Handbook!M13`
 
 Placeholders in the template use the format `{Column Name}`. Four passes run per document:
 
-1. **Images** — `image`-type column placeholders are replaced with the actual image blob
+1. **Images** — `image`-type column placeholders are replaced with a compressed image blob
 2. **Service history table** — `{Проходження служби}` is expanded into one table row per entry
 3. **Direct text** — remaining `{Column Name}` placeholders are replaced with cell values
 4. **Correspondence table** — Handbook-defined aliases and computed values fill any remaining placeholders
 
 After all passes, the marital status line is underlined based on the `Сімейний стан` value.
+
+### Image compression
+
+Google Docs embeds an inserted image's actual bytes regardless of the display size set afterward, so inserting a full-resolution photo (often several MB) made exported documents unnecessarily large even though they only displayed at `IMAGE_MAX_HEIGHT` px tall. Image placeholders are now filled with a resized thumbnail fetched via the Advanced Drive Service (`Drive.Files.get(fileId, {fields: 'thumbnailLink'})`, enabled in `appsscript.json`) requested at `EXPORT_IMAGE_THUMBNAIL_SIZE` px wide, rather than the original file. If the Drive advanced service or thumbnail fetch fails for any reason, export falls back to the original full-resolution blob, so this never breaks or blanks an export.
 
 ### Computed values
 
@@ -313,6 +317,7 @@ Exports run in automatic batches capped at `EXPORT_TIME_LIMIT_MS` (5 minutes) to
 | `WC_DOC_PREFIX` | `'Розшукова картка '` | Filename prefix for Wanted Card exports |
 | `DEFAULT_UNIT_NUMBER` | `'3102'` | Fallback military unit number for `contractSignDate` |
 | `IMAGE_MAX_HEIGHT` | `500` | Max image height (px) when inserting into a document |
+| `EXPORT_IMAGE_THUMBNAIL_SIZE` | `800` | Width (px) requested from Drive's thumbnail service for export images, before the `IMAGE_MAX_HEIGHT` display clamp is applied |
 | `COLUMN_MIN_WIDTHS` | `{ text: 150, image: 150, table: 900 }` | Minimum column widths (px) in the list view |
 | `COLUMN_MAX_WIDTHS` | `{ image: 250 }` | Maximum column widths (px) in the list view |
 | `FILTER_DEBOUNCE_MS` | `500` | Debounce delay (ms) for filter text inputs |

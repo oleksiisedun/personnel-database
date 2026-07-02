@@ -155,12 +155,14 @@ Export is triggered from the toolbar. The Export F-1 and Export WC buttons are d
 
 `exportF1(rowEntries)` and `exportWC(rowEntries)` copy Google Docs templates into the export folder and fill placeholders with row data. Both delegate to `_exportDoc()`, which caches sheet data per `spreadsheetId` (so each remote spreadsheet is read at most once per export call) and runs four passes in strict order:
 
-1. **Image columns** — `{Column Name}` placeholder replaced with the actual image blob.
+1. **Image columns** — `{Column Name}` placeholder replaced with a compressed image blob (see below).
 2. **Service history table** — `{Проходження служби}` placeholder row expanded into one table row per service entry. Must run before pass 3 or the placeholder text would be consumed before the table handler can locate it.
 3. **Direct text columns** — remaining `{Column Name}` placeholders replaced with cell text.
 4. **Correspondence table** — Handbook-defined aliases and computed values (e.g. `totalServiceLength`, `motherFullName`) replace their own placeholders.
 
 Placeholders with no match are left untouched. `_exportDoc()` checks elapsed time against `EXPORT_TIME_LIMIT_MS` before each row (5 min — 1 min safety margin before the GAS 6-min hard kill) and returns `{ results, remaining }` so the client can surface any unprocessed rows.
+
+Pass 1's image blob comes from `_getExportImageBlob(fileId)`, not a raw `DriveApp.getFileById(fileId).getBlob()` — Apps Script embeds a blob's actual bytes into the Doc regardless of the display size set afterward, so inserting the full-resolution original (often several MB for a phone photo) bloated exported files even though `_replacePlaceholderWithImage()` immediately shrinks the *displayed* size down to `IMAGE_MAX_HEIGHT`. `_getExportImageBlob()` instead calls the Advanced Drive Service (`Drive.Files.get(fileId, {fields: 'thumbnailLink'})`, enabled via `enabledAdvancedServices` in `appsscript.json`) to get a `thumbnailLink`, rewrites its size parameter to request a `EXPORT_IMAGE_THUMBNAIL_SIZE`-px-wide thumbnail, and fetches those bytes with `UrlFetchApp` (authorized via `ScriptApp.getOAuthToken()`). If the Drive advanced service call, the thumbnail link, or the fetch fails for any reason, it falls back to the original `DriveApp.getFileById(fileId).getBlob()` behavior — export never regresses to a blanked placeholder because of this optimization. The `EXPORT_IMAGE_THUMBNAIL_SIZE` constant is kept above `IMAGE_MAX_HEIGHT` on purpose: the thumbnail governs stored byte size, `IMAGE_MAX_HEIGHT` still governs the displayed height, and a thumbnail smaller than the display size would look soft.
 
 ## Constants — always in `Config.js`
 
