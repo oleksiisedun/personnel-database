@@ -26,6 +26,17 @@
    */
   const rowKey = row => `${row.spreadsheetId ?? ''}:${row.rowIndex}`;
 
+  /**
+   * Returns the currently checked (visible) rows as rowEntries, ready to send
+   * to a server function that takes {rowIndex, spreadsheetId}[] (export/move/delete).
+   * @returns {Array<{rowIndex: number, spreadsheetId: string|null}>}
+   */
+  function getSelectedRowEntries() {
+    return filteredRows
+      .filter(r => selectedKeys.has(rowKey(r)))
+      .map(r => ({ rowIndex: r.rowIndex, spreadsheetId: r.spreadsheetId ?? null }));
+  }
+
   const FIELD_SEP = ' | ';
   const ROW_SEP = '\n';
 
@@ -1390,9 +1401,7 @@
    * Asks for confirmation then moves all selected rows to Trash via the server.
    */
   function deletePersonnelBulk() {
-    const rowEntries = filteredRows
-      .filter(r => selectedKeys.has(rowKey(r)))
-      .map(r => ({ rowIndex: r.rowIndex, spreadsheetId: r.spreadsheetId ?? null }));
+    const rowEntries = getSelectedRowEntries();
     if (!rowEntries.length) return;
     const count = rowEntries.length;
     if (!confirm(`Move ${count} person${count !== 1 ? 's' : ''} to Trash?`)) return;
@@ -1446,11 +1455,10 @@
    * @param {string} serverFnName - Name of the Apps Script function to call ('exportF1' or 'exportWC').
    */
   function runExport(btnId, serverFnName) {
-    const rowsToExport = filteredRows.filter(r => selectedKeys.has(rowKey(r)));
-    if (!rowsToExport.length) return; // safety guard — buttons should already be disabled
+    const entries = getSelectedRowEntries();
+    if (!entries.length) return; // safety guard — buttons should already be disabled
 
-    const total = rowsToExport.length;
-    const entries = rowsToExport.map(r => ({ rowIndex: r.rowIndex, spreadsheetId: r.spreadsheetId ?? null }));
+    const total = entries.length;
     const btn = document.getElementById(btnId);
     btn.disabled = true;
 
@@ -1594,10 +1602,7 @@
    * the local schema and re-renders the list.
    */
   function runMove() {
-    const rowEntries = filteredRows
-      .filter(r => selectedKeys.has(rowKey(r)))
-      .map(r => ({ rowIndex: r.rowIndex, spreadsheetId: r.spreadsheetId ?? null }));
-
+    const rowEntries = getSelectedRowEntries();
     if (!rowEntries.length) return;
     pendingMoveEntries = rowEntries;
 

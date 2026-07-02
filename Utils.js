@@ -101,6 +101,18 @@ function compareColumnSchemas(localSchema, remoteSchema) {
 }
 
 /**
+ * Reads a Handbook cell holding a Drive ID (or sharing URL) and parses it via
+ * parseDriveId(). Returns '' if the sheet is missing.
+ *
+ * @param {GoogleAppsScript.Spreadsheet.Sheet|null} handbookSheet
+ * @param {string} cellAddress
+ * @returns {string}
+ */
+function getDriveIdFromHandbook(handbookSheet, cellAddress) {
+  return handbookSheet ? parseDriveId(String(handbookSheet.getRange(cellAddress).getValue()).trim()) : '';
+}
+
+/**
  * Groups an array of row entries by spreadsheetId and sorts each group in
  * descending rowIndex order so that rows can be deleted sequentially without
  * the deletion of one row shifting the index of rows below it.

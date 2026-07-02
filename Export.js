@@ -40,8 +40,8 @@ function exportWC(rowEntries) {
 function _exportDoc(rowEntries, templateCell, docPrefix) {
   const localSs = SpreadsheetApp.getActiveSpreadsheet();
   const handbookSheet = localSs.getSheetByName(SHEET_HANDBOOK);
-  const templateId = handbookSheet ? parseDriveId(String(handbookSheet.getRange(templateCell).getValue())) : '';
-  const exportFolderId = handbookSheet ? parseDriveId(String(handbookSheet.getRange(EXPORT_FOLDER_CELL).getValue())) : '';
+  const templateId = getDriveIdFromHandbook(handbookSheet, templateCell);
+  const exportFolderId = getDriveIdFromHandbook(handbookSheet, EXPORT_FOLDER_CELL);
   const exportFolder = DriveApp.getFolderById(exportFolderId);
   const mappings = handbookSheet ? _loadCorrespondenceTable(handbookSheet) : [];
 
@@ -180,13 +180,13 @@ function _computeValue(name, data) {
   if (name === 'totalServiceLength') return _computeTotalServiceLength(data);
   if (name === 'motherFullName') return _findRelativeField(data, 'мати', 1);
   if (name === 'fatherFullName') return _findRelativeField(data, 'батько', 1);
-  if (name === 'spouseFullName') return _findRelativeField(data, 'дружина', 1) || _findRelativeField(data, 'чоловік', 1);
-  if (name === 'spouseActualAddress') return _findRelativeField(data, 'дружина', 2) || _findRelativeField(data, 'чоловік', 2);
+  if (name === 'spouseFullName') return _findSpouseField(data, 1);
+  if (name === 'spouseActualAddress') return _findSpouseField(data, 2);
   if (name === 'motherPhoneNumber') return _findRelativeField(data, 'мати', 3);
   if (name === 'fatherPhoneNumber') return _findRelativeField(data, 'батько', 3);
   if (name === 'motherActualAddress') return _findRelativeField(data, 'мати', 2);
   if (name === 'fatherActualAddress') return _findRelativeField(data, 'батько', 2);
-  if (name === 'spousePhoneNumber') return _findRelativeField(data, 'дружина', 3) || _findRelativeField(data, 'чоловік', 3);
+  if (name === 'spousePhoneNumber') return _findSpouseField(data, 3);
   if (name === 'childrenNamesBirthDates') return _computeChildrenNamesBirthDates(data);
   if (name === 'childrenPhoneNumbers') return _computeChildrenPhoneNumbers(data);
   if (name === 'currentPosition') return _computeCurrentPosition(data);
@@ -462,6 +462,18 @@ function _findRelativeField(data, relationType, fieldIndex) {
   const rows = _getRelativesRows(data);
   const row = rows.find(fields => (fields[0] || '').trim().toLowerCase() === relationType.toLowerCase());
   return row ? (row[fieldIndex] || '').trim() : '';
+}
+
+/**
+ * Looks up the requested field for a spouse, trying both "дружина" (wife) and
+ * "чоловік" (husband) relation types since only one will be present per row.
+ *
+ * @param {Object.<string, string>} data - Row data map.
+ * @param {number} fieldIndex - 0-based index of the field to return.
+ * @returns {string} Trimmed field value, or empty string if not found.
+ */
+function _findSpouseField(data, fieldIndex) {
+  return _findRelativeField(data, 'дружина', fieldIndex) || _findRelativeField(data, 'чоловік', fieldIndex);
 }
 
 /**

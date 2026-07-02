@@ -237,9 +237,7 @@ function movePersonnel(rowEntries, destinationSpreadsheetId) {
   const { ss: destSs, sheet: destSheet } = getDatabaseSheet(destinationSpreadsheetId);
 
   const destHandbook = destSs.getSheetByName(SHEET_HANDBOOK);
-  const destFolderId = parseDriveId(destHandbook
-    ? String(destHandbook.getRange(DATA_FOLDER).getValue()).trim()
-    : '');
+  const destFolderId = getDriveIdFromHandbook(destHandbook, DATA_FOLDER);
 
   const groups = groupAndSortBySpreadsheetId(rowEntries);
 
@@ -266,9 +264,7 @@ function movePersonnel(rowEntries, destinationSpreadsheetId) {
     }
 
     const srcHandbook = srcSs.getSheetByName(SHEET_HANDBOOK);
-    const srcFolderId = parseDriveId(srcHandbook
-      ? String(srcHandbook.getRange(DATA_FOLDER).getValue()).trim()
-      : '');
+    const srcFolderId = getDriveIdFromHandbook(srcHandbook, DATA_FOLDER);
 
     const destNumCols = destSheet.getLastColumn();
 
