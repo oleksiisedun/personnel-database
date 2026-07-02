@@ -53,6 +53,10 @@ const F1_DOC_PREFIX = 'Ф-1 ';
 const WC_DOC_PREFIX = 'Розшукова картка ';
 const DEFAULT_UNIT_NUMBER = '3102';
 const IMAGE_MAX_HEIGHT = 500;
+// Width (px) requested from Drive's thumbnail service for export images (see
+// _getExportImageBlob() in Export.js). Deliberately larger than IMAGE_MAX_HEIGHT's
+// 500px display clamp so the image isn't visibly soft when Docs/Word renders it.
+const EXPORT_IMAGE_THUMBNAIL_SIZE = 800;
 
 // Web editor UI settings
 const COLUMN_MIN_WIDTHS = { text: 150, image: 150, table: 900 };

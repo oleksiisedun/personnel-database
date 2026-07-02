@@ -109,7 +109,7 @@ function _exportDoc(rowEntries, templateCell, docPrefix) {
       const fileId = parseDriveId(data[col.name] || '');
       if (fileId) {
         try {
-          _replacePlaceholderWithImage(body, placeholder, DriveApp.getFileById(fileId).getBlob());
+          _replacePlaceholderWithImage(body, placeholder, _getExportImageBlob(fileId));
         } catch (e) {
           body.replaceText(_escapeRegex(placeholder), '');
         }
@@ -529,10 +529,43 @@ function _escapeReplacement(str) {
 }
 
 /**
+ * Returns a compressed image blob for the given Drive file ID, suitable for
+ * inserting into an exported document. Requests a resized thumbnail via the
+ * Drive advanced service (EXPORT_IMAGE_THUMBNAIL_SIZE px wide) instead of the
+ * full-resolution original, since Google Docs embeds the blob's actual bytes
+ * regardless of the display size set later. Falls back to the original
+ * full-resolution blob if the thumbnail path fails for any reason.
+ *
+ * @param {string} fileId - Google Drive file ID of the image.
+ * @returns {GoogleAppsScript.Base.Blob} Compressed thumbnail blob, or the
+ *   original full-resolution blob if compression was not possible.
+ */
+function _getExportImageBlob(fileId) {
+  try {
+    const meta = Drive.Files.get(fileId, { fields: 'thumbnailLink' });
+    const link = meta && meta.thumbnailLink;
+    if (link) {
+      const resized = link.replace(/=s\d+/, '=s' + EXPORT_IMAGE_THUMBNAIL_SIZE);
+      const response = UrlFetchApp.fetch(resized, {
+        headers: { Authorization: 'Bearer ' + ScriptApp.getOAuthToken() },
+        muteHttpExceptions: true
+      });
+      if (response.getResponseCode() === 200) {
+        const blob = response.getBlob();
+        if (blob && blob.getBytes().length > 0) return blob;
+      }
+    }
+  } catch (e) {
+    // Fall through to full-resolution fetch below.
+  }
+  return DriveApp.getFileById(fileId).getBlob();
+}
+
+/**
  * Finds the first paragraph in the document body that contains the given
  * placeholder text, clears it, and inserts the provided image blob inline.
- * If the inserted image's height exceeds 600 px the image is scaled down
- * proportionally to fit within that limit.
+ * If the inserted image's height exceeds IMAGE_MAX_HEIGHT px the image is
+ * scaled down proportionally to fit within that limit.
  *
  * @param {GoogleAppsScript.Document.Body} body - Document body to search.
  * @param {string} placeholder - Literal placeholder string, e.g. "{Фото}".
