@@ -50,7 +50,7 @@ const EXPORT_TIME_LIMIT_MS = 5 * 60 * 1000; // 5 min — 1 min safety margin bef
 const EXPORT_CONFIRM_THRESHOLD = 10; // show confirmation dialog when exporting more than this many docs
 const EXPORT_SECONDS_PER_DOC = 6;    // rough time estimate shown in the confirmation dialog (5 docs ≈ 30 s)
 const F1_DOC_PREFIX = 'Ф-1 ';
-const WC_DOC_PREFIX = 'Розшукова картка ';
+const WC_DOC_PREFIX = 'РК ';
 const DEFAULT_UNIT_NUMBER = '3102';
 const IMAGE_MAX_HEIGHT = 500;
 // Width (px) requested from Drive's thumbnail service for export images (see
