@@ -10,6 +10,8 @@ clasp push
 
 There is no build step, linter, or test suite.
 
+**Never run `clasp push`/`clasp-push.sh` or otherwise deploy/test changes yourself.** These scripts push live to real bound spreadsheets (including production personnel data across all targets in `clasp-targets.json`). Leave deployment and live testing to the user.
+
 ## Code conventions
 
 JS style and JSDoc rules are in the global `~/.claude/CLAUDE.md`. Project-specific rule: all tuneable constants belong in `Config.js` (see below).
