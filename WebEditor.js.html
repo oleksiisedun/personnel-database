@@ -27,12 +27,13 @@
   const rowKey = row => `${row.spreadsheetId ?? ''}:${row.rowIndex}`;
 
   /**
-   * Returns the currently checked (visible) rows as rowEntries, ready to send
-   * to a server function that takes {rowIndex, spreadsheetId}[] (export/move/delete).
+   * Returns all checked rows as rowEntries, regardless of the current filter view,
+   * ready to send to a server function that takes {rowIndex, spreadsheetId}[]
+   * (export/move/delete).
    * @returns {Array<{rowIndex: number, spreadsheetId: string|null}>}
    */
   function getSelectedRowEntries() {
-    return filteredRows
+    return schema.rows
       .filter(r => selectedKeys.has(rowKey(r)))
       .map(r => ({ rowIndex: r.rowIndex, spreadsheetId: r.spreadsheetId ?? null }));
   }
@@ -598,22 +599,22 @@
 
   /**
    * Updates export button disabled state and the master checkbox
-   * (checked / indeterminate / unchecked) to reflect current selection vs visible rows.
+   * (checked / indeterminate / unchecked), both based on total selection
+   * across all rows — independent of the current filter view.
    */
   function updateSelectionUI() {
-    const selectedInView = filteredRows.filter(r => selectedKeys.has(rowKey(r))).length;
-    document.getElementById('btn-export-f1').disabled = selectedInView === 0;
-    document.getElementById('btn-export-wc').disabled = selectedInView === 0;
-    document.getElementById('btn-move').disabled = selectedInView === 0;
-    document.getElementById('btn-delete-bulk').disabled = selectedInView === 0;
+    document.getElementById('btn-export-f1').disabled = selectedKeys.size === 0;
+    document.getElementById('btn-export-wc').disabled = selectedKeys.size === 0;
+    document.getElementById('btn-move').disabled = selectedKeys.size === 0;
+    document.getElementById('btn-delete-bulk').disabled = selectedKeys.size === 0;
 
     const chkAll = document.getElementById('chk-select-all');
     if (!chkAll) return;
-    const total = filteredRows.length;
-    if (total === 0 || selectedInView === 0) {
+    const total = schema.rows.length;
+    if (total === 0 || selectedKeys.size === 0) {
       chkAll.checked = false;
       chkAll.indeterminate = false;
-    } else if (selectedInView === total) {
+    } else if (selectedKeys.size === total) {
       chkAll.checked = true;
       chkAll.indeterminate = false;
     } else {
@@ -1562,7 +1563,7 @@
    */
   function openMoveOverlay() {
     const sources = schema.masterSources ?? [];
-    const selectedRows = filteredRows.filter(r => selectedKeys.has(rowKey(r)));
+    const selectedRows = schema.rows.filter(r => selectedKeys.has(rowKey(r)));
 
     // Determine if all selected rows share one source (may be null for local).
     const sourceIds = new Set(selectedRows.map(r => r.spreadsheetId ?? null));
