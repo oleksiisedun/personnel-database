@@ -598,9 +598,9 @@
   }
 
   /**
-   * Updates export button disabled state and the master checkbox
-   * (checked / indeterminate / unchecked), both based on total selection
-   * across all rows — independent of the current filter view.
+   * Updates export button disabled state (based on total selection across all
+   * rows) and the master checkbox (checked / indeterminate / unchecked, based
+   * on selection among the currently visible/filtered rows only).
    */
   function updateSelectionUI() {
     document.getElementById('btn-export-f1').disabled = selectedKeys.size === 0;
@@ -610,11 +610,12 @@
 
     const chkAll = document.getElementById('chk-select-all');
     if (!chkAll) return;
-    const total = schema.rows.length;
-    if (total === 0 || selectedKeys.size === 0) {
+    const total = filteredRows.length;
+    const selectedVisible = filteredRows.filter(row => selectedKeys.has(rowKey(row))).length;
+    if (total === 0 || selectedVisible === 0) {
       chkAll.checked = false;
       chkAll.indeterminate = false;
-    } else if (selectedKeys.size === total) {
+    } else if (selectedVisible === total) {
       chkAll.checked = true;
       chkAll.indeterminate = false;
     } else {
