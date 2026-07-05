@@ -76,6 +76,30 @@ function extractColumnSchema(allData) {
 }
 
 /**
+ * Finds the first key in a plain object whose text matches the given pattern.
+ *
+ * @param {Object.<string, *>} obj - Plain object keyed by column header text.
+ * @param {RegExp} pattern - Pattern to test each key against.
+ * @returns {string|null} The first matching key, or null if none match.
+ */
+function findKeyByPattern(obj, pattern) {
+  return Object.keys(obj).find(key => pattern.test(key)) ?? null;
+}
+
+/**
+ * Returns the value of the first entry in a row-data map whose key matches
+ * the given column pattern.
+ *
+ * @param {Object.<string, string>} data - Row data map keyed by column header text.
+ * @param {RegExp} pattern - Column-name pattern (one of the COL_* constants).
+ * @returns {string} The matched cell value, or '' if no column matches.
+ */
+function getFieldByPattern(data, pattern) {
+  const key = findKeyByPattern(data, pattern);
+  return key !== null ? data[key] : '';
+}
+
+/**
  * Compares two column schemas and returns an entry for every position where
  * name or type differs. Positions where both sides have an empty name are
  * skipped — those are trailing blank columns from getDataRange() expanding

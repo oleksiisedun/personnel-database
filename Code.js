@@ -83,9 +83,9 @@ function fixPhoneNumbers() {
   }
 
   const headers = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
-  const colIndex = headers.findIndex(h => String(h).trim() === COL_PHONE_NUMBER);
+  const colIndex = headers.findIndex(h => COL_PHONE_NUMBER.test(String(h).trim()));
   if (colIndex === -1) {
-    ui.alert(`Column "${COL_PHONE_NUMBER}" not found in row 1.`);
+    ui.alert(`Column matching "${COL_PHONE_NUMBER.source}" not found in row 1.`);
     return;
   }
 

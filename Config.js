@@ -37,13 +37,15 @@ const EXPORT_F1_TEMPLATE_CELL = 'M9';
 const EXPORT_WC_TEMPLATE_CELL = 'M11';
 const EXPORT_FOLDER_CELL = 'M13';
 
-// Database column names
-const COL_DRAFT_DATE = 'Дата призову';
-const COL_SERVICE_HISTORY = 'Проходження служби';
-const COL_CLOSE_RELATIVES = 'Близькі родичі';
-const COL_MARITAL_STATUS = 'Сімейний стан';
-const COL_CONTRACT_UNTIL = 'Контракт укладено до';
-const COL_PHONE_NUMBER = 'Номер телефону';
+// Database column-name patterns — matched case-insensitively against literal
+// header text read from row 1 (row 1 is not required to be byte-exact across
+// Master Mode source spreadsheets).
+const COL_DRAFT_DATE = /дата призову/i;
+const COL_SERVICE_HISTORY = /проходження служби/i;
+const COL_CLOSE_RELATIVES = /близькі родичі/i;
+const COL_MARITAL_STATUS = /сімейний стан/i;
+const COL_CONTRACT_UNTIL = /контракт укладено до/i;
+const COL_PHONE_NUMBER = /номер телефону/i;
 
 // Export / document settings
 const EXPORT_TIME_LIMIT_MS = 5 * 60 * 1000; // 5 min — 1 min safety margin before GAS 6-min hard limit

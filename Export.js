@@ -118,8 +118,8 @@ function _exportDoc(rowEntries, templateCell, docPrefix) {
       }
     });
 
-    // Pass 2: service history table — must run before direct text replacement
-    // so the {Проходження служби} placeholder is still intact.
+    // Pass 2: service history table — must run before pass 3 or the placeholder
+    // text would be consumed before the table handler can locate it.
     _fillServiceHistoryTable(body, data);
 
     // Pass 3: direct text column placeholders.
@@ -202,7 +202,7 @@ function _computeValue(name, data) {
  * @returns {string[][]}
  */
 function _getServiceHistoryRows(data) {
-  return _parseSubTable(data[COL_SERVICE_HISTORY] || '');
+  return _parseSubTable(getFieldByPattern(data, COL_SERVICE_HISTORY));
 }
 
 /**
@@ -211,7 +211,7 @@ function _getServiceHistoryRows(data) {
  * @returns {string[][]}
  */
 function _getRelativesRows(data) {
-  return _parseSubTable(data[COL_CLOSE_RELATIVES] || '');
+  return _parseSubTable(getFieldByPattern(data, COL_CLOSE_RELATIVES));
 }
 
 /**
@@ -234,7 +234,7 @@ function _filterChildrenRows(rows) {
  *                   or empty string if no valid date is found.
  */
 function _computeTotalServiceLength(data) {
-  const raw = data[COL_DRAFT_DATE] || '';
+  const raw = getFieldByPattern(data, COL_DRAFT_DATE);
   const matches = raw.match(DATE_REGEX);
   if (!matches) return '';
 
@@ -275,10 +275,10 @@ function _computeTotalServiceLength(data) {
  * @returns {string} e.g. "07.05.2015 з в/ч 3011", or empty string.
  */
 function _computeContractSignDate(data) {
-  const contractField = (data[COL_CONTRACT_UNTIL] || '').toLowerCase();
+  const contractField = getFieldByPattern(data, COL_CONTRACT_UNTIL).toLowerCase();
   if (contractField.includes('мобілізований') || contractField.includes('мобілізована')) return '';
 
-  const dateMatch = (data[COL_DRAFT_DATE] || '').match(DATE_REGEX);
+  const dateMatch = getFieldByPattern(data, COL_DRAFT_DATE).match(DATE_REGEX);
   if (!dateMatch) return '';
 
   const rows = _getServiceHistoryRows(data);
@@ -379,7 +379,7 @@ function _computeRelativesWithPhoneNumbers(data) {
  * @param {Object.<string, string>} data - Row data map.
  */
 function _underlineMaritalStatus(body, data) {
-  const status = (data[COL_MARITAL_STATUS] || '').toLowerCase().trim();
+  const status = getFieldByPattern(data, COL_MARITAL_STATUS).toLowerCase().trim();
   let pattern;
   if (status.includes('неодружен') || status.includes('незаміжн')) {
     pattern = 'неодружений \\(незаміжня\\)';
@@ -406,7 +406,10 @@ function _underlineMaritalStatus(body, data) {
 function _fillServiceHistoryTable(body, data) {
   const entries = _getServiceHistoryRows(data);
 
-  const found = body.findText(_escapeRegex('{' + COL_SERVICE_HISTORY + '}'));
+  const serviceHistoryKey = findKeyByPattern(data, COL_SERVICE_HISTORY);
+  if (!serviceHistoryKey) return;
+
+  const found = body.findText(_escapeRegex('{' + serviceHistoryKey + '}'));
   if (!found) return;
 
   // Navigate up: Text → Paragraph → TableCell → TableRow → Table
