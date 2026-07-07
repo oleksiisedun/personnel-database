@@ -195,6 +195,8 @@ The displayed list is always sorted: local spreadsheet rows first, then each rem
 
 The **"All units"** toolbar checkbox (visible only in Master Mode, checked by default) hides all streamed-in remote rows so only the local `Database` sheet's own rows are shown.
 
+The green **Refresh** button (visible only in Master Mode, to the left of "All units") re-runs the same load — local rows plus every Master Mode source — without closing the dialog, so updates made by other admins in a source spreadsheet since the dialog was opened become visible. It preserves current filter text and column visibility, but clears the row selection checkboxes (row positions may have shifted upstream). Clicking it again while a previous refresh's remote sources are still streaming in safely discards the stale results instead of duplicating rows.
+
 When Master Mode is **OFF**, only the local `Database` sheet is shown. Editing (add / edit / delete) is always available regardless of Master Mode.
 
 New rows added via **Add person** always go to the local `Database` sheet, never to a remote source.
@@ -225,6 +227,7 @@ The Sheets **More... ⭐️** menu (added by `onOpen()`) has two items:
 - **Filtering** — debounced live filter input above every column; supports plain text and regular expressions (toggle per session); for `image` columns the search matches the raw Drive URL/ID (`""` to filter empty); for `*-table` columns the search runs against the raw encoded cell content, so any sub-field value is matched
 - **Actual personnel filter** — "Actual personnel" checkbox in the toolbar (enabled only when `Handbook!M6`/`M7` are configured and accessible); when checked, only rows whose first-column value (full name) appears in the external personnel list are shown; composes with all other filters
 - **All units filter** (Master Mode only) — "All units" checkbox in the toolbar, checked by default; uncheck to hide rows streamed in from Master Mode source spreadsheets and show only the local `Database` sheet's rows; composes with all other filters. An amber ⚠ button appears to its left when one or more remote sources have a column schema mismatch; clicking it shows which columns differ so the issue can be fixed in the remote sheet
+- **Refresh** (Master Mode only) — green button to the left of "All units"; re-fetches local rows and every Master Mode source without closing the dialog, so changes made by other admins become visible; preserves filter text and column visibility, clears row selection
 - **Add person** — appends a new empty row to the local `Database` sheet and opens it in the edit view immediately
 - **Delete** — red "Delete" button in the edit view moves the record to the `Trash` sheet of its source spreadsheet (not available for unsaved new rows)
 - **Column visibility** — "Columns ▾" button to hide/show individual columns; first column is always visible
