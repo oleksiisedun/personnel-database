@@ -6,6 +6,7 @@
     --color-focus-shadow: rgba(66,133,244,0.2);
     --color-danger: #c62828;
     --color-danger-hover: #b71c1c;
+    --color-success: #2e7d32;
     --color-border: #ccc;
     --radius: 4px;
   }
@@ -29,6 +30,11 @@
     cursor: pointer; font-size: 13px; color: var(--color-danger);
   }
   .btn-danger:hover:not(:disabled) { background: #ffebee; }
+  .btn-success {
+    background: none; border: 1px solid var(--color-success); border-radius: var(--radius);
+    cursor: pointer; font-size: 13px; color: var(--color-success);
+  }
+  .btn-success:hover:not(:disabled) { background: #e8f5e9; }
   button:disabled { opacity: 0.5; cursor: default; }
 
   /* ── Shared overlay styles ── */
@@ -85,7 +91,7 @@
   #toolbar-right { display: flex; align-items: center; gap: 8px; }
   #col-toggle-wrap { position: relative; display: inline-block; }
   #regex-label, #actual-label, #all-units-label { font-size: 13px; color: #555; cursor: pointer; display: flex; align-items: center; gap: 4px; user-select: none; }
-  #btn-columns, #btn-add-person, #btn-export-f1, #btn-export-wc, #btn-move, #btn-delete-bulk, #btn-schema-warning { padding: 5px 12px; }
+  #btn-columns, #btn-add-person, #btn-refresh, #btn-export-f1, #btn-export-wc, #btn-move, #btn-delete-bulk, #btn-schema-warning { padding: 5px 12px; }
   #btn-schema-warning { font-size: 16px; line-height: 1; }
 
   /* ── Export overlay ── */

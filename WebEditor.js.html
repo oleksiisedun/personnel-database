@@ -297,6 +297,7 @@
     });
     const addBtn = document.getElementById('btn-add-person');
     if (addBtn) addBtn.addEventListener('click', addPerson);
+    document.getElementById('btn-refresh').addEventListener('click', refreshAll);
     document.getElementById('btn-export-f1').addEventListener('click', () => runExport('btn-export-f1', 'exportF1'));
     document.getElementById('btn-export-wc').addEventListener('click', () => runExport('btn-export-wc', 'exportWC'));
     document.getElementById('btn-export-close').addEventListener('click', () => {
@@ -341,6 +342,25 @@
   }
 
   /**
+   * Builds a trimmed-name Set from actualPersonnelNames for O(1) lookups in
+   * applyFilters(), or undefined when the list is absent/empty.
+   * @param {string[]|null|undefined} names
+   * @returns {Set<string>|undefined}
+   */
+  function buildActualPersonnelNamesSet(names) {
+    return names?.length ? new Set(names.map(n => n.trim())) : undefined;
+  }
+
+  /**
+   * Starts streaming in Master Mode remote sources when the schema indicates
+   * there's at least one to fetch.
+   * @param {{masterMode: boolean, masterSourceIds: string[]}} data
+   */
+  function maybeQueueMasterSourceFetch(data) {
+    if (data.masterMode && data.masterSourceIds?.length) queueMasterSourceFetch();
+  }
+
+  /**
    * Success handler for the initial getSchemaAndData() call.
    * Awaits the IndexedDB cache load so renderList() can display cached images
    * immediately, then builds and shows the table.
@@ -354,6 +374,7 @@
     document.getElementById('loading').style.display = 'none';
     if (data.masterMode) {
       document.getElementById('btn-move').style.display = '';
+      document.getElementById('btn-refresh').style.display = '';
       document.getElementById('all-units-label').style.display = '';
       const chkAllUnits = document.getElementById('chk-all-units');
       chkAllUnits.addEventListener('change', () => {
@@ -368,7 +389,7 @@
     }
     const chkActual = document.getElementById('chk-actual');
     if (data.actualPersonnelNames?.length) {
-      schema.actualPersonnelNamesSet = new Set(data.actualPersonnelNames.map(n => n.trim()));
+      schema.actualPersonnelNamesSet = buildActualPersonnelNamesSet(data.actualPersonnelNames);
       chkActual.disabled = false;
       chkActual.addEventListener('change', () => {
         filterActualPersonnel = chkActual.checked;
@@ -384,7 +405,7 @@
     applyFilters();
     document.getElementById('data-table').style.display = 'table';
     updateStickyOffsets();
-    if (data.masterMode && data.masterSourceIds?.length) queueMasterSourceFetch();
+    maybeQueueMasterSourceFetch(data);
   }
 
   /**
@@ -395,6 +416,55 @@
   function onLoadError(err) {
     document.getElementById('loading').style.display = 'none';
     showError('error-msg', 'Error loading data', err);
+  }
+
+  let refreshGeneration = 0; // bumped on each refresh; lets stale in-flight master-source fetches self-cancel
+
+  /**
+   * Re-runs the initial data load (local rows + Master Mode sources) without
+   * closing the dialog, so the user can pull in changes made by other admins
+   * since the dialog was opened. Unlike onDataLoaded(), this does not rebuild
+   * the filter DOM (would wipe typed filter text) or re-attach checkbox
+   * listeners (would stack duplicates on #chk-all-units / #chk-actual).
+   */
+  function refreshAll() {
+    document.getElementById('btn-refresh').disabled = true;
+    refreshGeneration++;
+    google.script.run
+      .withSuccessHandler(onRefreshSuccess)
+      .withFailureHandler(onRefreshError)
+      .getSchemaAndData();
+  }
+
+  /**
+   * Success handler for refreshAll(). Replaces row/master-source data in
+   * place and re-renders via applyFilters(), preserving current filter input
+   * values and column visibility settings.
+   * @param {{columns: Object[], rows: Object[]}} data
+   */
+  function onRefreshSuccess(data) {
+    selectedKeys.clear(); // rowIndexes may have shifted if rows were added/removed upstream
+    schema.rows = data.rows;
+    schema.masterMode = data.masterMode;
+    schema.masterSourceIds = data.masterSourceIds;
+    schema.masterSources = data.masterSources;
+    schema.sourceColumnMismatches = {};
+    schema.actualPersonnelNames = data.actualPersonnelNames;
+    schema.actualPersonnelNamesSet = buildActualPersonnelNamesSet(data.actualPersonnelNames);
+    document.getElementById('chk-actual').disabled = !schema.actualPersonnelNamesSet;
+    updateSchemaWarningIcon();
+    applyFilters();
+    document.getElementById('btn-refresh').disabled = false;
+    maybeQueueMasterSourceFetch(data);
+  }
+
+  /**
+   * Failure handler for refreshAll().
+   * @param {Error} err
+   */
+  function onRefreshError(err) {
+    document.getElementById('btn-refresh').disabled = false;
+    showError('error-msg', 'Error refreshing data', err);
   }
 
   /**
@@ -704,15 +774,18 @@
    * inaccessible sources are skipped, same as the previous synchronous loop.
    */
   function queueMasterSourceFetch() {
+    const myGeneration = refreshGeneration;
     const ids = schema.masterSourceIds.slice();
     const concurrency = schema.masterModeFetchConcurrency;
     const debouncedApplyFilters = debounce(applyFilters, schema.filterDebounceMs);
     let offset = 0;
     const fetchNext = () => {
+      if (myGeneration !== refreshGeneration) return; // a newer refresh superseded this run
       if (offset >= ids.length) return;
       const id = ids[offset++];
       google.script.run
         .withSuccessHandler(result => {
+          if (myGeneration !== refreshGeneration) return;
           if (result.columnMismatches?.length) {
             schema.sourceColumnMismatches[result.id] = result.columnMismatches;
           } else {
@@ -724,6 +797,7 @@
           fetchNext();
         })
         .withFailureHandler(() => {
+          if (myGeneration !== refreshGeneration) return;
           updateSchemaWarningIcon();
           fetchNext();
         })
