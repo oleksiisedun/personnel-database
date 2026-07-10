@@ -464,9 +464,12 @@
    * since the dialog was opened. Unlike onDataLoaded(), this does not rebuild
    * the filter DOM (would wipe typed filter text) or re-attach checkbox
    * listeners (would stack duplicates on #chk-all-units / #chk-actual).
+   * Dims #data-table with the .filtering class for the duration of the
+   * server round-trip, the same as resetListState().
    */
   function refreshAll() {
     document.getElementById('btn-refresh').disabled = true;
+    document.getElementById('data-table').classList.add('filtering');
     refreshGeneration++;
     google.script.run
       .withSuccessHandler(onRefreshSuccess)
@@ -493,6 +496,7 @@
     updateSchemaWarningIcon();
     applyFilters();
     document.getElementById('btn-refresh').disabled = false;
+    document.getElementById('data-table').classList.remove('filtering');
     maybeQueueMasterSourceFetch(data);
   }
 
@@ -502,6 +506,7 @@
    */
   function onRefreshError(err) {
     document.getElementById('btn-refresh').disabled = false;
+    document.getElementById('data-table').classList.remove('filtering');
     showError('error-msg', 'Error refreshing data', err);
   }
 
