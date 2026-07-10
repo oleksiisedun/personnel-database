@@ -298,6 +298,7 @@
     const addBtn = document.getElementById('btn-add-person');
     if (addBtn) addBtn.addEventListener('click', addPerson);
     document.getElementById('btn-refresh').addEventListener('click', refreshAll);
+    document.getElementById('btn-reset').addEventListener('click', resetListState);
     document.getElementById('btn-export-f1').addEventListener('click', () => runExport('btn-export-f1', 'exportF1'));
     document.getElementById('btn-export-wc').addEventListener('click', () => runExport('btn-export-wc', 'exportWC'));
     document.getElementById('btn-export-close').addEventListener('click', () => {
@@ -416,6 +417,43 @@
   function onLoadError(err) {
     document.getElementById('loading').style.display = 'none';
     showError('error-msg', 'Error loading data', err);
+  }
+
+  /**
+   * Resets Columns, Filters, and Selections to their default state and re-renders.
+   * Does not touch schema.rows — no server round-trip (unlike refreshAll()).
+   */
+  function resetListState() {
+    const btn = document.getElementById('btn-reset');
+    const table = document.getElementById('data-table');
+    btn.disabled = true;
+    table.classList.add('filtering');
+
+    requestAnimationFrame(() => requestAnimationFrame(() => {
+      document.querySelectorAll('#filter-row input[type=text]').forEach(input => { input.value = ''; });
+
+      useRegex = false;
+      document.getElementById('chk-regex').checked = false;
+
+      const chkActual = document.getElementById('chk-actual');
+      if (!chkActual.disabled) {
+        filterActualPersonnel = false;
+        chkActual.checked = false;
+      }
+
+      showAllUnits = true;
+      document.getElementById('chk-all-units').checked = true;
+
+      hiddenColumns.clear();
+      buildColumnPanel(); // rebuilds column-panel checkboxes as all-checked
+
+      selectedKeys.clear();
+
+      applyFilters(); // renderList() re-applies column visibility + updateSelectionUI()
+
+      table.classList.remove('filtering');
+      btn.disabled = false;
+    }));
   }
 
   let refreshGeneration = 0; // bumped on each refresh; lets stale in-flight master-source fetches self-cancel

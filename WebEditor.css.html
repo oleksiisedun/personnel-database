@@ -7,6 +7,8 @@
     --color-danger: #c62828;
     --color-danger-hover: #b71c1c;
     --color-success: #2e7d32;
+    --color-warning: #f9a825;
+    --color-warning-hover: #f57f17;
     --color-border: #ccc;
     --radius: 4px;
   }
@@ -91,7 +93,7 @@
   #toolbar-right { display: flex; align-items: center; gap: 8px; }
   #col-toggle-wrap { position: relative; display: inline-block; }
   #regex-label, #actual-label, #all-units-label { font-size: 13px; color: #555; cursor: pointer; display: flex; align-items: center; gap: 4px; user-select: none; }
-  #btn-columns, #btn-add-person, #btn-refresh, #btn-export-f1, #btn-export-wc, #btn-move, #btn-delete-bulk, #btn-schema-warning { padding: 5px 12px; }
+  #btn-columns, #btn-add-person, #btn-refresh, #btn-export-f1, #btn-export-wc, #btn-move, #btn-delete-bulk, #btn-schema-warning, #btn-reset { padding: 5px 12px; }
   #btn-schema-warning { font-size: 16px; line-height: 1; }
 
   /* ── Export overlay ── */
@@ -239,7 +241,7 @@
   .edit-preview-pdf a:hover { text-decoration:underline; }
 
   /* ── Schema warning ── */
-  .btn-warning { background:none; border:1px solid #f9a825; border-radius:var(--radius); color:#f57f17; cursor:pointer; font-size:13px; }
+  .btn-warning { background:none; border:1px solid var(--color-warning); border-radius:var(--radius); color:var(--color-warning-hover); cursor:pointer; font-size:13px; }
   .btn-warning:hover { background:#fff8e1; }
   #schema-warning-dialog { min-width:420px; max-width:640px; max-height:80vh; overflow-y:auto; }
   #schema-warning-actions { display:flex; justify-content:flex-end; margin-top:16px; }
