@@ -21,7 +21,7 @@ JS style and JSDoc rules are in the global `~/.claude/CLAUDE.md`. Project-specif
 Concrete tokens and shared classes already defined here (see global CSS design-system conventions for the reuse-first principle):
 
 - **Variables**: `--color-primary`, `--color-primary-hover`, `--color-focus`, `--color-focus-shadow`, `--color-danger`, `--color-danger-hover`, `--color-success`, `--color-warning`, `--color-warning-hover`, `--color-border`, `--radius`.
-- **Shared classes**: `.btn-primary` (filled accent — Save/Move/Close), `.btn-secondary` (outline — Back/Cancel/toolbar), `.btn-danger` (outline, danger color — Delete), `.btn-success` (outline, success color — Refresh), `.btn-warning` (outline, warning color — schema-mismatch ⚠ button, Reset), `.overlay`/`.overlay-dialog` (modal scaffolding — export progress, move dialog).
+- **Shared classes**: `.btn-primary` (filled accent — Save/Move/Close), `.btn-secondary` (outline — Back/Cancel/toolbar), `.btn-danger` (outline, danger color — Delete), `.btn-success` (outline, success color — Refresh), `.btn-warning` (outline, warning color — schema-mismatch ⚠ button, Reset), `.btn-dialog-action` (sizing only — `padding`/`font-size` for overlay action buttons: export Cancel/Proceed/Close, move Cancel/Confirm, schema-warning Close — combined with a color class like `.btn-primary`/`.btn-secondary`), `.overlay`/`.overlay-dialog` (modal scaffolding — export progress, move dialog).
 - **Global states**: `button:disabled` (`opacity: 0.5; cursor: default;`), text input/select focus (`border-color: var(--color-focus); box-shadow: 0 0 0 2px var(--color-focus-shadow);`).
 
 ## Architecture

@@ -38,6 +38,7 @@
   }
   .btn-success:hover:not(:disabled) { background: #e8f5e9; }
   button:disabled { opacity: 0.5; cursor: default; }
+  .btn-dialog-action { padding: 8px 20px; font-size: 13px; }
 
   /* ── Shared overlay styles ── */
   .overlay {
@@ -114,14 +115,12 @@
   #export-confirm-msg { font-size: 14px; color: #333; margin-bottom: 6px; line-height: 1.5; }
   #export-confirm-estimate { font-size: 13px; color: #888; margin-bottom: 20px; }
   #export-confirm-actions { display: flex; gap: 10px; justify-content: center; }
-  #btn-export-cancel, #btn-export-proceed { padding: 8px 24px; font-size: 13px; }
   #export-error { font-size: 13px; color: var(--color-danger); margin-bottom: 12px; }
   #export-links { list-style: none; text-align: left; margin: 0 0 16px; padding: 0; max-height: 200px; overflow-y: auto; }
   #export-links li { padding: 4px 0; border-bottom: 1px solid #f0f0f0; font-size: 13px; }
   #export-links li:last-child { border-bottom: none; }
   #export-links a { color: var(--color-primary); text-decoration: none; }
   #export-links a:hover { text-decoration: underline; }
-  #btn-export-close { padding: 8px 20px; font-size: 13px; }
   /* ── Move overlay ── */
   #move-dialog { min-width: 320px; }
   #move-dialog-title { font-size: 14px; font-weight: 600; color: #333; margin-bottom: 12px; }
@@ -138,7 +137,6 @@
   }
   #move-log div { padding: 2px 0; }
   #move-actions { display: flex; gap: 10px; justify-content: flex-end; }
-  #btn-move-cancel, #btn-move-confirm { padding: 8px 20px; font-size: 13px; }
 
   #col-panel {
     position: absolute; top: calc(100% + 4px); right: 0; z-index: 100;
@@ -250,7 +248,6 @@
   .btn-warning:hover { background:#fff8e1; }
   #schema-warning-dialog { min-width:420px; max-width:640px; max-height:80vh; overflow-y:auto; }
   #schema-warning-actions { display:flex; justify-content:flex-end; margin-top:16px; }
-  #btn-schema-warning-close { padding: 8px 20px; font-size: 13px; }
   #schema-warning-content h3 { font-size:13px; font-weight:600; color:#333; margin:0 0 6px; }
   #schema-warning-content table { width:100%; border-collapse:collapse; font-size:13px; margin-bottom:16px; }
   #schema-warning-content th { text-align:left; padding:4px 8px; border-bottom:1px solid #ddd; color:#555; font-weight:600; }
