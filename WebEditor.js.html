@@ -277,6 +277,21 @@
   }
 
   /**
+   * Dims #data-table with the .filtering class, waits two animation frames
+   * (so the dimmed state paints before synchronous work runs), executes fn,
+   * then removes the dimming class.
+   * @param {Function} fn - Synchronous work to run once dimmed.
+   */
+  function dimTableWhile(fn) {
+    const table = document.getElementById('data-table');
+    table.classList.add('filtering');
+    requestAnimationFrame(() => requestAnimationFrame(() => {
+      fn();
+      table.classList.remove('filtering');
+    }));
+  }
+
+  /**
    * Entry point. Wires up all static event listeners and kicks off the
    * initial data load from the server via google.script.run.
    */
@@ -380,12 +395,7 @@
       const chkAllUnits = document.getElementById('chk-all-units');
       chkAllUnits.addEventListener('change', () => {
         showAllUnits = chkAllUnits.checked;
-        const table = document.getElementById('data-table');
-        table.classList.add('filtering');
-        requestAnimationFrame(() => requestAnimationFrame(() => {
-          applyFilters();
-          table.classList.remove('filtering');
-        }));
+        dimTableWhile(applyFilters);
       });
     }
     const chkActual = document.getElementById('chk-actual');
@@ -394,12 +404,7 @@
       chkActual.disabled = false;
       chkActual.addEventListener('change', () => {
         filterActualPersonnel = chkActual.checked;
-        const table = document.getElementById('data-table');
-        table.classList.add('filtering');
-        requestAnimationFrame(() => requestAnimationFrame(() => {
-          applyFilters();
-          table.classList.remove('filtering');
-        }));
+        dimTableWhile(applyFilters);
       });
     }
     buildListView();
@@ -425,11 +430,9 @@
    */
   function resetListState() {
     const btn = document.getElementById('btn-reset');
-    const table = document.getElementById('data-table');
     btn.disabled = true;
-    table.classList.add('filtering');
 
-    requestAnimationFrame(() => requestAnimationFrame(() => {
+    dimTableWhile(() => {
       document.querySelectorAll('#filter-row input[type=text]').forEach(input => { input.value = ''; });
 
       useRegex = false;
@@ -451,9 +454,8 @@
 
       applyFilters(); // renderList() re-applies column visibility + updateSelectionUI()
 
-      table.classList.remove('filtering');
       btn.disabled = false;
-    }));
+    });
   }
 
   let refreshGeneration = 0; // bumped on each refresh; lets stale in-flight master-source fetches self-cancel
