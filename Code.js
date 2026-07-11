@@ -481,17 +481,7 @@ function updateRow(rowIndex, values, spreadsheetId) {
  * @returns {boolean} Always true; thrown errors propagate to the client failure handler.
  */
 function deleteRow(rowIndex, spreadsheetId) {
-  const { ss, sheet: dbSheet } = getDatabaseSheet(spreadsheetId);
-
-  const numCols = dbSheet.getLastColumn();
-  const rowData = dbSheet.getRange(rowIndex, 1, 1, numCols).getValues()[0];
-
-  const trashSheet = ensureTrashSheetExists(ss, dbSheet, numCols);
-  const trashLastRow = Math.max(trashSheet.getLastRow(), 2);
-  trashSheet.getRange(trashLastRow + 1, 1, 1, numCols).setValues([rowData]);
-
-  dbSheet.deleteRow(rowIndex);
-  return true;
+  return deleteRows([{ rowIndex, spreadsheetId }]);
 }
 
 /**
