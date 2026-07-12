@@ -388,9 +388,9 @@
     schema.sourceColumnMismatches = {};
     await loadCacheFromIndexedDB();
     document.getElementById('loading').style.display = 'none';
+    document.getElementById('btn-refresh').style.display = '';
     if (data.masterMode) {
       document.getElementById('btn-move').style.display = '';
-      document.getElementById('btn-refresh').style.display = '';
       document.getElementById('all-units-label').style.display = '';
       const chkAllUnits = document.getElementById('chk-all-units');
       chkAllUnits.addEventListener('change', () => {
