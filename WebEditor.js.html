@@ -10,6 +10,7 @@
   let imageCache = {};     // fileId → { type:'image', dataUrl } | { type:'pdf', viewUrl } | null
   let pendingImages = new Set(); // fileIds currently being fetched to avoid duplicate requests
   let isNewRow = false;    // true when the edit view holds a freshly appended row
+  let originalFormValues = null; // snapshot of collectFormValues() taken right after openEditView() builds the form
   let useRegex = false;              // true when filter inputs are treated as regular expressions
   let filterActualPersonnel = false; // true when only names in the actual personnel list are shown
   let showAllUnits = true;           // true when master-mode remote rows are included alongside local ones
@@ -297,8 +298,16 @@
    */
   function init() {
     document.getElementById('btn-back').addEventListener('click', () => {
-      isNewRow = false;
-      showView('list');
+      if (formValuesChanged()) {
+        openUnsavedChangesOverlay();
+      } else {
+        leaveEditView();
+      }
+    });
+    document.getElementById('btn-unsaved-cancel').addEventListener('click', closeUnsavedChangesOverlay);
+    document.getElementById('btn-unsaved-discard').addEventListener('click', () => {
+      closeUnsavedChangesOverlay();
+      leaveEditView();
     });
     document.getElementById('btn-save').addEventListener('click', saveRow);
     document.getElementById('btn-delete').addEventListener('click', deletePerson);
@@ -1231,7 +1240,30 @@
     } else {
       ssSelect.style.display = 'none';
     }
+    originalFormValues = collectFormValues();
     showView('edit');
+  }
+
+  /**
+   * Leaves the edit view and returns to the list, discarding any in-progress edit state.
+   */
+  function leaveEditView() {
+    isNewRow = false;
+    showView('list');
+  }
+
+  /**
+   * Shows the confirmation overlay warning that unsaved edit-form changes will be discarded.
+   */
+  function openUnsavedChangesOverlay() {
+    document.getElementById('unsaved-changes-overlay').style.display = 'flex';
+  }
+
+  /**
+   * Hides the unsaved-changes confirmation overlay without taking any action.
+   */
+  function closeUnsavedChangesOverlay() {
+    document.getElementById('unsaved-changes-overlay').style.display = 'none';
   }
 
   /**
@@ -1379,6 +1411,37 @@
   }
 
   /**
+   * Reads the current state of every field in #edit-form into a values array
+   * aligned with schema.columns (plain inputs, selects, and table editors via
+   * encodeTableEditor). Used both to build the save payload and to detect
+   * unsaved changes against the snapshot taken when the edit view was opened.
+   * @returns {string[]}
+   */
+  function collectFormValues() {
+    const values = new Array(schema.columns.length).fill('');
+    document.querySelectorAll('#edit-form input[data-col-index]').forEach(inp => {
+      values[parseInt(inp.dataset.colIndex)] = inp.value;
+    });
+    document.querySelectorAll('#edit-form select[data-col-index]').forEach(sel => {
+      values[parseInt(sel.dataset.colIndex)] = sel.value;
+    });
+    schema.columns.forEach((col, i) => {
+      if (isTableType(col)) values[i] = encodeTableEditor(i, col);
+    });
+    return values;
+  }
+
+  /**
+   * True if any field in #edit-form differs from the snapshot captured when
+   * the edit view was opened (originalFormValues).
+   * @returns {boolean}
+   */
+  function formValuesChanged() {
+    if (!originalFormValues) return false;
+    return JSON.stringify(collectFormValues()) !== JSON.stringify(originalFormValues);
+  }
+
+  /**
    * Collects new values for all columns from the edit form (plain inputs and table
    * editors), stores them in pendingValues, and calls updateRow() on the server.
    * Disables the Save button for the duration of the async call.
@@ -1402,16 +1465,7 @@
       return;
     }
 
-    const newValues = new Array(schema.columns.length).fill('');
-    document.querySelectorAll('#edit-form input[data-col-index]').forEach(inp => {
-      newValues[parseInt(inp.dataset.colIndex)] = inp.value;
-    });
-    document.querySelectorAll('#edit-form select[data-col-index]').forEach(sel => {
-      newValues[parseInt(sel.dataset.colIndex)] = sel.value;
-    });
-    schema.columns.forEach((col, i) => {
-      if (isTableType(col)) newValues[i] = encodeTableEditor(i, col);
-    });
+    const newValues = collectFormValues();
     pendingValues = newValues;
 
     document.getElementById('btn-save').disabled = true;

@@ -116,6 +116,18 @@
     <div id="edit-form"></div>
   </div>
 
+  <!-- Unsaved changes overlay -->
+  <div id="unsaved-changes-overlay" class="overlay" style="display:none">
+    <div id="unsaved-changes-dialog" class="overlay-dialog">
+      <div id="unsaved-changes-title">You have unsaved changes</div>
+      <p id="unsaved-changes-msg">Leaving now will discard your changes to this record.</p>
+      <div class="dialog-actions">
+        <button id="btn-unsaved-cancel" class="btn-secondary btn-dialog-action">Keep Editing</button>
+        <button id="btn-unsaved-discard" class="btn-danger btn-dialog-action">Discard Changes</button>
+      </div>
+    </div>
+  </div>
+
   <!-- Lightbox -->
   <div id="lightbox" style="display:none">
     <img id="lightbox-img" alt="">
