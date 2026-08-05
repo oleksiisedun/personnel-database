@@ -231,6 +231,7 @@ The Sheets **More... ⭐️** menu (added by `onOpen()`) has two items:
 - **Reset** — orange button to the left of Refresh, always visible; clears all column filters, the regex/"Actual personnel"/"All units" toggles, hidden-column visibility, and the row selection checkboxes back to their defaults, without re-fetching data from the server
 - **Add person** — appends a new empty row to the local `Database` sheet and opens it in the edit view immediately
 - **Delete** — red "Delete" button in the edit view moves the record to the `Trash` sheet of its source spreadsheet (not available for unsaved new rows)
+- **Unsaved changes confirmation** — clicking "Back" in the edit view with pending edits (including `*-table` fields) shows a "Keep Editing" / "Discard Changes" prompt instead of silently discarding them; no prompt if nothing changed
 - **Column visibility** — "Columns ▾" button to hide/show individual columns; first column is always visible
 - **Image thumbnails** — loaded asynchronously; persisted in IndexedDB so subsequent opens display instantly
 - **Lightbox** — click any thumbnail to view the full image

@@ -21,7 +21,7 @@ JS style and JSDoc rules are in the global `~/.claude/CLAUDE.md`. Project-specif
 Concrete tokens and shared classes already defined here (see global CSS design-system conventions for the reuse-first principle):
 
 - **Variables**: `--color-primary`, `--color-primary-hover`, `--color-focus`, `--color-focus-shadow`, `--color-danger`, `--color-danger-hover`, `--color-success`, `--color-warning`, `--color-warning-hover`, `--color-border`, `--radius`.
-- **Shared classes**: `.btn-primary` (filled accent — Save/Move/Close), `.btn-secondary` (outline — Back/Cancel/toolbar), `.btn-danger` (outline, danger color — Delete), `.btn-success` (outline, success color — Refresh), `.btn-warning` (outline, warning color — schema-mismatch ⚠ button, Reset), `.btn-dialog-action` (sizing only — `padding`/`font-size` for overlay action buttons: export Cancel/Proceed/Close, move Cancel/Confirm, schema-warning Close — combined with a color class like `.btn-primary`/`.btn-secondary`), `.overlay`/`.overlay-dialog` (modal scaffolding — export progress, move dialog).
+- **Shared classes**: `.btn-primary` (filled accent — Save/Move/Close), `.btn-secondary` (outline — Back/Cancel/toolbar), `.btn-danger` (outline, danger color — Delete, Discard Changes), `.btn-success` (outline, success color — Refresh), `.btn-warning` (outline, warning color — schema-mismatch ⚠ button, Reset), `.btn-dialog-action` (sizing only — `padding`/`font-size` for overlay action buttons: export Cancel/Proceed/Close, move Cancel/Confirm, schema-warning Close, unsaved-changes Keep Editing/Discard Changes — combined with a color class like `.btn-primary`/`.btn-secondary`/`.btn-danger`), `.overlay`/`.overlay-dialog` (modal scaffolding — export progress, move dialog, unsaved-changes dialog), `.dialog-actions` (sizing-agnostic `display:flex; gap:10px; justify-content:flex-end` action row — used by the unsaved-changes dialog; new overlay action rows should use this instead of a one-off `#foo-actions` ID rule).
 - **Global states**: `button:disabled` (`opacity: 0.5; cursor: default;`), text input/select focus (`border-color: var(--color-focus); box-shadow: 0 0 0 2px var(--color-focus-shadow);`).
 
 ## Architecture
@@ -133,6 +133,10 @@ Triggered from the "More... ⭐️" custom menu (added by `onOpen()` alongside "
 ### Edit view layout
 
 `#edit-form` is a two-column CSS grid (`grid-template-columns: 1fr 1fr`). Most field blocks occupy one column. Table-type fields get the additional class `field-block--full` (→ `grid-column: 1 / -1`) so they span the full width, since their multi-row editors are too wide for a half-width cell.
+
+### Unsaved changes confirmation
+
+`openEditView(row)` captures `originalFormValues = collectFormValues()` right after the form DOM is built (before `showView('edit')`), so the snapshot goes through the same serialization as any later read — this matters because `*-table` fields round-trip through `encodeTableEditor()`/`mergeData()`, which can reformat a cell's string slightly even with zero edits, so comparing against the raw `row.values` instead would risk false positives. `collectFormValues()` (also used by `saveRow()` to build its save payload) and `formValuesChanged()` (`JSON.stringify` comparison against the snapshot) live in `WebEditor.js.html` next to `saveRow()`. Clicking `#btn-back` calls `formValuesChanged()`: if unchanged, it goes straight to `leaveEditView()` (`isNewRow = false; showView('list');`); if dirty, it shows the `#unsaved-changes-overlay` (Keep Editing / Discard Changes), and Discard calls `leaveEditView()`. New code that needs "did the user change anything in the edit form" should reuse `formValuesChanged()` rather than re-deriving it.
 
 ### `*-table` column widths
 
