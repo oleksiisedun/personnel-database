@@ -83,7 +83,7 @@ flowchart TD
 | Row | Purpose |
 |-----|---------|
 | 1 | Column names |
-| 2 | Column types (`text`, `image`, `date`, `unit`, `tin`, `relatives-table`, `service-table`, …) |
+| 2 | Column types (`text`, `image`, `date`, `number`, `unit`, `tin`, `relatives-table`, `service-table`, …) |
 | 3+ | Data rows |
 
 ### `Trash` sheet
@@ -127,6 +127,7 @@ Exactly one of B or C should be filled per row.
 | `image` | Thumbnail (click to enlarge) | Google Drive link input with live preview |
 | `date` | Plain text | Text input with `DD.MM.YYYY` format validation |
 | `tin` | Plain text | Text input validated as exactly 10 digits |
+| `number` | Plain text | Text input validated as digits only |
 | `unit` | Plain text | Dropdown of allowed values from Handbook `D17:D40` |
 | `origin` | Plain text | Dropdown of allowed values from Handbook `E17:E40` |
 | `marital-status` | Plain text | Dropdown of allowed values from Handbook `F17:F40` |

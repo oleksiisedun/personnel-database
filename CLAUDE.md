@@ -32,7 +32,7 @@ This is a **Google Apps Script** project (V8 runtime) bound to a Google Spreadsh
 
 The `Database` sheet has this fixed structure:
 - Row 1 — column names (header)
-- Row 2 — column types (`text`, `image`, `*-table`, `unit`, `origin`, `marital-status`, `sex`, `tin`)
+- Row 2 — column types (`text`, `image`, `*-table`, `unit`, `origin`, `marital-status`, `sex`, `tin`, `number`)
 - Row 3+ — one person record per row
 
 The `Handbook` sheet holds schema metadata, dropdown option lists, the Master Mode toggle, the data folder cell, and export correspondence tables. Constants in `Config.js` define each range address.

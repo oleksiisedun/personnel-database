@@ -157,8 +157,9 @@
    * module scope so both real-time input handlers and saveRow() share the same regex.
    */
   const VALIDATORS = {
-    date: { regex: /^\d{2}\.\d{2}\.\d{4}$/, placeholder: 'DD.MM.YYYY',  hint: 'Format: DD.MM.YYYY',        msg: 'Fix date fields (expected format: DD.MM.YYYY) before saving.' },
-    tin:  { regex: /^\d{10}$/,               placeholder: '1234567890',  hint: 'Must be exactly 10 digits', msg: 'TIN must be exactly 10 digits.' },
+    date:   { regex: /^\d{2}\.\d{2}\.\d{4}$/, placeholder: 'DD.MM.YYYY', hint: 'Format: DD.MM.YYYY',        msg: 'Fix date fields (expected format: DD.MM.YYYY) before saving.' },
+    tin:    { regex: /^\d{10}$/,              placeholder: '1234567890', hint: 'Must be exactly 10 digits', msg: 'TIN must be exactly 10 digits.' },
+    number: { regex: /^\d+$/,                 placeholder: '123',        hint: 'Digits only',               msg: 'Number fields must contain only digits.' },
   };
 
   /**
