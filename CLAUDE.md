@@ -130,6 +130,10 @@ The client uses `masterSources: Array<{id, name}>` to populate the Move destinat
 
 Triggered from the "More... ⭐️" custom menu (added by `onOpen()` alongside "Open Web Editor"). Scans the `COL_PHONE_NUMBER` (`Номер телефону`) column of `Database` and rewrites two malformed shapes in place: bare 9-digit numbers missing the leading `0`, and 12-digit numbers carrying a `38` country-code prefix. Numbers already in canonical 10-digit form are left untouched. Runs synchronously over the whole sheet; reports a count via `ui.alert()`. No undo beyond manual edit or Trash recovery.
 
+### Full name normalization (`fixFullNames`)
+
+Also triggered from the "More... ⭐️" custom menu, following the same header-lookup pattern as `fixPhoneNumbers`. Scans the `COL_FULL_NAME` (`ПІБ`) column of `Database` and rewrites each value via `normalizeFullName()` (`Utils.js`): trims surrounding whitespace, collapses internal whitespace runs — including newlines — to a single space via `WHITESPACE_RUN_REGEX`, and uppercases the first word (the surname). Already-normalized values are left untouched. Runs synchronously over the whole sheet; reports a count via `ui.alert()`. No undo beyond manual edit or Trash recovery.
+
 ### Edit view layout
 
 `#edit-form` is a two-column CSS grid (`grid-template-columns: 1fr 1fr`). Most field blocks occupy one column. Table-type fields get the additional class `field-block--full` (→ `grid-column: 1 / -1`) so they span the full width, since their multi-row editors are too wide for a half-width cell.

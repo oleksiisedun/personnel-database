@@ -48,6 +48,19 @@ function stringifyRowValues(row) {
 }
 
 /**
+ * Trims, collapses internal whitespace runs to a single space, and
+ * uppercases the first word (surname) of a full name.
+ * @param {string} value
+ * @returns {string}
+ */
+function normalizeFullName(value) {
+  const collapsed = String(value).trim().replace(WHITESPACE_RUN_REGEX, ' ');
+  if (!collapsed) return collapsed;
+  const [surname, ...rest] = collapsed.split(' ');
+  return [surname.toUpperCase(), ...rest].join(' ');
+}
+
+/**
  * Trims or pads a values array to exactly numCols elements. Excess values are
  * dropped; missing values are filled with empty strings.
  *

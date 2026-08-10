@@ -215,12 +215,13 @@ After a successful move the rows reappear in the list immediately under their ne
 
 ## Custom menu
 
-The Sheets **More... ⭐️** menu (added by `onOpen()`) has two items:
+The Sheets **More... ⭐️** menu (added by `onOpen()`) has three items:
 
 | Item | Action |
 |------|--------|
 | Open Web Editor | Opens the web editor dialog described below |
 | Fix phone numbers | Scans the `Database` sheet's `Номер телефону` column and rewrites two malformed shapes in place: bare 9-digit numbers missing the leading `0`, and 12-digit numbers carrying a `38` country-code prefix. Numbers already in canonical 10-digit form are left untouched. Runs synchronously over the whole sheet and reports the fixed count via a dialog. No undo beyond manual edit or `Trash` recovery. |
+| Fix full names | Scans the `Database` sheet's `ПІБ` column and rewrites each value: trims surrounding whitespace, collapses internal whitespace runs (including newlines) to a single space, and uppercases the surname (first word). Already-normalized values are left untouched. Runs synchronously over the whole sheet and reports the fixed count via a dialog. No undo beyond manual edit or `Trash` recovery. |
 
 ## Web editor features
 

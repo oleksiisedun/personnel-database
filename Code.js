@@ -54,7 +54,9 @@ function onOpen() {
   SpreadsheetApp.getUi()
     .createMenu('More... ⭐️')
     .addItem('Open Web Editor', 'openWebEditor')
+    .addSeparator()
     .addItem('Fix phone numbers', 'fixPhoneNumbers')
+    .addItem('Fix full names', 'fixFullNames')
     .addToUi();
 }
 
@@ -114,6 +116,52 @@ function fixPhoneNumbers() {
 
   range.setValues(result);
   ui.alert(`Fixed ${fixedCount} phone number(s).`);
+}
+
+/**
+ * Normalizes full names in the Database sheet's "ПІБ" column: trims
+ * surrounding whitespace, collapses internal whitespace runs (including
+ * newlines) to a single space, and uppercases the surname (first word).
+ * Triggered only from the custom menu.
+ * @returns {void}
+ */
+function fixFullNames() {
+  const ui = SpreadsheetApp.getUi();
+  const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(SHEET_DATABASE);
+  if (!sheet) {
+    ui.alert(`Sheet "${SHEET_DATABASE}" not found.`);
+    return;
+  }
+
+  const headers = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
+  const colIndex = headers.findIndex(h => COL_FULL_NAME.test(String(h).trim()));
+  if (colIndex === -1) {
+    ui.alert(`Column matching "${COL_FULL_NAME.source}" not found in row 1.`);
+    return;
+  }
+
+  const numRows = sheet.getLastRow() - 2;
+  if (numRows <= 0) {
+    ui.alert('No data rows to process.');
+    return;
+  }
+
+  const range = sheet.getRange(3, colIndex + 1, numRows, 1);
+  const values = range.getValues();
+  let fixedCount = 0;
+
+  const result = values.map(row => {
+    const original = String(row[0]);
+    const normalized = normalizeFullName(original);
+    if (normalized !== original) {
+      fixedCount++;
+      return [normalized];
+    }
+    return row;
+  });
+
+  range.setValues(result);
+  ui.alert(`Fixed ${fixedCount} full name(s).`);
 }
 
 /**

@@ -46,6 +46,7 @@ const COL_CLOSE_RELATIVES = /близькі родичі/i;
 const COL_MARITAL_STATUS = /сімейний стан/i;
 const COL_CONTRACT_UNTIL = /контракт укладено до/i;
 const COL_PHONE_NUMBER = /номер телефону/i;
+const COL_FULL_NAME = /ПІБ/i;
 
 // Export / document settings
 const EXPORT_TIME_LIMIT_MS = 5 * 60 * 1000; // 5 min — 1 min safety margin before GAS 6-min hard limit
@@ -95,6 +96,9 @@ const DROPDOWN_TYPES = [
 // Regex patterns shared between server-side phone normalization and export logic.
 const PHONE_REGEX_9DIGIT  = /^\d{9}$/;
 const PHONE_REGEX_COUNTRY = /^38\d{10}$/;
+
+// Full-name normalization — matches runs of whitespace (incl. newlines) for collapsing to a single space.
+const WHITESPACE_RUN_REGEX = /\s+/g;
 
 // DD.MM.YYYY date pattern (global flag — safe to reuse with String.prototype.match()).
 const DATE_REGEX = /\d{2}\.\d{2}\.\d{4}/g;
