@@ -368,13 +368,14 @@
   }
 
   /**
-   * Builds a trimmed-name Set from actualPersonnelNames for O(1) lookups in
-   * applyFilters(), or undefined when the list is absent/empty.
+   * Builds a trimmed, uppercased-name Set from actualPersonnelNames for
+   * case-insensitive O(1) lookups in applyFilters(), or undefined when the
+   * list is absent/empty.
    * @param {string[]|null|undefined} names
    * @returns {Set<string>|undefined}
    */
   function buildActualPersonnelNamesSet(names) {
-    return names?.length ? new Set(names.map(n => n.trim())) : undefined;
+    return names?.length ? new Set(names.map(n => n.trim().toUpperCase())) : undefined;
   }
 
   /**
@@ -618,7 +619,7 @@
       })) return false;
       if (!showAllUnits && row.spreadsheetId) return false;
       if (filterActualPersonnel) {
-        return schema.actualPersonnelNamesSet.has((row.values[0] ?? '').trim());
+        return schema.actualPersonnelNamesSet.has((row.values[0] ?? '').trim().toUpperCase());
       }
       return true;
     });
