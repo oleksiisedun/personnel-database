@@ -60,7 +60,7 @@
         <div id="move-dialog-title">Move selected persons to:</div>
         <select id="move-destination"></select>
         <div id="move-status" style="display:none"></div>
-        <div id="move-log" style="display:none"></div>
+        <div id="move-log" class="log-list" style="display:none"></div>
         <div id="move-error" style="display:none"></div>
         <div id="move-actions">
           <button id="btn-move-cancel" class="btn-secondary btn-dialog-action">Cancel</button>
@@ -85,6 +85,7 @@
         </div>
         <div id="export-msg"></div>
         <ul id="export-links" style="display:none"></ul>
+        <div id="export-skip-log" class="log-list" style="display:none"></div>
         <div id="export-error" style="display:none"></div>
         <button id="btn-export-close" class="btn-primary btn-dialog-action" style="display:none">Close</button>
       </div>
@@ -137,6 +138,9 @@
     </div>
   </div>
 
+  <script>
+    const INITIAL_MODE = <?!= JSON.stringify(mode); ?>;
+  </script>
   <?!= HtmlService.createHtmlOutputFromFile('WebEditor.js').getContent(); ?>
 </body>
 </html>

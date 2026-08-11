@@ -47,6 +47,8 @@ const COL_MARITAL_STATUS = /сімейний стан/i;
 const COL_CONTRACT_UNTIL = /контракт укладено до/i;
 const COL_PHONE_NUMBER = /номер телефону/i;
 const COL_FULL_NAME = /ПІБ/i;
+const COL_PHOTO = /фото/i;
+const COL_CARD_ID = /s-кадр id/i;
 
 // Export / document settings
 const EXPORT_TIME_LIMIT_MS = 5 * 60 * 1000; // 5 min — 1 min safety margin before GAS 6-min hard limit
@@ -60,6 +62,11 @@ const IMAGE_MAX_HEIGHT = 500;
 // _getExportImageBlob() in Export.js). Deliberately larger than IMAGE_MAX_HEIGHT's
 // 500px display clamp so the image isn't visibly soft when Docs/Word renders it.
 const EXPORT_IMAGE_THUMBNAIL_SIZE = 800;
+
+// Photo export ("Export Photos for S-КАДР" menu action) — destination subfolder
+// name prefix, combined with formatDateDDMMYYYY(new Date()) →
+// "Photos for S-КАДР 11.08.2026".
+const PHOTO_EXPORT_FOLDER_PREFIX = 'Photos for S-КАДР ';
 
 // Regex extracting a Drive file/folder ID out of a sharing URL. Shared by
 // parseDriveId() (existing) and looksLikeDriveUrl() (Code.js) — the latter

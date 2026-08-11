@@ -338,6 +338,7 @@
     document.getElementById('btn-export-wc').addEventListener('click', () => runExport('btn-export-wc', 'exportWC'));
     document.getElementById('btn-export-xlsx').addEventListener('click', runExportXlsx);
     document.getElementById('btn-export-close').addEventListener('click', () => {
+      if (INITIAL_MODE === 'photoExport') { google.script.host.close(); return; }
       document.getElementById('export-overlay').style.display = 'none';
     });
     document.getElementById('btn-export-cancel').addEventListener('click', () => {
@@ -374,6 +375,14 @@
     document.addEventListener('click', () => {
       document.getElementById('col-panel').style.display = 'none';
     });
+
+    if (INITIAL_MODE === 'photoExport') {
+      document.getElementById('loading').style.display = 'none';
+      document.getElementById('toolbar').style.display = 'none';
+      document.getElementById('table-wrapper').style.display = 'none';
+      startPhotoExportFlow();
+      return;
+    }
 
     openImageDB(); // start DB open in parallel with getSchemaAndData
     google.script.run
@@ -1758,6 +1767,137 @@
     };
 
     fire(entries);
+  }
+
+  let photoExportSkipEntries = []; // accumulated across discovery + copy phases, in 'photoExport' mode
+
+  /**
+   * Kicks off the "Export Photos for S-КАДР" flow immediately on dialog open,
+   * in 'photoExport' mode (see init()). Shows the shared export overlay in its
+   * progress state and starts the server-side discovery phase.
+   */
+  function startPhotoExportFlow() {
+    const ul = document.getElementById('export-links');
+    const skipLog = document.getElementById('export-skip-log');
+
+    document.getElementById('export-confirm-wrap').style.display = 'none';
+    document.getElementById('export-progress-wrap').style.display = 'block';
+    document.getElementById('export-msg').textContent = 'Finding personnel with photos…';
+    ul.style.display = 'none';
+    ul.innerHTML = '';
+    skipLog.style.display = 'none';
+    skipLog.innerHTML = '';
+    document.getElementById('export-error').style.display = 'none';
+    document.getElementById('btn-export-close').style.display = 'none';
+    document.getElementById('export-overlay').style.display = 'flex';
+    document.getElementById('export-progress-bar').classList.add('indeterminate');
+
+    google.script.run
+      .withSuccessHandler(onPhotoDiscoverySuccess)
+      .withFailureHandler(onPhotoExportError)
+      .startPhotoExport();
+  }
+
+  /**
+   * Success handler for startPhotoExport(). Stashes the discovery skip list
+   * and starts the batched copy/convert phase, or finishes immediately if no
+   * one is eligible.
+   * @param {{folderId: string, folderUrl: string, eligible: Array<Object>, skipped: Array<{name: string, reason: string}>}} response
+   */
+  function onPhotoDiscoverySuccess(response) {
+    photoExportSkipEntries = response.skipped.slice();
+    if (!response.eligible.length) {
+      finishPhotoExport(0, response.folderUrl);
+      return;
+    }
+    runPhotoCopyBatch(response.folderId, response.folderUrl, response.eligible, response.eligible.length, 0);
+  }
+
+  /**
+   * Drives one batch of copyPhotosBatch(), recursing on response.remaining
+   * until the whole eligible list has been processed (mirrors the fire()
+   * loop in startExportProgress()).
+   * @param {string} folderId
+   * @param {string} folderUrl
+   * @param {Array<Object>} entries - Remaining eligible entries to process.
+   * @param {number} total
+   * @param {number} doneCount
+   */
+  function runPhotoCopyBatch(folderId, folderUrl, entries, total, doneCount) {
+    const progressBar = document.getElementById('export-progress-bar');
+    progressBar.classList.remove('indeterminate');
+    progressBar.style.width = Math.round(doneCount / total * 100) + '%';
+    document.getElementById('export-msg').textContent = `Copying photo ${doneCount} of ${total}…`;
+
+    google.script.run
+      .withSuccessHandler(response => {
+        const ul = document.getElementById('export-links');
+        response.results.forEach(r => {
+          const li = document.createElement('li');
+          const a = document.createElement('a');
+          a.href = r.url;
+          a.target = '_blank';
+          a.textContent = r.name;
+          li.appendChild(a);
+          ul.appendChild(li);
+        });
+        if (response.results.length) ul.style.display = 'block';
+        photoExportSkipEntries.push(...response.skipped);
+        const newDone = doneCount + response.results.length + response.skipped.length;
+
+        if (response.remaining.length > 0) {
+          runPhotoCopyBatch(folderId, folderUrl, response.remaining, total, newDone);
+        } else {
+          finishPhotoExport(newDone, folderUrl);
+        }
+      })
+      .withFailureHandler(onPhotoExportError)
+      .copyPhotosBatch(folderId, entries);
+  }
+
+  /**
+   * Renders the final progress-overlay state once the copy phase completes:
+   * a summary message with a link to the destination folder, the skip log,
+   * and the Close button.
+   * @param {number} doneCount
+   * @param {string} folderUrl
+   */
+  function finishPhotoExport(doneCount, folderUrl) {
+    document.getElementById('export-progress-bar').classList.remove('indeterminate');
+    document.getElementById('export-progress-bar').style.width = '100%';
+    document.getElementById('export-msg').innerHTML =
+      `Done — ${doneCount} photo${doneCount !== 1 ? 's' : ''} processed. <a href="${folderUrl}" target="_blank">Open folder</a>`;
+    renderPhotoSkipLog();
+    document.getElementById('btn-export-close').style.display = 'inline-block';
+  }
+
+  /**
+   * Populates #export-skip-log from the accumulated photoExportSkipEntries
+   * (missing photo/ID and duplicate-ID entries from discovery, plus any
+   * per-item failures from the copy phase), or hides it if empty.
+   */
+  function renderPhotoSkipLog() {
+    const el = document.getElementById('export-skip-log');
+    el.innerHTML = '';
+    if (!photoExportSkipEntries.length) { el.style.display = 'none'; return; }
+    photoExportSkipEntries.forEach(({ name, reason }) => {
+      const div = document.createElement('div');
+      div.textContent = `${name}: ${reason}`;
+      el.appendChild(div);
+    });
+    el.style.display = 'block';
+  }
+
+  /**
+   * Failure handler shared by both the discovery and copy phases of the photo
+   * export flow.
+   * @param {Error|string} err
+   */
+  function onPhotoExportError(err) {
+    document.getElementById('export-progress-bar').classList.remove('indeterminate');
+    showError('export-error', 'Photo export failed', err);
+    renderPhotoSkipLog();
+    document.getElementById('btn-export-close').style.display = 'inline-block';
   }
 
   /**

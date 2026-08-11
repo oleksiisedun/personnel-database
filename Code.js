@@ -48,16 +48,21 @@ function getColumnMaxWidths() { return COLUMN_MAX_WIDTHS; }
 
 /**
  * Simple trigger that runs when the spreadsheet is opened.
- * Adds the "More... ⭐️" custom menu to the Google Sheets toolbar.
+ * Adds the "More... ⭐️" custom menu to the Google Sheets toolbar. The photo
+ * export item is only shown when Master Mode is on, since it's meaningless
+ * for a spreadsheet with no other sources to aggregate across.
  */
 function onOpen() {
-  SpreadsheetApp.getUi()
+  const menu = SpreadsheetApp.getUi()
     .createMenu('More... ⭐️')
     .addItem('Open Web Editor', 'openWebEditor')
     .addSeparator()
     .addItem('Fix phone numbers', 'fixPhoneNumbers')
-    .addItem('Fix full names', 'fixFullNames')
-    .addToUi();
+    .addItem('Fix full names', 'fixFullNames');
+  if (getMasterMode()) {
+    menu.addItem('Export Photos for S-КАДР', 'openPhotoExport');
+  }
+  menu.addToUi();
 }
 
 /**
@@ -66,8 +71,21 @@ function onOpen() {
  * WebEditor.html are evaluated before the HTML is served to the client.
  */
 function openWebEditor() {
-  const html = HtmlService.createTemplateFromFile('WebEditor').evaluate();
-  SpreadsheetApp.getUi().showModalDialog(html, 'Web Editor');
+  const template = HtmlService.createTemplateFromFile('WebEditor');
+  template.mode = null;
+  SpreadsheetApp.getUi().showModalDialog(template.evaluate(), 'Web Editor');
+}
+
+/**
+ * Opens the web editor modal directly in "photo export" mode, which skips the
+ * normal list-view bootstrap and immediately drives the shared export
+ * progress overlay to run startPhotoExport()/copyPhotosBatch(). Only exposed
+ * on the menu when Master Mode is on (see onOpen()).
+ */
+function openPhotoExport() {
+  const template = HtmlService.createTemplateFromFile('WebEditor');
+  template.mode = 'photoExport';
+  SpreadsheetApp.getUi().showModalDialog(template.evaluate(), 'Export Photos for S-КАДР');
 }
 
 /**
