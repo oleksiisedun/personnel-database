@@ -28,15 +28,33 @@
   const rowKey = row => `${row.spreadsheetId ?? ''}:${row.rowIndex}`;
 
   /**
-   * Returns all checked rows as rowEntries, regardless of the current filter view,
-   * ready to send to a server function that takes {rowIndex, spreadsheetId}[]
-   * (export/move/delete).
+   * True when row's first column (full name) is in the Actual Personnel list.
+   * @param {{values: string[]}} row
+   * @returns {boolean}
+   */
+  const isActualPersonnelRow = row => schema.actualPersonnelNamesSet.has((row.values[0] ?? '').trim().toUpperCase());
+
+  /**
+   * Returns all checked rows, regardless of the current filter view, ready
+   * for export/move/delete. When the Actual Personnel filter is on, rows not
+   * on that list are excluded even if they were checked under a different
+   * filter state — otherwise a stale selection could silently export/move/
+   * delete people the filtered view no longer shows.
+   * @returns {Array<{rowIndex: number, spreadsheetId?: string, values: string[]}>}
+   */
+  function getSelectedRows() {
+    return schema.rows
+      .filter(r => selectedKeys.has(rowKey(r)))
+      .filter(r => !filterActualPersonnel || isActualPersonnelRow(r));
+  }
+
+  /**
+   * Returns getSelectedRows() as rowEntries, ready to send to a server
+   * function that takes {rowIndex, spreadsheetId}[] (export/move/delete).
    * @returns {Array<{rowIndex: number, spreadsheetId: string|null}>}
    */
   function getSelectedRowEntries() {
-    return schema.rows
-      .filter(r => selectedKeys.has(rowKey(r)))
-      .map(r => ({ rowIndex: r.rowIndex, spreadsheetId: r.spreadsheetId ?? null }));
+    return getSelectedRows().map(r => ({ rowIndex: r.rowIndex, spreadsheetId: r.spreadsheetId ?? null }));
   }
 
   /**
@@ -643,7 +661,7 @@
       })) return false;
       if (!showAllUnits && row.spreadsheetId) return false;
       if (filterActualPersonnel) {
-        return schema.actualPersonnelNamesSet.has((row.values[0] ?? '').trim().toUpperCase());
+        return isActualPersonnelRow(row);
       }
       return true;
     });
@@ -1993,7 +2011,7 @@
    */
   function openMoveOverlay() {
     const sources = schema.masterSources ?? [];
-    const selectedRows = schema.rows.filter(r => selectedKeys.has(rowKey(r)));
+    const selectedRows = getSelectedRows();
 
     // Determine if all selected rows share one source (may be null for local).
     const sourceIds = new Set(selectedRows.map(r => r.spreadsheetId ?? null));
