@@ -19,7 +19,7 @@ flowchart TD
     subgraph server["Server — Google Apps Script"]
         config["Config.js<br/>Constants & IDs"]
         code["Code.js<br/>Menu, data access, image proxy, openSpreadsheetSafely"]
-        export["Export.js<br/>F-1 & Wanted Card docs"]
+        export["Export.js<br/>F-1, Wanted Card & XLSX exports"]
     end
 
     subgraph workspace["Google Workspace"]
@@ -71,7 +71,7 @@ flowchart TD
 |------|---------|
 | `Config.js` | All constants — sheet names, column names, Drive IDs, export settings |
 | `Code.js` | Server-side script: menu, data access, image proxy |
-| `Export.js` | Server-side export logic for F-1 and Wanted Card documents |
+| `Export.js` | Server-side export logic for F-1 and Wanted Card documents, and the single-file XLSX export |
 | `WebEditor.html` | Client app shell; includes CSS and JS via `<?!= HtmlService.createHtmlOutputFromFile(...) ?>` |
 | `WebEditor.css.html` | Styles for the web editor |
 | `WebEditor.js.html` | Client-side logic for the web editor |
@@ -238,6 +238,7 @@ The Sheets **More... ⭐️** menu (added by `onOpen()`) has three items:
 - **Image thumbnails** — loaded asynchronously; persisted in IndexedDB so subsequent opens display instantly
 - **Lightbox** — click any thumbnail to view the full image
 - **Row selection** — checkbox column at the left of the table; master checkbox in the filter row selects/deselects all visible rows; indeterminate state when a subset is selected; drives which rows are exported and moved
+- **Export XLSX** — exports the selected rows, restricted to currently visible columns, as a single `.xlsx` file (see [XLSX export](#xlsx-export))
 - **Move** (Master Mode only) — moves selected rows to another spreadsheet and relocates the person's Drive folder; button is hidden when Master Mode is off
 - **Edit view** — click a name in the first column to open a per-record editor
 
@@ -296,6 +297,18 @@ When more than `EXPORT_CONFIRM_THRESHOLD` (default 10) rows are selected, clicki
 
 Exports run in automatic batches capped at `EXPORT_TIME_LIMIT_MS` (5 minutes) to stay within the Google Apps Script execution limit. The client automatically fires the next batch until all rows are done — no user interaction required. The progress bar in the export dialog shows real-time progress across batches.
 
+## XLSX export
+
+The "Export XLSX" toolbar button exports the **selected** rows (checkbox column), restricted to the columns currently **visible** in the list view (toggle via "Columns ▾"), as a single `.xlsx` file:
+
+- Regular columns → cell value as-is
+- `*-table` columns → the raw pipe/newline-encoded storage string, unchanged
+- `image` columns, and any other column whose value looks like a Drive sharing URL → a clickable `HYPERLINK()` formula pointing at the file/folder's Drive view URL (no image embedding, no blob fetch — link only)
+
+The file is named `Export DD.MM.YYYY.xlsx` (today's date) and saved to the same Drive folder as F-1/WC exports (`Handbook!M13`). Repeated exports on the same day are saved as separate files — Drive allows duplicate filenames, so no overwrite/suffix logic is applied.
+
+Since Apps Script has no way to author `.xlsx` bytes directly and this project has no build step (so no bundling a library like ExcelJS), the export is built as a temporary Google Sheet and converted by fetching the Sheets export URL (`.../export?format=xlsx`) via `UrlFetchApp`, authorized with the script's own OAuth token (`Blob.getAs()` doesn't support this conversion); the temp sheet is always deleted afterward, even on error. Unlike F-1/WC export, this is a single `google.script.run` call with no batching — it produces one file for the whole selection, not one file per row, so there's no partial result to resume. See `exportXLSX()` in `Export.js` and `runExportXlsx()` in `WebEditor.js.html`.
+
 ## Configuration (`Config.js`)
 
 | Constant | Default | Purpose |
@@ -331,6 +344,9 @@ Exports run in automatic batches capped at `EXPORT_TIME_LIMIT_MS` (5 minutes) to
 | `IMAGE_FETCH_BATCH_SIZE` | `10` | Number of Drive files resolved per `google.script.run` call |
 | `IMAGE_FETCH_CONCURRENCY` | `3` | Number of image-fetch batches running in parallel; raising it speeds up large lists but risks the Apps Script 30-concurrent-execution limit |
 | `IMAGE_CACHE_TTL_DAYS` | `7` | How many days a cached image entry survives in IndexedDB before being re-fetched |
+| `DRIVE_URL_REGEX` | `/(?:\/folders\/\|\/d\/\|[?&]id=)([-\w]+)/` | Extracts a Drive file/folder ID from a sharing URL; shared by `parseDriveId()` and `looksLikeDriveUrl()` |
+| `XLSX_EXPORT_FILENAME_PREFIX` | `'Export '` | Filename prefix for XLSX exports, e.g. `Export 11.08.2026.xlsx` |
+| `XLSX_EXPORT_SECONDS_PER_ROW` | `0.2` | Seconds per row used to estimate XLSX export duration in the confirmation dialog |
 
 ## Local development
 

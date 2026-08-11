@@ -16,7 +16,7 @@
   let showAllUnits = true;           // true when master-mode remote rows are included alongside local ones
   let dbPromise = null;              // Promise<IDBDatabase> — opened once in init(), reused thereafter
   let pendingMoveEntries = null;     // rowEntries[] sent to movePersonnel(), consumed by onMoveSuccess()
-  let pendingExportState = null;     // { btnId, serverFnName, entries } staged when confirm dialog is shown
+  let pendingExportState = null;     // { mode: 'batch'|'xlsx', btnId, entries, total, serverFnName? } staged when confirm dialog is shown
   const selectedKeys = new Set(); // compound "spreadsheetId:rowIndex" keys of rows checked for export
 
   /**
@@ -37,6 +37,16 @@
     return schema.rows
       .filter(r => selectedKeys.has(rowKey(r)))
       .map(r => ({ rowIndex: r.rowIndex, spreadsheetId: r.spreadsheetId ?? null }));
+  }
+
+  /**
+   * Returns the indices of schema.columns that are NOT currently hidden via the
+   * column-visibility panel, in column order. Sent to exportXLSX() so the
+   * server knows which columns to include.
+   * @returns {number[]}
+   */
+  function getVisibleColumnIndices() {
+    return schema.columns.map((_, i) => i).filter(i => !hiddenColumns.has(i));
   }
 
   const FIELD_SEP = ' | ';
@@ -326,6 +336,7 @@
     document.getElementById('btn-reset').addEventListener('click', resetListState);
     document.getElementById('btn-export-f1').addEventListener('click', () => runExport('btn-export-f1', 'exportF1'));
     document.getElementById('btn-export-wc').addEventListener('click', () => runExport('btn-export-wc', 'exportWC'));
+    document.getElementById('btn-export-xlsx').addEventListener('click', runExportXlsx);
     document.getElementById('btn-export-close').addEventListener('click', () => {
       document.getElementById('export-overlay').style.display = 'none';
     });
@@ -338,10 +349,14 @@
     });
     document.getElementById('btn-export-proceed').addEventListener('click', () => {
       if (!pendingExportState) return;
-      const { btnId, serverFnName, entries, total } = pendingExportState;
+      const state = pendingExportState;
       pendingExportState = null;
       document.getElementById('export-confirm-wrap').style.display = 'none';
-      startExportProgress(btnId, serverFnName, entries, total);
+      if (state.mode === 'xlsx') {
+        startXlsxExportProgress(state.entries, state.total);
+      } else {
+        startExportProgress(state.btnId, state.serverFnName, state.entries, state.total);
+      }
     });
     document.getElementById('btn-schema-warning').addEventListener('click', openSchemaWarningOverlay);
     document.getElementById('btn-schema-warning-close').addEventListener('click', closeSchemaWarningOverlay);
@@ -624,17 +639,30 @@
       return true;
     });
 
-    if (schema.masterSourceIds?.length) {
-      const srcOrder = new Map([[undefined, 0], [null, 0]]);
-      schema.masterSourceIds.forEach((id, i) => srcOrder.set(id, i + 1));
-      filteredRows.sort((a, b) => {
-        const ao = srcOrder.get(a.spreadsheetId) ?? srcOrder.size;
-        const bo = srcOrder.get(b.spreadsheetId) ?? srcOrder.size;
-        return ao !== bo ? ao - bo : a.rowIndex - b.rowIndex;
-      });
-    }
+    filteredRows = sortRowsBySourceOrder(filteredRows);
 
     renderList();
+  }
+
+  /**
+   * Sorts rows by Master Mode source declaration order (schema.masterSourceIds,
+   * local rows first), then by rowIndex within each source. Used both for list
+   * display (applyFilters()) and to order rows sent to exportXLSX(), so a
+   * multi-source XLSX export lands in the same order the user sees on screen.
+   * Returns the input unchanged (not sorted, not copied) when there are no
+   * master sources. Does not mutate its input.
+   * @param {Array<{rowIndex: number, spreadsheetId?: string}>} rows
+   * @returns {Array<{rowIndex: number, spreadsheetId?: string}>}
+   */
+  function sortRowsBySourceOrder(rows) {
+    if (!schema.masterSourceIds?.length) return rows;
+    const srcOrder = new Map([[undefined, 0], [null, 0]]);
+    schema.masterSourceIds.forEach((id, i) => srcOrder.set(id, i + 1));
+    return [...rows].sort((a, b) => {
+      const ao = srcOrder.get(a.spreadsheetId) ?? srcOrder.size;
+      const bo = srcOrder.get(b.spreadsheetId) ?? srcOrder.size;
+      return ao !== bo ? ao - bo : a.rowIndex - b.rowIndex;
+    });
   }
 
   /**
@@ -731,6 +759,7 @@
   function updateSelectionUI() {
     document.getElementById('btn-export-f1').disabled = selectedKeys.size === 0;
     document.getElementById('btn-export-wc').disabled = selectedKeys.size === 0;
+    document.getElementById('btn-export-xlsx').disabled = selectedKeys.size === 0;
     document.getElementById('btn-move').disabled = selectedKeys.size === 0;
     document.getElementById('btn-delete-bulk').disabled = selectedKeys.size === 0;
 
@@ -1640,7 +1669,7 @@
     btn.disabled = true;
 
     if (total > schema.exportConfirmThreshold) {
-      pendingExportState = { btnId, serverFnName, entries, total };
+      pendingExportState = { mode: 'batch', btnId, serverFnName, entries, total };
       const estSecs = total * schema.exportSecondsPerDoc;
       const estStr = estSecs < 90
         ? `about ${Math.round(estSecs / 10) * 10} seconds`
@@ -1729,6 +1758,91 @@
     };
 
     fire(entries);
+  }
+
+  /**
+   * Starts (or stages a confirmation for) an XLSX export of all checked rows,
+   * restricted to currently visible columns. Reuses the #export-overlay
+   * confirm/progress/result UI shared with runExport(), but always issues
+   * exactly one google.script.run call — exportXLSX() produces one file for
+   * all rows, unlike exportF1/exportWC's one-file-per-row + continuation model.
+   */
+  function runExportXlsx() {
+    const entries = sortRowsBySourceOrder(getSelectedRowEntries());
+    if (!entries.length) return; // safety guard — button should already be disabled
+
+    const total = entries.length;
+    const btn = document.getElementById('btn-export-xlsx');
+    btn.disabled = true;
+
+    if (total > schema.exportConfirmThreshold) {
+      pendingExportState = { mode: 'xlsx', btnId: 'btn-export-xlsx', entries, total };
+      const estSecs = total * schema.xlsxExportSecondsPerRow;
+      const estStr = estSecs < 90
+        ? `about ${Math.round(estSecs / 10) * 10} seconds`
+        : `about ${Math.round(estSecs / 60)} minutes`;
+      document.getElementById('export-confirm-msg').textContent =
+        `You are about to export ${total} rows into a single XLSX file. Export cannot be cancelled once started.`;
+      document.getElementById('export-confirm-estimate').textContent = `Estimated time: ${estStr}.`;
+      document.getElementById('export-confirm-wrap').style.display = 'block';
+      document.getElementById('export-progress-wrap').style.display = 'none';
+      document.getElementById('export-msg').textContent = '';
+      document.getElementById('export-links').style.display = 'none';
+      document.getElementById('export-error').style.display = 'none';
+      document.getElementById('btn-export-close').style.display = 'none';
+      document.getElementById('export-overlay').style.display = 'flex';
+      return;
+    }
+
+    startXlsxExportProgress(entries, total);
+  }
+
+  /**
+   * Resets the export overlay to its progress state and issues the single
+   * exportXLSX() call for all entries, then renders the one resulting file link.
+   * @param {Array<{rowIndex: number, spreadsheetId: string|null}>} entries
+   * @param {number} total - Row count, used only for the status message.
+   */
+  function startXlsxExportProgress(entries, total) {
+    const btn = document.getElementById('btn-export-xlsx');
+    const ul = document.getElementById('export-links');
+
+    document.getElementById('export-confirm-wrap').style.display = 'none';
+    document.getElementById('export-msg').textContent = `Building XLSX export of ${total} row${total !== 1 ? 's' : ''}…`;
+    ul.style.display = 'none';
+    ul.innerHTML = '';
+    document.getElementById('export-error').style.display = 'none';
+    document.getElementById('btn-export-close').style.display = 'none';
+    document.getElementById('export-progress-wrap').style.display = 'block';
+    document.getElementById('export-overlay').style.display = 'flex';
+
+    const progressBar = document.getElementById('export-progress-bar');
+    progressBar.classList.add('indeterminate');
+
+    google.script.run
+      .withSuccessHandler(result => {
+        progressBar.classList.remove('indeterminate');
+        progressBar.style.width = '100%';
+        const li = document.createElement('li');
+        const a = document.createElement('a');
+        a.href = result.url;
+        a.target = '_blank';
+        a.textContent = result.name;
+        li.appendChild(a);
+        ul.appendChild(li);
+        ul.style.display = 'block';
+        document.getElementById('export-msg').textContent = 'Exported:';
+        btn.disabled = false;
+        document.getElementById('btn-export-close').style.display = 'inline-block';
+      })
+      .withFailureHandler(err => {
+        progressBar.classList.remove('indeterminate');
+        btn.disabled = false;
+        document.getElementById('export-msg').textContent = '';
+        showError('export-error', 'Export failed', err);
+        document.getElementById('btn-export-close').style.display = 'inline-block';
+      })
+      .exportXLSX(entries, getVisibleColumnIndices());
   }
 
   /**

@@ -61,6 +61,22 @@ const IMAGE_MAX_HEIGHT = 500;
 // 500px display clamp so the image isn't visibly soft when Docs/Word renders it.
 const EXPORT_IMAGE_THUMBNAIL_SIZE = 800;
 
+// Regex extracting a Drive file/folder ID out of a sharing URL. Shared by
+// parseDriveId() (existing) and looksLikeDriveUrl() (Code.js) — the latter
+// only needs to test whether a raw cell value looks like a Drive URL at all,
+// without caring what the ID is.
+const DRIVE_URL_REGEX = /(?:\/folders\/|\/d\/|[?&]id=)([-\w]+)/;
+
+// XLSX export settings
+const XLSX_EXPORT_FILENAME_PREFIX = 'Export '; // → "Export 11.08.2026.xlsx"
+// Rough per-row time estimate for the confirm dialog. There's no per-row blob
+// fetch (unlike EXPORT_SECONDS_PER_DOC), so cost is dominated by one cached
+// sheet read plus, for image-type columns only, a lightweight per-row Drive
+// metadata lookup (DriveApp.getFileById(), no bytes downloaded). Adjust this
+// based on observed export times — it scales with how many visible columns
+// are image-type, which this constant can't see.
+const XLSX_EXPORT_SECONDS_PER_ROW = 0.2;
+
 // Web editor UI settings
 const COLUMN_MIN_WIDTHS = { text: 150, image: 150, table: 900 };
 const COLUMN_MAX_WIDTHS = { image: 250 };

@@ -48,6 +48,18 @@ function stringifyRowValues(row) {
 }
 
 /**
+ * Formats a Date as DD.MM.YYYY (zero-padded).
+ *
+ * @param {Date} date
+ * @returns {string}
+ */
+function formatDateDDMMYYYY(date) {
+  const dd = String(date.getDate()).padStart(2, '0');
+  const mm = String(date.getMonth() + 1).padStart(2, '0');
+  return `${dd}.${mm}.${date.getFullYear()}`;
+}
+
+/**
  * Trims, collapses internal whitespace runs to a single space, and
  * uppercases the first word (surname) of a full name.
  * @param {string} value

@@ -212,8 +212,21 @@ function getMasterSourceRows(spreadsheetId) {
  * @returns {string}
  */
 function parseDriveId(value) {
-  const m = value.match(/(?:\/folders\/|\/d\/|[?&]id=)([-\w]+)/);
+  const m = value.match(DRIVE_URL_REGEX);
   return m ? m[1] : value;
+}
+
+/**
+ * Tests whether a raw cell value looks like a Drive sharing URL (as opposed to
+ * a bare ID or ordinary text). Used by XLSX export to decide whether a
+ * non-image column's cell should be linkified — image columns always attempt
+ * resolution regardless (see _buildXlsxLinkCell() in Export.js).
+ *
+ * @param {string} value
+ * @returns {boolean}
+ */
+function looksLikeDriveUrl(value) {
+  return DRIVE_URL_REGEX.test(value);
 }
 
 /**
@@ -391,7 +404,8 @@ function movePersonnel(rowEntries, destinationSpreadsheetId) {
  *   masterModeFetchConcurrency: number,
  *   imageCacheTtlDays: number,
  *   exportConfirmThreshold: number,
- *   exportSecondsPerDoc: number
+ *   exportSecondsPerDoc: number,
+ *   xlsxExportSecondsPerRow: number
  * }}
  */
 function getSchemaAndData() {
@@ -450,7 +464,30 @@ function getSchemaAndData() {
            masterModeFetchConcurrency: MASTER_MODE_FETCH_CONCURRENCY,
            imageCacheTtlDays: IMAGE_CACHE_TTL_DAYS,
            exportConfirmThreshold: EXPORT_CONFIRM_THRESHOLD,
-           exportSecondsPerDoc: EXPORT_SECONDS_PER_DOC };
+           exportSecondsPerDoc: EXPORT_SECONDS_PER_DOC,
+           xlsxExportSecondsPerRow: XLSX_EXPORT_SECONDS_PER_ROW };
+}
+
+/**
+ * Classifies an already-opened Drive file by mimetype, returning its export
+ * type and Drive "view" URL. Shared by getImagesDataUrls() (which additionally
+ * fetches + base64-encodes the blob for the 'image' case) and
+ * resolveDriveFileForExport() (XLSX export's link-only resolver, which never
+ * fetches the blob).
+ *
+ * @param {GoogleAppsScript.Drive.File} file - Already-opened Drive file.
+ * @param {string} fileId
+ * @returns {{type: 'image'|'pdf'|'folder', viewUrl: string, mimeType: string}}
+ */
+function _classifyDriveFile(file, fileId) {
+  const mimeType = file.getMimeType();
+  if (mimeType === 'application/pdf') {
+    return { type: 'pdf', viewUrl: 'https://drive.google.com/file/d/' + fileId + '/view', mimeType };
+  }
+  if (mimeType === 'application/vnd.google-apps.folder') {
+    return { type: 'folder', viewUrl: 'https://drive.google.com/drive/folders/' + fileId, mimeType };
+  }
+  return { type: 'image', viewUrl: 'https://drive.google.com/file/d/' + fileId + '/view', mimeType };
 }
 
 /**
@@ -469,20 +506,35 @@ function getImagesDataUrls(fileIds) {
     if (!fileId) return;
     try {
       const file = DriveApp.getFileById(fileId);
-      const mimeType = file.getMimeType();
-      if (mimeType === 'application/pdf') {
-        result[fileId] = { type: 'pdf', viewUrl: 'https://drive.google.com/file/d/' + fileId + '/view' };
-      } else if (mimeType === 'application/vnd.google-apps.folder') {
-        result[fileId] = { type: 'folder', viewUrl: 'https://drive.google.com/drive/folders/' + fileId };
-      } else {
+      const info = _classifyDriveFile(file, fileId);
+      if (info.type === 'image') {
         const blob = file.getBlob();
-        result[fileId] = { type: 'image', dataUrl: 'data:' + (mimeType || 'image/jpeg') + ';base64,' + Utilities.base64Encode(blob.getBytes()) };
+        result[fileId] = { type: 'image', dataUrl: 'data:' + (info.mimeType || 'image/jpeg') + ';base64,' + Utilities.base64Encode(blob.getBytes()) };
+      } else {
+        result[fileId] = { type: info.type, viewUrl: info.viewUrl };
       }
     } catch (e) {
       result[fileId] = { type: 'no-access' };
     }
   });
   return result;
+}
+
+/**
+ * Resolves a Drive file/folder's export link type without fetching its blob —
+ * the lighter-weight counterpart to getImagesDataUrls(), used only by XLSX
+ * export (Export.js), which needs a clickable Drive view URL but never embeds
+ * image bytes.
+ *
+ * @param {string} fileId
+ * @returns {{type: 'image'|'pdf'|'folder', viewUrl: string}|{type: 'no-access'}}
+ */
+function resolveDriveFileForExport(fileId) {
+  try {
+    return _classifyDriveFile(DriveApp.getFileById(fileId), fileId);
+  } catch (e) {
+    return { type: 'no-access' };
+  }
 }
 
 /**
