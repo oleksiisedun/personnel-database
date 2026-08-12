@@ -19,7 +19,9 @@ flowchart TD
     subgraph server["Server — Google Apps Script"]
         config["Config.js<br/>Constants & IDs"]
         code["Code.js<br/>Menu, data access, image proxy, openSpreadsheetSafely"]
-        export["Export.js<br/>F-1, Wanted Card & XLSX exports"]
+        utils["Utils.js<br/>Shared helpers"]
+        export["Export.js<br/>F-1, WC, XLSX & photo exports"]
+        import_["Import.js<br/>Award import from S-КАДР"]
     end
 
     subgraph workspace["Google Workspace"]
@@ -48,7 +50,12 @@ flowchart TD
     code --> drive
     code -. "Master Mode read" .-> remote
     code -- "batch export" --> export
+    code --> utils
+    export --> utils
+    import_ --> utils
     export --> drive
+    import_ -. "Master Mode read/write" .-> remote
+    import_ --> database
 
     clasp -.->|push/pull| code
     claspPush --> clasp
@@ -61,9 +68,9 @@ flowchart TD
     classDef devtools fill:#F1EFE8,stroke:#5F5E5A,color:#2C2C2A
 
     class html,js,css client
-    class config,code code
+    class config,code,utils code
     class database,handbook,trash,drive,remote store
-    class export export
+    class export,import_ export
     class clasp,claspPush,manifest devtools
 ```
 
@@ -71,7 +78,9 @@ flowchart TD
 |------|---------|
 | `Config.js` | All constants — sheet names, column names, Drive IDs, export settings |
 | `Code.js` | Server-side script: menu, data access, image proxy |
-| `Export.js` | Server-side export logic for F-1 and Wanted Card documents, and the single-file XLSX export |
+| `Utils.js` | Shared server-side helpers (spreadsheet resolution, schema comparison, column lookups) used by `Code.js`, `Export.js`, and `Import.js` |
+| `Export.js` | Server-side export logic for F-1 and Wanted Card documents, the single-file XLSX export, and the S-КАДР photo export |
+| `Import.js` | Server-side award import from an external S-КАДР sheet |
 | `WebEditor.html` | Client app shell; includes CSS and JS via `<?!= HtmlService.createHtmlOutputFromFile(...) ?>` |
 | `WebEditor.css.html` | Styles for the web editor |
 | `WebEditor.js.html` | Client-side logic for the web editor |
@@ -215,13 +224,37 @@ After a successful move the rows reappear in the list immediately under their ne
 
 ## Custom menu
 
-The Sheets **More... ⭐️** menu (added by `onOpen()`) has three items:
+The Sheets **More... ⭐️** menu (added by `onOpen()`) always has three items, plus two more shown only when Master Mode (`Handbook!M2`) is on:
 
 | Item | Action |
 |------|--------|
 | Open Web Editor | Opens the web editor dialog described below |
 | Fix phone numbers | Scans the `Database` sheet's `Номер телефону` column and rewrites two malformed shapes in place: bare 9-digit numbers missing the leading `0`, and 12-digit numbers carrying a `38` country-code prefix. Numbers already in canonical 10-digit form are left untouched. Runs synchronously over the whole sheet and reports the fixed count via a dialog. No undo beyond manual edit or `Trash` recovery. |
 | Fix full names | Scans the `Database` sheet's `ПІБ` column and rewrites each value: trims surrounding whitespace, collapses internal whitespace runs (including newlines) to a single space, and uppercases the surname (first word). Already-normalized values are left untouched. Runs synchronously over the whole sheet and reports the fixed count via a dialog. No undo beyond manual edit or `Trash` recovery. |
+| Export photos for S-КАДР *(Master Mode only)* | Opens the same web editor dialog in a dedicated progress view and copies photos for every Actual Personnel row across the local sheet and all Master Mode sources — see [Photo export for S-КАДР](#photo-export-for-s-кадр) |
+| Import awards from S-КАДР *(Master Mode only)* | Prompts for an external Google Sheets URL and merges its award rows into the local `Нагороди` column across the local sheet and all Master Mode sources — see [Award import from S-КАДР](#award-import-from-s-кадр) |
+
+## Photo export for S-КАДР
+
+Triggered by the **Export photos for S-КАДР** menu item (Master Mode only). It opens the same `WebEditor` dialog as **Open Web Editor**, but in a dedicated progress view instead of the normal list — there is no manual row selection here.
+
+Instead of operating on a checkbox selection, it sweeps **every** row on the Actual Personnel list (`Handbook!M6`/`M7`) across the local `Database` sheet and every Master Mode source, in two phases:
+
+1. **Discovery** — walks the local sheet, then each `Handbook!N2:N` source in order, reading only the `Фото` and `S-КАДР ID` columns (no image bytes fetched yet). A person missing either value is skipped with a reason. If the same `S-КАДР ID` appears more than once (e.g. duplicated across sources), the first occurrence found wins and later ones are recorded as duplicate skips.
+2. **Copy/convert** — for each eligible person, fetches the full-resolution photo from Drive, force-converts it to JPEG, and saves it as `{S-КАДР ID}.jpg` in a new destination folder named `Photos for S-КАДР DD.MM.YYYY` inside `Handbook!M13` (`EXPORT_FOLDER_CELL`). Runs in automatic time-boxed batches the same way F-1/WC export does, so large personnel lists don't hit the Apps Script execution limit.
+
+When finished, the dialog shows a link to the destination folder plus the accumulated list of skipped/duplicate entries with their reasons. Closing the dialog in this mode closes the whole window, since there's no list view to return to.
+
+## Award import from S-КАДР
+
+Triggered by the **Import awards from S-КАДР** menu item (Master Mode only). Unlike every other Master Mode feature, this one uses plain Sheets `ui.prompt()`/`ui.alert()` dialogs instead of the web editor — the whole operation is a synchronous sheet-to-sheet scan with no per-row Drive I/O, so it comfortably finishes within one execution.
+
+1. Prompts for the full URL of the external S-КАДР Google Sheet. If the URL contains a `gid` parameter it opens that exact tab; otherwise it uses the first tab.
+2. Reads award rows by **fixed column position** (not header text) — ID, award name, order number, and order date columns, configured in `Config.js` (`AWARDS_IMPORT_ID_COL`/`_NAME_COL`/`_ORDER_NUMBER_COL`/`_ORDER_DATE_COL`, data starting at row `AWARDS_IMPORT_DATA_START_ROW`). Rows with no ID or no award name are skipped. The award name's first letter is capitalized, and the order number is cleaned of surrounding text (e.g. `"Указ Президента України № 559/2022"` → `"559"`).
+3. Matches each imported ID against the local `Database` sheet and every Master Mode source's `S-КАДР ID` column. An ID found in more than one source resolves to the first match (local first, then sources in `Handbook!N2:N` order).
+4. Merges the new award entries into the matched person's `Нагороди` cell, skipping any entry that exactly duplicates one already there, and writes the merged cell back.
+
+The final alert shows counts (people updated, entries added, duplicates skipped, IDs not found) plus up to `AWARDS_IMPORT_NOT_FOUND_DISPLAY_LIMIT` not-found IDs by name. The full per-ID log is written to the Apps Script execution log (**Executions** in the Apps Script editor), since the alert dialog isn't scrollable.
 
 ## Web editor features
 
@@ -240,7 +273,7 @@ The Sheets **More... ⭐️** menu (added by `onOpen()`) has three items:
 - **Row selection** — checkbox column at the left of the table; master checkbox in the filter row selects/deselects all visible rows; indeterminate state when a subset is selected; drives which rows are exported and moved
 - **Export XLSX** — exports the selected rows, restricted to currently visible columns, as a single `.xlsx` file (see [XLSX export](#xlsx-export))
 - **Move** (Master Mode only) — moves selected rows to another spreadsheet and relocates the person's Drive folder; button is hidden when Master Mode is off
-- **Edit view** — click a name in the first column to open a per-record editor
+- **Edit view** — click a name in the first column to open a per-record editor. All regular fields share one "main" tab; each `*-table` column (e.g. service history, close relatives, awards) gets its own tab in the header next to the person's name, so wide sub-tables don't crowd the main form. Switching tabs never discards edits — every tab stays mounted in the background for the life of the edit session
 
 ## Document export
 
@@ -249,7 +282,7 @@ Two export types are available from the toolbar. Both operate on the **selected*
 | Button | Template cell | Output prefix |
 |--------|---------------|---------------|
 | Export F-1 | `Handbook!M9` (`EXPORT_F1_TEMPLATE_CELL`) | `Ф-1 ` |
-| Export WC | `Handbook!M11` (`EXPORT_WC_TEMPLATE_CELL`) | `Розшукова картка ` |
+| Export WC | `Handbook!M11` (`EXPORT_WC_TEMPLATE_CELL`) | `РК ` |
 
 Exported files are saved to the Google Drive folder configured in `Handbook!M13` (`EXPORT_FOLDER_CELL`). Each cell accepts either a bare Drive ID or a full shareable link.
 
@@ -290,6 +323,7 @@ These keys can be placed in column C of the correspondence table:
 | `childrenNamesBirthDates` | Numbered list of children's names and birth dates |
 | `childrenPhoneNumbers` | Comma-separated phone numbers of all children |
 | `relativesWithPhoneNumbers` | Semicolon-separated list of all relatives with a phone number, formatted as `relation, name, address, phone` |
+| `awardsList` | Semicolon-joined sentence built from the `Нагороди` sub-table, each entry formatted `{name} №{order number} від {order date}`, with the number/date parts individually omitted when empty |
 
 ### Large exports
 
@@ -334,15 +368,24 @@ Since Apps Script has no way to author `.xlsx` bytes directly and this project h
 | `EXPORT_CONFIRM_THRESHOLD` | `10` | Row count above which a confirmation dialog is shown before export starts |
 | `EXPORT_SECONDS_PER_DOC` | `6` | Seconds per document used to estimate export duration in the confirmation dialog |
 | `F1_DOC_PREFIX` | `'Ф-1 '` | Filename prefix for F-1 exports |
-| `WC_DOC_PREFIX` | `'Розшукова картка '` | Filename prefix for Wanted Card exports |
+| `WC_DOC_PREFIX` | `'РК '` | Filename prefix for Wanted Card exports |
 | `DEFAULT_UNIT_NUMBER` | `'3102'` | Fallback military unit number for `contractSignDate` |
 | `IMAGE_MAX_HEIGHT` | `500` | Max image height (px) when inserting into a document |
 | `EXPORT_IMAGE_THUMBNAIL_SIZE` | `800` | Width (px) requested from Drive's thumbnail service for export images, before the `IMAGE_MAX_HEIGHT` display clamp is applied |
+| `PHOTO_EXPORT_FOLDER_PREFIX` | `'Photos for S-КАДР '` | Destination folder name prefix for [Photo export for S-КАДР](#photo-export-for-s-кадр), combined with today's date |
+| `GID_REGEX` | `/[?&]gid=(\d+)/` | Extracts the tab id from a Google Sheets URL's `gid` parameter; used by [Award import](#award-import-from-s-кадр) to pick the correct tab |
+| `AWARDS_IMPORT_ID_COL` / `_NAME_COL` / `_ORDER_NUMBER_COL` / `_ORDER_DATE_COL` | `'A'` / `'F'` / `'G'` / `'H'` | Fixed column letters (A1 notation) for the ID/name/order-number/order-date fields in the external award import sheet |
+| `AWARDS_IMPORT_DATA_START_ROW` | `2` | First data row (after the header) in the external award import sheet |
+| `AWARDS_ORDER_NUMBER_CLEAN_REGEX` | `/\/\d+\|[\W]+/g` | Strips surrounding text/punctuation from the import sheet's free-text order-number field, keeping just the leading number |
+| `AWARDS_IMPORT_NOT_FOUND_DISPLAY_LIMIT` | `20` | Max "not found" IDs listed by name in the award import summary alert before collapsing the rest into a `(+N more)` suffix |
+| `TABLE_FIELD_SEP` | `' \| '` | Field separator used to encode/decode `*-table` cell values (shared by `Export.js` and `Import.js`; the client declares its own copy) |
+| `TABLE_ROW_SEP` | `'\n'` | Row separator used to encode/decode `*-table` cell values (same sharing as `TABLE_FIELD_SEP`) |
 | `COLUMN_MIN_WIDTHS` | `{ text: 150, image: 150, table: 900 }` | Minimum column widths (px) in the list view |
 | `COLUMN_MAX_WIDTHS` | `{ image: 250 }` | Maximum column widths (px) in the list view |
 | `FILTER_DEBOUNCE_MS` | `500` | Debounce delay (ms) for filter text inputs |
 | `IMAGE_FETCH_BATCH_SIZE` | `10` | Number of Drive files resolved per `google.script.run` call |
 | `IMAGE_FETCH_CONCURRENCY` | `3` | Number of image-fetch batches running in parallel; raising it speeds up large lists but risks the Apps Script 30-concurrent-execution limit |
+| `MASTER_MODE_FETCH_CONCURRENCY` | `3` | Number of remote Master Mode source spreadsheets fetched in parallel after the initial local-only row set has rendered |
 | `IMAGE_CACHE_TTL_DAYS` | `7` | How many days a cached image entry survives in IndexedDB before being re-fetched |
 | `DRIVE_URL_REGEX` | `/(?:\/folders\/\|\/d\/\|[?&]id=)([-\w]+)/` | Extracts a Drive file/folder ID from a sharing URL; shared by `parseDriveId()` and `looksLikeDriveUrl()` |
 | `XLSX_EXPORT_FILENAME_PREFIX` | `'Export '` | Filename prefix for XLSX exports, e.g. `Export 11.08.2026.xlsx` |
