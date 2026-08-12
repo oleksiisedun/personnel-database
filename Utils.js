@@ -101,6 +101,42 @@ function extractColumnSchema(allData) {
 }
 
 /**
+ * Converts an A1 column letter (e.g. "A", "F", "AA") to a 0-based column index.
+ *
+ * @param {string} letter - Column letter(s), case-insensitive.
+ * @returns {number} 0-based column index.
+ */
+function columnLetterToIndex(letter) {
+  let index = 0;
+  for (let i = 0; i < letter.length; i++) {
+    index = index * 26 + (letter.toUpperCase().charCodeAt(i) - 64);
+  }
+  return index - 1;
+}
+
+/**
+ * Finds the index of the first header cell matching the given pattern.
+ *
+ * @param {Array<*>} headerRow - Raw header row values (e.g. sheet row 1).
+ * @param {RegExp} pattern - Pattern to test each trimmed header against.
+ * @returns {number} 0-based column index, or -1 if no header matches.
+ */
+function findColumnIndex(headerRow, pattern) {
+  return headerRow.findIndex(h => pattern.test(String(h).trim()));
+}
+
+/**
+ * Extracts the gid (tab id) from a Google Sheets URL's ?gid=... / #gid=... param.
+ *
+ * @param {string} url
+ * @returns {number|null} The parsed gid, or null if the URL has none.
+ */
+function parseGidFromUrl(url) {
+  const m = GID_REGEX.exec(String(url));
+  return m ? Number(m[1]) : null;
+}
+
+/**
  * Finds the first key in a plain object whose text matches the given pattern.
  *
  * @param {Object.<string, *>} obj - Plain object keyed by column header text.

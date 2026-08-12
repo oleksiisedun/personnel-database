@@ -49,8 +49,9 @@ function getColumnMaxWidths() { return COLUMN_MAX_WIDTHS; }
 /**
  * Simple trigger that runs when the spreadsheet is opened.
  * Adds the "More... ⭐️" custom menu to the Google Sheets toolbar. The photo
- * export item is only shown when Master Mode is on, since it's meaningless
- * for a spreadsheet with no other sources to aggregate across.
+ * export and awards import items are only shown when Master Mode is on,
+ * since both are meaningless for a spreadsheet with no other sources to
+ * aggregate across.
  */
 function onOpen() {
   const menu = SpreadsheetApp.getUi()
@@ -60,7 +61,10 @@ function onOpen() {
     .addItem('Fix phone numbers', 'fixPhoneNumbers')
     .addItem('Fix full names', 'fixFullNames');
   if (getMasterMode()) {
-    menu.addItem('Export Photos for S-КАДР', 'openPhotoExport');
+    menu
+      .addSeparator()
+      .addItem('Export photos for S-КАДР', 'openPhotoExport')
+      .addItem('Import awards from S-КАДР', 'importAwards');
   }
   menu.addToUi();
 }
@@ -103,7 +107,7 @@ function fixPhoneNumbers() {
   }
 
   const headers = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
-  const colIndex = headers.findIndex(h => COL_PHONE_NUMBER.test(String(h).trim()));
+  const colIndex = findColumnIndex(headers, COL_PHONE_NUMBER);
   if (colIndex === -1) {
     ui.alert(`Column matching "${COL_PHONE_NUMBER.source}" not found in row 1.`);
     return;
@@ -152,7 +156,7 @@ function fixFullNames() {
   }
 
   const headers = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
-  const colIndex = headers.findIndex(h => COL_FULL_NAME.test(String(h).trim()));
+  const colIndex = findColumnIndex(headers, COL_FULL_NAME);
   if (colIndex === -1) {
     ui.alert(`Column matching "${COL_FULL_NAME.source}" not found in row 1.`);
     return;

@@ -825,7 +825,7 @@ function _fillServiceHistoryTable(body, data) {
 /**
  * Parses a pipe-and-newline encoded sub-table cell (the storage format used by
  * all *-table columns) into an array of field arrays.
- * Field separator: ' | '  Row separator: '\n'
+ * Field separator: TABLE_FIELD_SEP  Row separator: TABLE_ROW_SEP
  * Trailing empty fields from a trailing separator are preserved but harmless.
  *
  * @param {string} rawValue - Raw encoded cell string.
@@ -833,9 +833,20 @@ function _fillServiceHistoryTable(body, data) {
  */
 function _parseSubTable(rawValue) {
   if (!rawValue) return [];
-  return rawValue.split('\n')
-    .map(row => row.split(' | '))
+  return rawValue.split(TABLE_ROW_SEP)
+    .map(row => row.split(TABLE_FIELD_SEP))
     .filter(fields => fields[0] && fields[0].trim());
+}
+
+/**
+ * Encodes an array of field arrays back into a sub-table cell string — the
+ * inverse of _parseSubTable().
+ *
+ * @param {string[][]} rows - Array of rows, each row being an array of field strings.
+ * @returns {string} Pipe-and-newline encoded cell string.
+ */
+function _encodeSubTable(rows) {
+  return rows.map(fields => fields.join(TABLE_FIELD_SEP)).join(TABLE_ROW_SEP);
 }
 
 /**

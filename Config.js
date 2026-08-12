@@ -75,6 +75,35 @@ const PHOTO_EXPORT_FOLDER_PREFIX = 'Photos for S-КАДР ';
 // without caring what the ID is.
 const DRIVE_URL_REGEX = /(?:\/folders\/|\/d\/|[?&]id=)([-\w]+)/;
 
+// Extracts the gid (tab id) from a Google Sheets URL's ?gid=... / #gid=... param.
+const GID_REGEX = /[?&]gid=(\d+)/;
+
+// Awards import — fixed column layout (A1 notation) in the external import
+// sheet, row 1 = header, data from row 2. A2:A=ID, F2:F=award name,
+// G2:G=order number, H2:H=order date.
+const AWARDS_IMPORT_ID_COL = 'A';
+const AWARDS_IMPORT_NAME_COL = 'F';
+const AWARDS_IMPORT_ORDER_NUMBER_COL = 'G';
+const AWARDS_IMPORT_ORDER_DATE_COL = 'H';
+const AWARDS_IMPORT_DATA_START_ROW = 2;
+
+// Strips everything except a leading order number from the import sheet's
+// free-text order-number field, e.g. "Указ Президента України № 559/2022" →
+// "559". \W is ASCII-only, so this also strips Cyrillic text/spaces/№ as a
+// side effect of not matching \w; \/\d+ additionally strips a trailing "/2022".
+const AWARDS_ORDER_NUMBER_CLEAN_REGEX = /\/\d+|[\W]+/g;
+
+// Max number of "not found" IDs listed by name in the import summary alert
+// before collapsing the rest into a "(+N more)" suffix.
+const AWARDS_IMPORT_NOT_FOUND_DISPLAY_LIMIT = 20;
+
+// *-table cell encoding, shared by _parseSubTable()/_encodeSubTable() in
+// Export.js and the award importer (Import.js). The client
+// (WebEditor.js.html) independently declares the same two literals since it
+// runs in a separate HTML-embedded script, not this server runtime.
+const TABLE_FIELD_SEP = ' | ';
+const TABLE_ROW_SEP = '\n';
+
 // XLSX export settings
 const XLSX_EXPORT_FILENAME_PREFIX = 'Export '; // → "Export 11.08.2026.xlsx"
 // Rough per-row time estimate for the confirm dialog. There's no per-row blob
