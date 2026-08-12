@@ -201,10 +201,18 @@
     padding: 16px 0 12px; margin-bottom: 20px; border-bottom: 1px solid #e0e0e0;
   }
   #edit-header-actions { margin-left: auto; display: flex; align-items: center; gap: 12px; }
-  #edit-form { display: grid; grid-template-columns: 1fr 1fr; column-gap: 24px; }
-  .field-block--full { grid-column: 1 / -1; }
   #btn-back { padding: 6px 14px; font-size: 14px; }
-  #edit-title { font-size: 18px; font-weight: 600; }
+  #edit-title { font-weight: 600; }
+
+  #edit-tabs { display: flex; align-items: center; gap: 4px; flex-wrap: wrap; }
+  .edit-tab { cursor: pointer; padding: 4px 2px; font-weight: 600; color: #888; border-bottom: 2px solid transparent; white-space: nowrap; }
+  .edit-tab:hover { color: #333; }
+  .edit-tab.active { color: var(--color-primary); border-bottom-color: var(--color-primary); }
+  #edit-title.edit-tab { font-size: 18px; }
+
+  .edit-panel { display: none; }
+  .edit-panel--grid.active { display: grid; grid-template-columns: 1fr 1fr; column-gap: 24px; }
+  .edit-panel--table.active { display: block; }
 
   .field-block { margin-bottom: 16px; }
   .field-block label { display: block; font-weight: 600; margin-bottom: 4px; font-size: 13px; color: #555; }

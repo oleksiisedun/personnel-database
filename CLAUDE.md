@@ -141,7 +141,9 @@ Also triggered from the "More... ⭐️" custom menu, following the same header-
 
 ### Edit view layout
 
-`#edit-form` is a two-column CSS grid (`grid-template-columns: 1fr 1fr`). Most field blocks occupy one column. Table-type fields get the additional class `field-block--full` (→ `grid-column: 1 / -1`) so they span the full width, since their multi-row editors are too wide for a half-width cell.
+`openEditView(row)` builds `#edit-form` as a set of sibling `.edit-panel` divs rather than a single grid: one `.edit-panel--grid` panel (`grid-template-columns: 1fr 1fr` when active) holding every non-table field block, plus one `.edit-panel--table` panel per `*-table` column holding just that column's `buildTableEditor()` output. Only the panel matching the current `activeEditTab` gets the `.active` class (`display:grid`/`display:block`); every other panel is `display:none` but stays mounted in the DOM for the life of the edit session — this is deliberate, since `collectFormValues()`/`encodeTableEditor()` query by ancestry/`data-col-index` rather than visibility, so hidden panels must never be destroyed or their in-progress edits would be lost on tab switch.
+
+The tab strip (`#edit-tabs`) sits in the sticky `#edit-header`, right of the person's name. `#edit-title` itself is styled and behaves as the first tab (`class="edit-tab"`, click → `switchEditTab('main')`, listener attached once in `init()` since the element persists across `openEditView()` calls); one `.edit-tab` button is built per `*-table` column, freshly created on every `openEditView()` call alongside its panel. `switchEditTab(tabKey)` (`'main'` or a table column's index as a string) toggles `.active` on the matching panel, tab button, and `#edit-title`. `openEditView()` calls `switchEditTab('main')` before showing the view, so re-opening a different row always starts back on the main tab regardless of which tab was active last.
 
 ### Unsaved changes confirmation
 

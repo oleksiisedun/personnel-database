@@ -11,6 +11,7 @@
   let pendingImages = new Set(); // fileIds currently being fetched to avoid duplicate requests
   let isNewRow = false;    // true when the edit view holds a freshly appended row
   let originalFormValues = null; // snapshot of collectFormValues() taken right after openEditView() builds the form
+  let activeEditTab = 'main';    // 'main', or a *-table column's index as a string — reset to 'main' on every openEditView() call
   let useRegex = false;              // true when filter inputs are treated as regular expressions
   let filterActualPersonnel = false; // true when only names in the actual personnel list are shown
   let showAllUnits = true;           // true when master-mode remote rows are included alongside local ones
@@ -333,6 +334,7 @@
         leaveEditView();
       }
     });
+    document.getElementById('edit-title').addEventListener('click', () => switchEditTab('main'));
     document.getElementById('btn-unsaved-cancel').addEventListener('click', closeUnsavedChangesOverlay);
     document.getElementById('btn-unsaved-discard').addEventListener('click', () => {
       closeUnsavedChangesOverlay();
@@ -1218,9 +1220,32 @@
   function openEditView(row) {
     editingRow = row;
     const form = document.getElementById('edit-form');
+    const tabs = document.getElementById('edit-tabs');
     form.innerHTML = '';
+    tabs.innerHTML = '';
+
+    const mainPanel = document.createElement('div');
+    mainPanel.className = 'edit-panel edit-panel--grid';
+    mainPanel.dataset.tabKey = 'main';
+    form.appendChild(mainPanel);
 
     schema.columns.forEach((col, i) => {
+      if (isTableType(col)) {
+        const panel = document.createElement('div');
+        panel.className = 'edit-panel edit-panel--table';
+        panel.dataset.tabKey = String(i);
+        panel.appendChild(buildTableEditor(i, parseData(row.values[i] || '', col.tableHeaders || []), col.tableHeaders || []));
+        form.appendChild(panel);
+
+        const tabBtn = document.createElement('div');
+        tabBtn.className = 'edit-tab';
+        tabBtn.textContent = col.name;
+        tabBtn.dataset.tabKey = String(i);
+        tabBtn.addEventListener('click', () => switchEditTab(String(i)));
+        tabs.appendChild(tabBtn);
+        return;
+      }
+
       const block = document.createElement('div');
       block.className = 'field-block';
 
@@ -1228,10 +1253,7 @@
       label.textContent = col.name;
       block.appendChild(label);
 
-      if (isTableType(col)) {
-        block.classList.add('field-block--full');
-        block.appendChild(buildTableEditor(i, parseData(row.values[i] || '', col.tableHeaders || []), col.tableHeaders || []));
-      } else if (col.type === 'unit' || col.type === 'origin' || col.type === 'marital-status' || col.type === 'sex') {
+      if (col.type === 'unit' || col.type === 'origin' || col.type === 'marital-status' || col.type === 'sex') {
         block.appendChild(buildDropdownField(col, i, row.values[i] || ''));
       } else if (VALIDATORS[col.type]) {
         const { input, errHint } = buildValidatedInput(col, row.values[i] || '', i);
@@ -1275,10 +1297,10 @@
         }
       }
 
-      form.appendChild(block);
+      mainPanel.appendChild(block);
     });
 
-    document.getElementById('edit-title').textContent = isNewRow ? '' : (row.values[0] || 'Edit record');
+    document.getElementById('edit-title').textContent = isNewRow ? 'New person' : (row.values[0] || 'Edit record');
     document.getElementById('save-error').style.display = 'none';
     document.getElementById('save-status').textContent = '';
     document.getElementById('btn-save').disabled = false;
@@ -1299,7 +1321,28 @@
       ssSelect.style.display = 'none';
     }
     originalFormValues = collectFormValues();
+    switchEditTab('main');
     showView('edit');
+  }
+
+  /**
+   * Switches the active tab within the edit view (main-info panel, or one
+   * *-table column panel) by toggling `.active` on the matching panel and
+   * tab button, including #edit-title when switching to 'main'. All panels
+   * stay mounted in the DOM for the life of the edit session — this only
+   * toggles CSS display, never rebuilds anything — so typed input and
+   * table-editor row edits on inactive tabs are never lost.
+   * @param {string} tabKey - 'main', or a *-table column's index as a string.
+   */
+  function switchEditTab(tabKey) {
+    activeEditTab = tabKey;
+    document.querySelectorAll('#edit-form .edit-panel').forEach(panel => {
+      panel.classList.toggle('active', panel.dataset.tabKey === tabKey);
+    });
+    document.querySelectorAll('#edit-tabs .edit-tab').forEach(btn => {
+      btn.classList.toggle('active', btn.dataset.tabKey === tabKey);
+    });
+    document.getElementById('edit-title').classList.toggle('active', tabKey === 'main');
   }
 
   /**
