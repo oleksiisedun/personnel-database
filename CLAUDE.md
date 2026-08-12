@@ -180,8 +180,8 @@ Export is triggered from the toolbar. The Export F-1 and Export WC buttons are d
 
 1. **Image columns** — `{Column Name}` placeholder replaced with a compressed image blob (see below).
 2. **Service history table** — `{Проходження служби}` placeholder row expanded into one table row per service entry. Must run before pass 3 or the placeholder text would be consumed before the table handler can locate it.
-3. **Direct text columns** — remaining `{Column Name}` placeholders replaced with cell text.
-4. **Correspondence table** — Handbook-defined aliases and computed values (e.g. `totalServiceLength`, `motherFullName`) replace their own placeholders.
+3. **Direct text columns** — remaining `{Column Name}` placeholders replaced with cell text. `*-table` columns are skipped here (their raw pipe/newline-encoded storage string is never a meaningful placeholder replacement) — a `*-table` column's placeholder must be resolved by pass 2 or pass 4 instead, and skipping it here is what lets pass 4 reach it, for the same reason pass 2 must run before pass 3 for service history.
+4. **Correspondence table** — Handbook-defined aliases and computed values (e.g. `totalServiceLength`, `motherFullName`, `awardsList` — a semicolon-joined sentence built from the "Нагороди" sub-table, each entry `{name} №{order number} від {order date}` with the number/date parts individually omitted when empty) replace their own placeholders.
 
 Placeholders with no match are left untouched. `_exportDoc()` checks elapsed time against `EXPORT_TIME_LIMIT_MS` before each row (5 min — 1 min safety margin before the GAS 6-min hard kill) and returns `{ results, remaining }` so the client can surface any unprocessed rows.
 

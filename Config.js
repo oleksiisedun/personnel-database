@@ -43,6 +43,7 @@ const EXPORT_FOLDER_CELL = 'M13';
 const COL_DRAFT_DATE = /дата призову/i;
 const COL_SERVICE_HISTORY = /проходження служби/i;
 const COL_CLOSE_RELATIVES = /близькі родичі/i;
+const COL_AWARDS = /нагороди/i;
 const COL_MARITAL_STATUS = /сімейний стан/i;
 const COL_CONTRACT_UNTIL = /контракт укладено до/i;
 const COL_PHONE_NUMBER = /номер телефону/i;

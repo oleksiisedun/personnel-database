@@ -62,6 +62,10 @@ function _makeSheetDataLoader(localSs) {
  *   1. Image-type columns — placeholder replaced with the actual image blob.
  *   2. Service history table — {COL_SERVICE_HISTORY} row expanded into table rows.
  *   3. Direct text columns — {column name} replaced with the cell value.
+ *      *-table columns are skipped here (their raw pipe/newline-encoded storage
+ *      string is never a meaningful placeholder replacement); they're instead
+ *      handled by pass 2 (service history) or pass 4 computed values (e.g.
+ *      awardsList, relativesWithPhoneNumbers).
  *   4. Correspondence table — Handbook-defined aliases and computed values.
  *
  * Placeholders with no match are left untouched. The marital status line is
@@ -127,9 +131,13 @@ function _exportDoc(rowEntries, templateCell, docPrefix) {
     // text would be consumed before the table handler can locate it.
     _fillServiceHistoryTable(body, data);
 
-    // Pass 3: direct text column placeholders.
+    // Pass 3: direct text column placeholders. *-table columns are skipped —
+    // their raw pipe/newline-encoded storage string would otherwise leak into
+    // the document, and (for columns whose header matches a correspondence
+    // table placeholder, e.g. awardsList) would also consume the placeholder
+    // before pass 4 gets a chance to replace it with the computed value.
     columns.forEach(col => {
-      if (col.type === 'image') return;
+      if (col.type === 'image' || col.type.endsWith('-table')) return;
       body.replaceText(_escapeRegex('{' + col.name + '}'), _escapeReplacement(data[col.name] || ''));
     });
 
@@ -539,6 +547,7 @@ function _computeValue(name, data) {
   if (name === 'currentPositionStartDate') return _computeCurrentPositionStartDate(data);
   if (name === 'contractSignDate') return _computeContractSignDate(data);
   if (name === 'relativesWithPhoneNumbers') return _computeRelativesWithPhoneNumbers(data);
+  if (name === 'awardsList') return _computeAwardsList(data);
   return '';
 }
 
@@ -558,6 +567,15 @@ function _getServiceHistoryRows(data) {
  */
 function _getRelativesRows(data) {
   return _parseSubTable(getFieldByPattern(data, COL_CLOSE_RELATIVES));
+}
+
+/**
+ * Parses the awards sub-table for the given row data.
+ * @param {Object.<string, string>} data - Row data map.
+ * @returns {string[][]}
+ */
+function _getAwardsRows(data) {
+  return _parseSubTable(getFieldByPattern(data, COL_AWARDS));
 }
 
 /**
@@ -713,6 +731,29 @@ function _computeRelativesWithPhoneNumbers(data) {
     .filter(fields => (fields[3] || '').trim())
     .map(fields => [fields[0], fields[1], fields[2], fields[3]].map(f => (f || '').trim()).join(', '))
     .join('; ');
+}
+
+/**
+ * Builds a semicolon-separated sentence listing all awards from the "Нагороди"
+ * sub-table. Each row is encoded as "award name | order number | order date"
+ * (order number and/or date may be empty). Each entry is formatted as the
+ * award name (first letter capitalized) followed by "№{order number}" and
+ * "від {order date}" when present.
+ *
+ * @param {Object.<string, string>} data - Row data map.
+ * @returns {string} e.g. "Нагрудний знак «За доблесну службу» №421 від 28.11.2023; ..."
+ *                   or empty string if no awards found.
+ */
+function _computeAwardsList(data) {
+  return _getAwardsRows(data).map(fields => {
+    const name = (fields[0] || '').trim();
+    const number = (fields[1] || '').trim();
+    const date = (fields[2] || '').trim();
+    let text = name.charAt(0).toUpperCase() + name.slice(1);
+    if (number) text += ` №${number}`;
+    if (date) text += ` від ${date}`;
+    return text;
+  }).join('; ');
 }
 
 /**
