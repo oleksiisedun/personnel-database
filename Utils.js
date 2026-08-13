@@ -198,6 +198,28 @@ function getDriveIdFromHandbook(handbookSheet, cellAddress) {
 }
 
 /**
+ * Opens the export folder (Handbook!M13 / EXPORT_FOLDER_CELL) by ID, throwing
+ * a clear, actionable error instead of DriveApp's raw "Unexpected error while
+ * getting the method or property getFolderById on object DriveApp" — either
+ * because the cell is empty, or because the current user's account lacks
+ * access to the configured folder.
+ *
+ * @param {string} exportFolderId
+ * @returns {GoogleAppsScript.Drive.Folder}
+ */
+function getExportFolderSafely(exportFolderId) {
+  if (!exportFolderId) {
+    throw new Error(`Export folder is not configured (Handbook!${EXPORT_FOLDER_CELL} is empty).`);
+  }
+  try {
+    return DriveApp.getFolderById(exportFolderId);
+  } catch (e) {
+    throw new Error(`Cannot access the export folder (Handbook!${EXPORT_FOLDER_CELL}, Drive ID "${exportFolderId}"). ` +
+      `Check that your Google account has been granted access to this folder. Original error: ${e.message}`);
+  }
+}
+
+/**
  * Groups an array of row entries by spreadsheetId and sorts each group in
  * descending rowIndex order so that rows can be deleted sequentially without
  * the deletion of one row shifting the index of rows below it.

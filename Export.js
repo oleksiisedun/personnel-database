@@ -81,7 +81,7 @@ function _exportDoc(rowEntries, templateCell, docPrefix) {
   const handbookSheet = localSs.getSheetByName(SHEET_HANDBOOK);
   const templateId = getDriveIdFromHandbook(handbookSheet, templateCell);
   const exportFolderId = getDriveIdFromHandbook(handbookSheet, EXPORT_FOLDER_CELL);
-  const exportFolder = DriveApp.getFolderById(exportFolderId);
+  const exportFolder = getExportFolderSafely(exportFolderId);
   const mappings = handbookSheet ? _loadCorrespondenceTable(handbookSheet) : [];
   const getSheetData = _makeSheetDataLoader(localSs);
 
@@ -211,7 +211,7 @@ function exportXLSX(rowEntries, visibleColumnIndices) {
   const localSs = SpreadsheetApp.getActiveSpreadsheet();
   const handbookSheet = localSs.getSheetByName(SHEET_HANDBOOK);
   const exportFolderId = getDriveIdFromHandbook(handbookSheet, EXPORT_FOLDER_CELL);
-  const exportFolder = DriveApp.getFolderById(exportFolderId);
+  const exportFolder = getExportFolderSafely(exportFolderId);
 
   const getSheetData = _makeSheetDataLoader(localSs);
   const localData = getSheetData(null);
@@ -307,7 +307,7 @@ function startPhotoExport() {
   const handbookSheet = localSs.getSheetByName(SHEET_HANDBOOK);
 
   const exportFolderId = getDriveIdFromHandbook(handbookSheet, EXPORT_FOLDER_CELL);
-  const parentFolder = DriveApp.getFolderById(exportFolderId);
+  const parentFolder = getExportFolderSafely(exportFolderId);
   const destFolder = parentFolder.createFolder(PHOTO_EXPORT_FOLDER_PREFIX + formatDateDDMMYYYY(new Date()));
 
   const actualNames = getActualPersonnelNames();
