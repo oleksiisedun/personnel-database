@@ -70,11 +70,30 @@ function onOpen() {
 }
 
 /**
+ * Runs handbookCheck() and, on failure, alerts the user and returns false
+ * without opening any dialog. Shared by openWebEditor() and openPhotoExport()
+ * so both entry points fail the same way.
+ *
+ * @param {string} actionName - Human-readable name of the action being attempted, shown in the alert.
+ * @returns {boolean} True if the healthcheck passed.
+ */
+function assertHandbookHealthy(actionName) {
+  const result = handbookCheck();
+  if (!result.ok) {
+    SpreadsheetApp.getUi().alert(`${actionName} cannot be opened:\n\n${result.errors.join('\n')}`);
+  }
+  return result.ok;
+}
+
+/**
  * Opens the web editor as a full-screen modal dialog.
  * Uses createTemplateFromFile so that <?!= ?> scriptlet includes in
  * WebEditor.html are evaluated before the HTML is served to the client.
+ * Bails out (via assertHandbookHealthy()) with an alert instead of opening
+ * the modal if the Database/Handbook sheets are missing or corrupted.
  */
 function openWebEditor() {
+  if (!assertHandbookHealthy('Web Editor')) return;
   const template = HtmlService.createTemplateFromFile('WebEditor');
   template.mode = null;
   SpreadsheetApp.getUi().showModalDialog(template.evaluate(), 'Web Editor');
@@ -84,9 +103,12 @@ function openWebEditor() {
  * Opens the web editor modal directly in "photo export" mode, which skips the
  * normal list-view bootstrap and immediately drives the shared export
  * progress overlay to run startPhotoExport()/copyPhotosBatch(). Only exposed
- * on the menu when Master Mode is on (see onOpen()).
+ * on the menu when Master Mode is on (see onOpen()). Bails out (via
+ * assertHandbookHealthy()) with an alert instead of opening the modal if the
+ * Database/Handbook sheets are missing or corrupted.
  */
 function openPhotoExport() {
+  if (!assertHandbookHealthy('Export Photos for S-КАДР')) return;
   const template = HtmlService.createTemplateFromFile('WebEditor');
   template.mode = 'photoExport';
   SpreadsheetApp.getUi().showModalDialog(template.evaluate(), 'Export Photos for S-КАДР');

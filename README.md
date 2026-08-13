@@ -224,6 +224,8 @@ After a successful move the rows reappear in the list immediately under their ne
 
 ## Custom menu
 
+Opening the web editor (either "Open Web Editor" or "Export photos for S-КАДР" below) first checks that the `Database` and `Handbook` sheets exist. If either is missing, a dialog reports it instead of the editor opening in a silently broken state.
+
 The Sheets **More... ⭐️** menu (added by `onOpen()`) always has three items, plus two more shown only when Master Mode (`Handbook!M2`) is on:
 
 | Item | Action |

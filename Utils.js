@@ -7,6 +7,25 @@ function getHandbookSheet() {
 }
 
 /**
+ * Validates that the active spreadsheet's Database and Handbook sheets exist.
+ * Most Handbook reads in getSchemaAndData() individually fall back to a safe
+ * empty default on error rather than throwing, so a missing Handbook sheet
+ * would otherwise silently degrade the editor instead of surfacing an error.
+ * Called by openWebEditor()/openPhotoExport() before the modal is shown.
+ *
+ * @returns {{ ok: boolean, errors: string[] }}
+ */
+function handbookCheck() {
+  const errors = [];
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+
+  if (!ss.getSheetByName(SHEET_DATABASE)) errors.push(`Sheet "${SHEET_DATABASE}" not found.`);
+  if (!ss.getSheetByName(SHEET_HANDBOOK)) errors.push(`Sheet "${SHEET_HANDBOOK}" not found.`);
+
+  return { ok: errors.length === 0, errors };
+}
+
+/**
  * Resolves a spreadsheet by optional ID. Returns the remote spreadsheet when an
  * ID is supplied (via openSpreadsheetSafely), or the active spreadsheet when ID
  * is null / undefined / empty. Returns null only when a non-empty ID is provided

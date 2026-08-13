@@ -52,6 +52,10 @@ Key Handbook cells:
 
 Every target spreadsheet has its own local `Handbook` sheet. Spreadsheets that should share most config with a central source do so via `IMPORTRANGE` formulas inside their own `Handbook` sheet's cells, rather than any code-level fallback — from the script's perspective every spreadsheet's `Handbook` sheet is simply self-contained.
 
+### Startup healthcheck (`handbookCheck`)
+
+Because the per-range try/catch fallbacks described above make a missing `Handbook` sheet fail silently rather than loudly, `openWebEditor()` and `openPhotoExport()` (`Code.js`) both call `assertHandbookHealthy(actionName)` before creating the modal. It runs `handbookCheck()` (`Utils.js`), which checks only that the `Database` and `Handbook` sheets exist by name — it does not validate cell contents or range structure, since most Handbook config is either read defensively elsewhere (see above) or optional per-feature (e.g. `getActualPersonnelNames()` already treats a blank `M6`/`M7` as "feature disabled," `getExportFolderSafely()` already throws its own clear error for a blank `EXPORT_FOLDER_CELL` at export time). If either sheet is missing, `assertHandbookHealthy()` shows a `ui.alert()` listing the problem and the modal is never opened.
+
 ### How the HTML template works
 
 `WebEditor.html` is served via `HtmlService.createTemplateFromFile()`. It includes CSS and JS using scriptlet tags:
