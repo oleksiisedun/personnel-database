@@ -78,7 +78,7 @@ function _makeSheetDataLoader(localSs) {
  */
 function _exportDoc(rowEntries, templateCell, docPrefix) {
   const localSs = SpreadsheetApp.getActiveSpreadsheet();
-  const handbookSheet = localSs.getSheetByName(SHEET_HANDBOOK);
+  const handbookSheet = resolveHandbookSheet(localSs);
   const templateId = getDriveIdFromHandbook(handbookSheet, templateCell);
   const exportFolderId = getDriveIdFromHandbook(handbookSheet, EXPORT_FOLDER_CELL);
   const exportFolder = DriveApp.getFolderById(exportFolderId);
@@ -209,7 +209,7 @@ function _exportDoc(rowEntries, templateCell, docPrefix) {
  */
 function exportXLSX(rowEntries, visibleColumnIndices) {
   const localSs = SpreadsheetApp.getActiveSpreadsheet();
-  const handbookSheet = localSs.getSheetByName(SHEET_HANDBOOK);
+  const handbookSheet = resolveHandbookSheet(localSs);
   const exportFolderId = getDriveIdFromHandbook(handbookSheet, EXPORT_FOLDER_CELL);
   const exportFolder = DriveApp.getFolderById(exportFolderId);
 
@@ -304,7 +304,7 @@ function exportXLSX(rowEntries, visibleColumnIndices) {
  */
 function startPhotoExport() {
   const localSs = SpreadsheetApp.getActiveSpreadsheet();
-  const handbookSheet = localSs.getSheetByName(SHEET_HANDBOOK);
+  const handbookSheet = resolveHandbookSheet(localSs);
 
   const exportFolderId = getDriveIdFromHandbook(handbookSheet, EXPORT_FOLDER_CELL);
   const parentFolder = DriveApp.getFolderById(exportFolderId);

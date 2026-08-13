@@ -3,6 +3,12 @@ const SHEET_DATABASE = 'Database';
 const SHEET_HANDBOOK = 'Handbook';
 const SHEET_TRASH = 'Trash';
 
+// Fallback "Handbook" spreadsheet, used only when the current spreadsheet has
+// no local "Handbook" sheet of its own. Must contain a Handbook sheet with the
+// same layout as the local one (see Handbook layout constants below). Lets
+// most Handbook config live in one place instead of every target spreadsheet.
+const SHARED_HANDBOOK_SPREADSHEET_ID = '12JeQKkzBDFaPvHsfs-dwIIN3OgXhPYd0gppVAAHBY1w';
+
 // Handbook layout — Master Mode toggle cell and source spreadsheet IDs range
 const MASTER_MODE_CELL = 'M2';
 const MASTER_MODE_SOURCES_RANGE = 'N2:N';

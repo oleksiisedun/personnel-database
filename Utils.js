@@ -1,9 +1,40 @@
+let _sharedHandbookSheetCache; // undefined = not yet resolved this execution
+
 /**
- * Returns the Handbook sheet for the active spreadsheet, or null if not found.
+ * Opens the shared fallback Handbook spreadsheet (SHARED_HANDBOOK_SPREADSHEET_ID)
+ * and returns its "Handbook" sheet, memoized for the lifetime of the current
+ * execution since multiple call sites (e.g. movePersonnel's source + destination
+ * lookups) may need it in the same request. Returns null if the constant is
+ * empty, the spreadsheet is inaccessible, or it has no Handbook sheet.
+ * @returns {GoogleAppsScript.Spreadsheet.Sheet|null}
+ */
+function getSharedHandbookSheet() {
+  if (_sharedHandbookSheetCache === undefined) {
+    const ss = SHARED_HANDBOOK_SPREADSHEET_ID ? openSpreadsheetSafely(SHARED_HANDBOOK_SPREADSHEET_ID) : null;
+    _sharedHandbookSheetCache = ss ? ss.getSheetByName(SHEET_HANDBOOK) : null;
+  }
+  return _sharedHandbookSheetCache;
+}
+
+/**
+ * Resolves the Handbook sheet for a given spreadsheet: its own local
+ * "Handbook" sheet if present, otherwise the shared fallback Handbook
+ * spreadsheet's sheet (see SHARED_HANDBOOK_SPREADSHEET_ID in Config.js).
+ * @param {GoogleAppsScript.Spreadsheet.Spreadsheet} ss
+ * @returns {GoogleAppsScript.Spreadsheet.Sheet|null}
+ */
+function resolveHandbookSheet(ss) {
+  return ss.getSheetByName(SHEET_HANDBOOK) || getSharedHandbookSheet();
+}
+
+/**
+ * Returns the Handbook sheet for the active spreadsheet — its own local
+ * "Handbook" sheet if present, otherwise the shared fallback (see
+ * resolveHandbookSheet()). Returns null if neither is available.
  * @returns {GoogleAppsScript.Spreadsheet.Sheet|null}
  */
 function getHandbookSheet() {
-  return SpreadsheetApp.getActiveSpreadsheet().getSheetByName(SHEET_HANDBOOK);
+  return resolveHandbookSheet(SpreadsheetApp.getActiveSpreadsheet());
 }
 
 /**

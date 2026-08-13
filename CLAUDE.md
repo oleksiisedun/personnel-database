@@ -50,6 +50,12 @@ Key Handbook cells:
 - `M13` (`EXPORT_FOLDER_CELL`) — Google Drive folder ID where exported documents are saved
 - `N2:N` (`MASTER_MODE_SOURCES_RANGE`) — source spreadsheet IDs for Master Mode
 
+### Shared Handbook fallback (`resolveHandbookSheet`)
+
+A spreadsheet is not required to have its own `Handbook` sheet. `resolveHandbookSheet(ss)` (`Utils.js`) returns `ss`'s own `Handbook` sheet if present; otherwise it falls back to the `Handbook` sheet of a single shared spreadsheet identified by `SHARED_HANDBOOK_SPREADSHEET_ID` (`Config.js`), via the memoized `getSharedHandbookSheet()` (opened at most once per execution, since e.g. `movePersonnel()` may need it for both source and destination in one call). This lets most Handbook config live in one place instead of every target spreadsheet in `clasp-targets.json` — a spreadsheet only needs its own `Handbook` sheet when it must diverge from the shared config. The fallback is all-or-nothing per spreadsheet (whole sheet present or absent), never a cell-by-cell merge.
+
+Every call site that previously did `ss.getSheetByName(SHEET_HANDBOOK)` directly — `getSchemaAndData()`, `movePersonnel()`'s source/destination `DATA_FOLDER` lookups, `_exportDoc()`, `exportXLSX()`, `startPhotoExport()` — now calls `resolveHandbookSheet(ss)` instead. `getHandbookSheet()` (used by `getMasterMode()`, `getMasterSources()`, `getActualPersonnelNames()`) is `resolveHandbookSheet(SpreadsheetApp.getActiveSpreadsheet())`. New code needing "the Handbook sheet for spreadsheet X" should use `resolveHandbookSheet(ssX)` rather than a raw `getSheetByName(SHEET_HANDBOOK)` call, so it picks up the shared fallback automatically.
+
 ### How the HTML template works
 
 `WebEditor.html` is served via `HtmlService.createTemplateFromFile()`. It includes CSS and JS using scriptlet tags:

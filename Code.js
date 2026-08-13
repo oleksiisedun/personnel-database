@@ -319,7 +319,7 @@ function getActualPersonnelNames() {
 function movePersonnel(rowEntries, destinationSpreadsheetId) {
   const { ss: destSs, sheet: destSheet } = getDatabaseSheet(destinationSpreadsheetId);
 
-  const destHandbook = destSs.getSheetByName(SHEET_HANDBOOK);
+  const destHandbook = resolveHandbookSheet(destSs);
   const destFolderId = getDriveIdFromHandbook(destHandbook, DATA_FOLDER);
 
   const groups = groupAndSortBySpreadsheetId(rowEntries);
@@ -346,7 +346,7 @@ function movePersonnel(rowEntries, destinationSpreadsheetId) {
       return;
     }
 
-    const srcHandbook = srcSs.getSheetByName(SHEET_HANDBOOK);
+    const srcHandbook = resolveHandbookSheet(srcSs);
     const srcFolderId = getDriveIdFromHandbook(srcHandbook, DATA_FOLDER);
 
     const destNumCols = destSheet.getLastColumn();
@@ -448,7 +448,7 @@ function getSchemaAndData() {
   const masterSourceIds = masterMode ? getMasterSources() : [];
 
   const tableHeadersMap = {};
-  const handbookSheet = ss.getSheetByName(SHEET_HANDBOOK);
+  const handbookSheet = resolveHandbookSheet(ss);
   if (handbookSheet) {
     try {
       const hbData = handbookSheet.getRange(HANDBOOK_TYPES_RANGE).getValues();
