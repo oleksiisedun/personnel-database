@@ -217,6 +217,23 @@ function getDriveIdFromHandbook(handbookSheet, cellAddress) {
 }
 
 /**
+ * Finds a direct subfolder of parentFolder matching name, case-insensitively.
+ * DriveApp's Folder.getFoldersByName() only does exact, case-sensitive matches.
+ * @param {GoogleAppsScript.Drive.Folder} parentFolder
+ * @param {string} name
+ * @returns {GoogleAppsScript.Drive.Folder|null}
+ */
+function findFolderByNameCaseInsensitive(parentFolder, name) {
+  const target = name.toLowerCase();
+  const folders = parentFolder.getFolders();
+  while (folders.hasNext()) {
+    const folder = folders.next();
+    if (folder.getName().toLowerCase() === target) return folder;
+  }
+  return null;
+}
+
+/**
  * Opens the export folder (Handbook!M13 / EXPORT_FOLDER_CELL) by ID, throwing
  * a clear, actionable error instead of DriveApp's raw "Unexpected error while
  * getting the method or property getFolderById on object DriveApp" — either

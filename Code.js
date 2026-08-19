@@ -402,11 +402,10 @@ function movePersonnel(rowEntries, destinationSpreadsheetId) {
       } else {
         try {
           const srcDataFolder = DriveApp.getFolderById(srcFolderId);
-          const folderIter = srcDataFolder.getFoldersByName(fullName);
-          if (!folderIter.hasNext()) {
+          const personFolder = findFolderByNameCaseInsensitive(srcDataFolder, fullName);
+          if (!personFolder) {
             folderNote = 'Folder not found — skipped';
           } else {
-            const personFolder = folderIter.next();
             const destDataFolder = DriveApp.getFolderById(destFolderId);
             personFolder.moveTo(destDataFolder);
             folderNote = 'Folder moved';
