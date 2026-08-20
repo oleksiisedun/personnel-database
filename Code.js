@@ -448,7 +448,8 @@ function movePersonnel(rowEntries, destinationSpreadsheetId) {
  *   imageCacheTtlDays: number,
  *   exportConfirmThreshold: number,
  *   exportSecondsPerDoc: number,
- *   xlsxExportSecondsPerRow: number
+ *   xlsxExportSecondsPerRow: number,
+ *   documentPhotoTabName: string
  * }}
  */
 function getSchemaAndData() {
@@ -508,7 +509,8 @@ function getSchemaAndData() {
            imageCacheTtlDays: IMAGE_CACHE_TTL_DAYS,
            exportConfirmThreshold: EXPORT_CONFIRM_THRESHOLD,
            exportSecondsPerDoc: EXPORT_SECONDS_PER_DOC,
-           xlsxExportSecondsPerRow: XLSX_EXPORT_SECONDS_PER_ROW };
+           xlsxExportSecondsPerRow: XLSX_EXPORT_SECONDS_PER_ROW,
+           documentPhotoTabName: DOCUMENT_PHOTO_TAB_NAME };
 }
 
 /**

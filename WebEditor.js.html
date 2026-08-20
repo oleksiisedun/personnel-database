@@ -1215,6 +1215,9 @@
    * Switches to the edit view for the given row. Dynamically builds a form field
    * for each column: a dropdown for dropdown types, a table editor for *-table types,
    * a text input with live image preview for image types, and a plain text input for text types.
+   * Image-type fields are grouped into their own "documentPhotos" tab/panel (labeled
+   * schema.documentPhotoTabName) instead of the main grid panel, built up front so it
+   * appears as the first dynamic tab, ahead of any *-table tabs.
    * @param {{rowIndex: number|null, values: string[]}} row
    */
   function openEditView(row) {
@@ -1228,6 +1231,21 @@
     mainPanel.className = 'edit-panel edit-panel--grid';
     mainPanel.dataset.tabKey = 'main';
     form.appendChild(mainPanel);
+
+    let photoPanel = null;
+    if (schema.columns.some(col => col.type === 'image')) {
+      photoPanel = document.createElement('div');
+      photoPanel.className = 'edit-panel edit-panel--grid';
+      photoPanel.dataset.tabKey = 'documentPhotos';
+      form.appendChild(photoPanel);
+
+      const photoTabBtn = document.createElement('div');
+      photoTabBtn.className = 'edit-tab';
+      photoTabBtn.textContent = schema.documentPhotoTabName;
+      photoTabBtn.dataset.tabKey = 'documentPhotos';
+      photoTabBtn.addEventListener('click', () => switchEditTab('documentPhotos'));
+      tabs.appendChild(photoTabBtn);
+    }
 
     schema.columns.forEach((col, i) => {
       if (isTableType(col)) {
@@ -1297,7 +1315,7 @@
         }
       }
 
-      mainPanel.appendChild(block);
+      (col.type === 'image' && photoPanel ? photoPanel : mainPanel).appendChild(block);
     });
 
     document.getElementById('edit-title').textContent = isNewRow ? 'Person' : (row.values[0] || 'Edit record');
@@ -1326,13 +1344,14 @@
   }
 
   /**
-   * Switches the active tab within the edit view (main-info panel, or one
-   * *-table column panel) by toggling `.active` on the matching panel and
-   * tab button, including #edit-title when switching to 'main'. All panels
-   * stay mounted in the DOM for the life of the edit session — this only
-   * toggles CSS display, never rebuilds anything — so typed input and
-   * table-editor row edits on inactive tabs are never lost.
-   * @param {string} tabKey - 'main', or a *-table column's index as a string.
+   * Switches the active tab within the edit view (main-info panel, the
+   * "documentPhotos" image-fields panel, or one *-table column panel) by
+   * toggling `.active` on the matching panel and tab button, including
+   * #edit-title when switching to 'main'. All panels stay mounted in the DOM
+   * for the life of the edit session — this only toggles CSS display, never
+   * rebuilds anything — so typed input and table-editor row edits on inactive
+   * tabs are never lost.
+   * @param {string} tabKey - 'main', 'documentPhotos', or a *-table column's index as a string.
    */
   function switchEditTab(tabKey) {
     activeEditTab = tabKey;

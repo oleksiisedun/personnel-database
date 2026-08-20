@@ -51,6 +51,10 @@ const COL_FULL_NAME = /ПІБ/i;
 const COL_PHOTO = /фото/i;
 const COL_CARD_ID = /s-кадр id/i;
 
+// Tab name for grouping all image-type columns in the edit view, instead of
+// showing them inline in the main grid panel. See getSchemaAndData()/openEditView().
+const DOCUMENT_PHOTO_TAB_NAME = 'Фото документи';
+
 // Export / document settings
 const EXPORT_TIME_LIMIT_MS = 5 * 60 * 1000; // 5 min — 1 min safety margin before GAS 6-min hard limit
 const EXPORT_CONFIRM_THRESHOLD = 10; // show confirmation dialog when exporting more than this many docs
