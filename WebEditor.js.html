@@ -457,6 +457,8 @@
     if (data.actualPersonnelNames?.length) {
       schema.actualPersonnelNamesSet = buildActualPersonnelNamesSet(data.actualPersonnelNames);
       chkActual.disabled = false;
+      chkActual.checked = true;
+      filterActualPersonnel = true;
       chkActual.addEventListener('change', () => {
         filterActualPersonnel = chkActual.checked;
         dimTableWhile(applyFilters);
@@ -495,8 +497,8 @@
 
       const chkActual = document.getElementById('chk-actual');
       if (!chkActual.disabled) {
-        filterActualPersonnel = false;
-        chkActual.checked = false;
+        filterActualPersonnel = true;
+        chkActual.checked = true;
       }
 
       showAllUnits = true;
