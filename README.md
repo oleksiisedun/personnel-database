@@ -345,6 +345,18 @@ The file is named `Export DD.MM.YYYY.xlsx` (today's date) and saved to the same 
 
 Since Apps Script has no way to author `.xlsx` bytes directly and this project has no build step (so no bundling a library like ExcelJS), the export is built as a temporary Google Sheet and converted by fetching the Sheets export URL (`.../export?format=xlsx`) via `UrlFetchApp`, authorized with the script's own OAuth token (`Blob.getAs()` doesn't support this conversion); the temp sheet is always deleted afterward, even on error. Unlike F-1/WC export, this is a single `google.script.run` call with no batching — it produces one file for the whole selection, not one file per row, so there's no partial result to resume. See `exportXLSX()` in `Export.js` and `runExportXlsx()` in `WebEditor.js.html`.
 
+## Sample files
+
+The `samples/` directory contains example files for setting up a new deployment:
+
+| File | Purpose |
+|------|---------|
+| `УСТАНОВЧІ ДАНІ ОС.xlsx` | Sample `Database` sheet layout — column headers matching the schema described in [Spreadsheet structure](#spreadsheet-structure), usable as a starting point for a new spreadsheet |
+| `ДОВІДКА (Ф-1).docx` | Sample F-1 export template (see [Document export](#document-export)) with `{Column Name}` placeholders matching this schema |
+| `РОЗШУКОВА КАРТКА.docx` | Sample Wanted Card export template (see [Document export](#document-export)) with `{Column Name}` placeholders matching this schema |
+
+To use a template, upload it to Google Drive (converting to Google Docs format if needed) and set its file ID or link in `Handbook!M9` (`EXPORT_F1_TEMPLATE_CELL`) for the F-1 template, or `Handbook!M11` (`EXPORT_WC_TEMPLATE_CELL`) for the Wanted Card template.
+
 ## Configuration (`Config.js`)
 
 | Constant | Default | Purpose |
