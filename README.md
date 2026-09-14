@@ -106,7 +106,7 @@ Single-value config lives in column A as a vertical list (a documentation label,
 | Cell | Purpose |
 |------|---------|
 | `A2` (`MASTER_MODE_CELL`) | Master Mode toggle (checkbox) — when checked, the webview aggregates data from all source spreadsheets listed in `B2:B` |
-| `A4` (`DATA_FOLDER`) | Google Drive folder ID that contains person images and PDFs |
+| `A4` (`DATA_FOLDER`) | Google Drive folder ID of the shared "UNITS" parent folder (same value everywhere, imported like most other Handbook config) — each unit's own person images/PDFs subfolder inside it is resolved per spreadsheet by matching the unit name extracted from the spreadsheet's own title (e.g. `"УСТАНОВЧІ ДАНІ О/С - 7 РОП"` → `"7 РОП"`), *unless* Master Mode is on for that spreadsheet, in which case `DATA_FOLDER` is used directly as that spreadsheet's own dedicated folder |
 | `A6` (`ACTUAL_PERSONNEL_SPREADSHEET_CELL`) | Link or bare ID of the spreadsheet that holds the authoritative personnel list |
 | `A7` (`ACTUAL_PERSONNEL_RANGE_CELL`) | Range address within that spreadsheet (e.g. `Sheet1!A:A`) containing full names |
 | `A9` (`EXPORT_F1_TEMPLATE_CELL`) | Google Drive file ID (or shareable link) of the F-1 Docs template |
@@ -210,7 +210,7 @@ The **Move** toolbar button appears only when Master Mode is on. Select one or m
 
 What happens on the server:
 1. The row is appended to the destination `Database` sheet and **hard-deleted** from the source (not sent to Trash).
-2. The person's Drive folder — searched by full name (first column) inside the source `DATA_FOLDER` — is moved to the destination `DATA_FOLDER` using `DriveApp`. If the folder is not found or `DATA_FOLDER` is not configured in either spreadsheet the row move still completes; the result dialog shows a per-person note.
+2. The person's Drive folder — searched by full name (first column) inside the source spreadsheet's own unit folder (resolved as the subfolder of `DATA_FOLDER` matching the unit name extracted from that spreadsheet's title, or `DATA_FOLDER` itself directly if Master Mode is on for that spreadsheet) — is moved to the destination spreadsheet's own unit folder using `DriveApp`. If either unit folder can't be resolved, or the person's folder is not found inside it, the row move still completes; the result dialog shows a per-person note.
 3. Rows that already belong to the destination spreadsheet are skipped.
 
 After a successful move the rows reappear in the list immediately under their new spreadsheet, without reopening the webview.
@@ -358,7 +358,7 @@ To use a template, upload it to Google Drive (converting to Google Docs format i
 | `SHEET_HANDBOOK` | `'Handbook'` | Name of the handbook sheet |
 | `SHEET_TRASH` | `'Trash'` | Name of the trash sheet (created automatically on first delete) |
 | `MASTER_MODE_CELL` | `'A2'` | Cell that holds the Master Mode checkbox |
-| `DATA_FOLDER` | `'A4'` | Cell that holds the Google Drive folder ID for person images/PDFs |
+| `DATA_FOLDER` | `'A4'` | Cell that holds the Google Drive folder ID of the shared "UNITS" parent folder |
 | `MASTER_MODE_SOURCES_RANGE` | `'B2:B'` | Range of source spreadsheet IDs/URLs for Master Mode |
 | `ACTUAL_PERSONNEL_SPREADSHEET_CELL` | `'A6'` | Cell holding the link/ID of the external spreadsheet with the actual personnel list |
 | `ACTUAL_PERSONNEL_RANGE_CELL` | `'A7'` | Cell holding the range address within that spreadsheet (e.g. `Sheet1!A:A`) |
@@ -378,6 +378,7 @@ To use a template, upload it to Google Drive (converting to Google Docs format i
 | `EXPORT_IMAGE_THUMBNAIL_SIZE` | `800` | Width (px) requested from Drive's thumbnail service for export images, before the `IMAGE_MAX_HEIGHT` display clamp is applied |
 | `PHOTO_EXPORT_FOLDER_PREFIX` | `'Photos for S-КАДР '` | Destination folder name prefix for [Photo export for S-КАДР](#photo-export-for-s-кадр), combined with today's date |
 | `GID_REGEX` | `/[?&]gid=(\d+)/` | Extracts the tab id from a Google Sheets URL's `gid` parameter; used by [Award import](#award-import-from-s-кадр) to pick the correct tab |
+| `UNIT_NAME_SEPARATOR` | `' - '` | Separator between a unit spreadsheet's fixed title prefix and its actual unit name (e.g. `"УСТАНОВЧІ ДАНІ О/С - 7 РОП"` → `"7 РОП"`); used by `extractUnitName()` to match against Drive folder names in `getUnitDataFolder()` |
 | `AWARDS_IMPORT_ID_COL` / `_NAME_COL` / `_ORDER_NUMBER_COL` / `_ORDER_DATE_COL` | `'A'` / `'F'` / `'G'` / `'H'` | Fixed column letters (A1 notation) for the ID/name/order-number/order-date fields in the external award import sheet |
 | `AWARDS_IMPORT_DATA_START_ROW` | `2` | First data row (after the header) in the external award import sheet |
 | `AWARDS_ORDER_NUMBER_CLEAN_REGEX` | `/\/\d+\|[\W]+/g` | Strips surrounding text/punctuation from the import sheet's free-text order-number field, keeping just the leading number |
