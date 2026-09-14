@@ -87,6 +87,13 @@ const DRIVE_URL_REGEX = /(?:\/folders\/|\/d\/|[?&]id=)([-\w]+)/;
 // Extracts the gid (tab id) from a Google Sheets URL's ?gid=... / #gid=... param.
 const GID_REGEX = /[?&]gid=(\d+)/;
 
+// Separator between a unit spreadsheet's fixed prefix and its actual unit
+// name, e.g. "УСТАНОВЧІ ДАНІ О/С - 7 РОП" → "7 РОП". Used by
+// extractUnitName() (Utils.js) to derive the name matched against Drive
+// folder names in getUnitDataFolder() — the unit's Drive folder is named
+// just "7 РОП", not the spreadsheet's full title.
+const UNIT_NAME_SEPARATOR = ' - ';
+
 // Awards import — fixed column layout (A1 notation) in the external import
 // sheet, row 1 = header, data from row 2. A2:A=ID, F2:F=award name,
 // G2:G=order number, H2:H=order date.

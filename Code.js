@@ -23,13 +23,7 @@ function getMasterSources() {
  * @returns {boolean}
  */
 function getMasterMode() {
-  const sheet = getHandbookSheet();
-  if (!sheet) return false;
-  try {
-    return sheet.getRange(MASTER_MODE_CELL).getValue() === true;
-  } catch (e) {
-    return false;
-  }
+  return readMasterModeFromSheet(getHandbookSheet());
 }
 
 /**
@@ -326,9 +320,13 @@ function getActualPersonnelNames() {
  * order so that deleting one row does not shift the indices of others.
  *
  * After moving each row the function tries to find the person's Drive folder
- * (by full name, first column) in the source DATA_FOLDER and move it to the
- * destination DATA_FOLDER. If the folder is not found or DATA_FOLDER is not
- * configured the row move still succeeds and a note is added to the log.
+ * (by full name, first column) inside the source spreadsheet's own unit
+ * folder and move it into the destination spreadsheet's own unit folder —
+ * both resolved via getUnitDataFolder(), which looks up a subfolder matching
+ * the spreadsheet's own name under the shared Handbook!DATA_FOLDER parent
+ * folder. If that unit folder can't be resolved on either side, or the named
+ * folder is not found inside it, the row move still succeeds and a note is
+ * added to the log.
  *
  * @param {Array<{rowIndex: number, spreadsheetId: string|null}>} rowEntries
  * @param {string|null} destinationSpreadsheetId
@@ -342,7 +340,7 @@ function movePersonnel(rowEntries, destinationSpreadsheetId) {
   const { ss: destSs, sheet: destSheet } = getDatabaseSheet(destinationSpreadsheetId);
 
   const destHandbook = destSs.getSheetByName(SHEET_HANDBOOK);
-  const destFolderId = getDriveIdFromHandbook(destHandbook, DATA_FOLDER);
+  const destFolderId = getUnitDataFolder(destHandbook, destSs);
 
   const groups = groupAndSortBySpreadsheetId(rowEntries);
 
@@ -369,7 +367,7 @@ function movePersonnel(rowEntries, destinationSpreadsheetId) {
     }
 
     const srcHandbook = srcSs.getSheetByName(SHEET_HANDBOOK);
-    const srcFolderId = getDriveIdFromHandbook(srcHandbook, DATA_FOLDER);
+    const srcFolderId = getUnitDataFolder(srcHandbook, srcSs);
 
     const destNumCols = destSheet.getLastColumn();
 
@@ -398,7 +396,7 @@ function movePersonnel(rowEntries, destinationSpreadsheetId) {
       // Try to move the person's Drive folder.
       let folderNote = '';
       if (!srcFolderId || !destFolderId) {
-        folderNote = 'DATA_FOLDER not configured — folder not moved';
+        folderNote = 'Unit data folder not found — folder not moved';
       } else {
         try {
           const srcDataFolder = DriveApp.getFolderById(srcFolderId);

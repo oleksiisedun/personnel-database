@@ -268,6 +268,80 @@ function getDriveIdFromHandbook(handbookSheet, cellAddress) {
 }
 
 /**
+ * Reads the Master Mode toggle (MASTER_MODE_CELL) directly from a given
+ * Handbook sheet, rather than resolving the active spreadsheet's own Handbook
+ * via getHandbookSheet() the way getMasterMode() (Code.js) does. Shared by
+ * getMasterMode() and getUnitDataFolder() (below), which already holds a
+ * Handbook sheet reference for a spreadsheet that isn't necessarily the
+ * active one (a Master Mode source, or the destination in movePersonnel()).
+ *
+ * @param {GoogleAppsScript.Spreadsheet.Sheet|null} handbookSheet
+ * @returns {boolean}
+ */
+function readMasterModeFromSheet(handbookSheet) {
+  if (!handbookSheet) return false;
+  try {
+    return handbookSheet.getRange(MASTER_MODE_CELL).getValue() === true;
+  } catch (e) {
+    return false;
+  }
+}
+
+/**
+ * Extracts the unit name portion of a unit spreadsheet's own file name.
+ * Spreadsheet names follow a "<fixed prefix>UNIT_NAME_SEPARATOR<unit name>"
+ * convention, e.g. "УСТАНОВЧІ ДАНІ О/С - 7 РОП" → "7 РОП", which is what the
+ * unit's actual Drive folder (a direct subfolder of the shared UNITS parent)
+ * is named — matching the full spreadsheet name against the folder name
+ * would never succeed. Splits on the *last* UNIT_NAME_SEPARATOR occurrence
+ * and trims; falls back to the full name unchanged if the separator isn't
+ * present, so an unexpected spreadsheet name degrades to the old
+ * whole-name-match behavior instead of throwing.
+ *
+ * @param {string} spreadsheetName
+ * @returns {string}
+ */
+function extractUnitName(spreadsheetName) {
+  const idx = spreadsheetName.lastIndexOf(UNIT_NAME_SEPARATOR);
+  return idx === -1 ? spreadsheetName.trim() : spreadsheetName.slice(idx + UNIT_NAME_SEPARATOR.length).trim();
+}
+
+/**
+ * Resolves a spreadsheet's own unit-specific person-photo folder.
+ * Only one spreadsheet is expected to run in Master Mode — the central one
+ * that aggregates every other unit — so Handbook!MASTER_MODE_CELL doubles as
+ * the signal for "this spreadsheet's own folder isn't organized under the
+ * shared UNITS tree": when it's true, Handbook!DATA_FOLDER is returned
+ * directly as this spreadsheet's own dedicated folder (e.g. the master
+ * spreadsheet's separate headquarters personnel folder). When Master Mode is
+ * off, DATA_FOLDER is treated as the shared parent "UNITS" folder — the same
+ * ID across every unit spreadsheet, since it's imported via IMPORTRANGE like
+ * most other Handbook config — and searched for a direct subfolder matching
+ * extractUnitName(ss.getName()), case-insensitively (via
+ * findFolderByNameCaseInsensitive()). Returns '' if DATA_FOLDER is
+ * unconfigured, the folder is inaccessible, or (Master Mode off) no subfolder
+ * matches the extracted unit name.
+ *
+ * @param {GoogleAppsScript.Spreadsheet.Sheet|null} handbookSheet
+ * @param {GoogleAppsScript.Spreadsheet.Spreadsheet} ss
+ * @returns {string}
+ */
+function getUnitDataFolder(handbookSheet, ss) {
+  const folderId = getDriveIdFromHandbook(handbookSheet, DATA_FOLDER);
+  if (!folderId) return '';
+
+  if (readMasterModeFromSheet(handbookSheet)) return folderId;
+
+  try {
+    const parentFolder = DriveApp.getFolderById(folderId);
+    const unitFolder = findFolderByNameCaseInsensitive(parentFolder, extractUnitName(ss.getName()));
+    return unitFolder ? unitFolder.getId() : '';
+  } catch (e) {
+    return '';
+  }
+}
+
+/**
  * Finds a direct subfolder of parentFolder matching name, case-insensitively.
  * DriveApp's Folder.getFoldersByName() only does exact, case-sensitive matches.
  * @param {GoogleAppsScript.Drive.Folder} parentFolder
