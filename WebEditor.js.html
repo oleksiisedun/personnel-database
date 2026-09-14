@@ -70,6 +70,7 @@
 
   const FIELD_SEP = ' | ';
   const ROW_SEP = '\n';
+  const MINI_TABLE_HEADER_MIN_FONT_SIZE_PX = 8;
 
   /**
    * Returns a debounced version of fn that fires only after delay ms of silence.
@@ -786,6 +787,7 @@
       });
       tbody.appendChild(tr);
     });
+    tbody.querySelectorAll('.mini-table').forEach(shrinkOverflowingSingleWordHeaders);
     applyColumnVisibility();
     queueImageFetch();
     updateSelectionUI();
@@ -1466,6 +1468,25 @@
     });
     table.appendChild(tbody);
     return table;
+  }
+
+  /**
+   * Shrinks the font-size of any mini-table header cell whose text is a single
+   * word (no space to wrap at) and wider than its column, proportionally to the
+   * exact ratio needed to fit it on one line — never wrapping mid-word or
+   * truncating. Multi-word headers are left untouched; they wrap normally at
+   * spaces. Must be called after `table` is attached to the live DOM, since it
+   * measures actual rendered width (clientWidth/scrollWidth).
+   * @param {HTMLTableElement} table
+   */
+  function shrinkOverflowingSingleWordHeaders(table) {
+    table.querySelectorAll('thead th').forEach(th => {
+      const text = th.textContent;
+      if (!text || /\s/.test(text) || th.scrollWidth <= th.clientWidth) return;
+      const scale = th.clientWidth / th.scrollWidth;
+      const baseSize = parseFloat(getComputedStyle(th).fontSize);
+      th.style.fontSize = `${Math.max(baseSize * scale, MINI_TABLE_HEADER_MIN_FONT_SIZE_PX)}px`;
+    });
   }
 
   /**
