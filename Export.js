@@ -72,7 +72,7 @@ function _makeSheetDataLoader(localSs) {
  * underlined based on the COL_MARITAL_STATUS value.
  *
  * @param {Array<{rowIndex: number, spreadsheetId: string|null}>} rowEntries
- * @param {string} templateCell - Handbook cell address (e.g. 'M9') holding the Docs template Drive ID.
+ * @param {string} templateCell - Handbook cell address (e.g. 'A9') holding the Docs template Drive ID.
  * @param {string} docPrefix - Prefix prepended to the first-column value to form the document name.
  * @returns {{results: Array<{name: string, url: string}>, remaining: Array<{rowIndex: number, spreadsheetId: string|null}>}}
  */
@@ -285,7 +285,7 @@ function exportXLSX(rowEntries, visibleColumnIndices) {
 
 /**
  * Discovers every Actual Personnel person (local Database + every Master Mode
- * source in Handbook!N2:N, processed in that fixed order so duplicate S-КАДР
+ * source in Handbook!B2:B, processed in that fixed order so duplicate S-КАДР
  * ID resolution is reproducible run to run) who has both a non-empty "Фото"
  * and "S-КАДР ID" value, creates the destination Drive folder, and returns
  * the full eligible list plus a skip list. No image bytes are fetched here —
@@ -312,7 +312,7 @@ function startPhotoExport() {
 
   const actualNames = getActualPersonnelNames();
   if (!actualNames) {
-    throw new Error('Actual Personnel list (Handbook!M6/M7) is not configured or not accessible — cannot determine who to export.');
+    throw new Error('Actual Personnel list (Handbook!A6/A7) is not configured or not accessible — cannot determine who to export.');
   }
   const actualSet = new Set(actualNames.map(n => n.trim().toUpperCase()));
 

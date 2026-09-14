@@ -2,7 +2,7 @@
   google.script.host.setWidth(screen.availWidth);
   google.script.host.setHeight(screen.availHeight);
 
-  let schema = null;       // { columns: [{name, type, tableHeaders?}], rows: [{rowIndex, values[]}] }
+  let schema = null;       // { columns: [{name, type, dropdownOptions?, tableHeaders?: [{name, type, dropdownOptions?}]}], rows: [{rowIndex, values[]}] }
   let filteredRows = [];   // subset of schema.rows currently shown after filters
   let editingRow = null;   // row object open in the edit view
   let pendingValues = null; // newValues[] staged by saveRow(), consumed by onSaveSuccess()
@@ -163,14 +163,14 @@
 
   /**
    * Encodes an array of row objects back into the pipe-delimited cell string.
-   * Rows where the first field (filterKey) is empty are excluded.
+   * Rows where every field is empty are excluded (treated as blank/deleted) — a row counts
+   * as filled in if the user entered a value in *any* column, not just the first one.
    * @param {Object[]} data - Array of row objects.
    * @param {string[]} fields - Ordered list of field names.
-   * @param {string} filterKey - Field name used to filter out blank rows.
    * @returns {string}
    */
-  const mergeData = (data, fields, filterKey) => data
-    .filter(r => r[filterKey])
+  const mergeData = (data, fields) => data
+    .filter(r => fields.some(f => r[f]))
     .map(r => fields.map(f => r[f] ?? '').join(FIELD_SEP))
     .join(ROW_SEP);
 
@@ -180,6 +180,15 @@
    * @returns {boolean}
    */
   function isTableType(col) { return col.type.endsWith('-table'); }
+
+  /**
+   * Extracts the bare sub-column name array from a *-table column's tableHeaders (now
+   * {name, type, dropdownOptions?} objects), for use with parseData()/mergeData() which key
+   * sub-table rows by field name only.
+   * @param {{tableHeaders?: Array<{name: string}>}} col
+   * @returns {string[]}
+   */
+  function tableHeaderNames(col) { return (col.tableHeaders || []).map(h => h.name); }
 
   /**
    * Validation rules for column types that have format constraints. Defined at
@@ -733,7 +742,7 @@
         if (col.type === 'image') cell.classList.add('cell-content--image');
         if (isTableType(col)) {
           cell.classList.add('cell-content--table');
-          cell.appendChild(buildMiniTable(parseData(val, col.tableHeaders || []), col.tableHeaders || []));
+          cell.appendChild(buildMiniTable(parseData(val, tableHeaderNames(col)), col.tableHeaders || []));
         } else if (col.type === 'image') {
           const id = extractDriveId(val);
           if (id) {
@@ -1181,18 +1190,14 @@
   }
 
   /**
-   * Builds a <select> element for a dropdown column type (unit, origin, marital-status, sex).
-   * Appends all known options plus the current value if it is not already in the list.
-   * @param {{type: string, [key: string]: string[]}} col - Column descriptor with XyzOptions array.
-   * @param {number} colIndex - Column index used as the select's data-col-index attribute.
-   * @param {string} currentVal - The row's current value for this column.
-   * @returns {HTMLSelectElement}
+   * Populates a <select> with an empty "—" option, each of `options`, and (if not already
+   * present) currentVal, then sets it as selected. Shared by buildDropdownField() (top-level
+   * dropdown columns) and addTableEditorRow() (*-table dropdown sub-columns).
+   * @param {HTMLSelectElement} sel
+   * @param {string[]} options
+   * @param {string} currentVal
    */
-  function buildDropdownField(col, colIndex, currentVal) {
-    const optKey = col.type === 'marital-status' ? 'maritalStatusOptions' : col.type + 'Options';
-    const options = col[optKey] || [];
-    const sel = document.createElement('select');
-    sel.dataset.colIndex = colIndex;
+  function populateSelectOptions(sel, options, currentVal) {
     const emptyOpt = document.createElement('option');
     emptyOpt.value = '';
     emptyOpt.textContent = '—';
@@ -1210,6 +1215,20 @@
       sel.appendChild(o);
     }
     sel.value = currentVal;
+  }
+
+  /**
+   * Builds a <select> element for a dropdown column type (any type with dropdownOptions).
+   * Appends all known options plus the current value if it is not already in the list.
+   * @param {{type: string, dropdownOptions?: string[]}} col - Column descriptor.
+   * @param {number} colIndex - Column index used as the select's data-col-index attribute.
+   * @param {string} currentVal - The row's current value for this column.
+   * @returns {HTMLSelectElement}
+   */
+  function buildDropdownField(col, colIndex, currentVal) {
+    const sel = document.createElement('select');
+    sel.dataset.colIndex = colIndex;
+    populateSelectOptions(sel, col.dropdownOptions || [], currentVal);
     return sel;
   }
 
@@ -1254,7 +1273,7 @@
         const panel = document.createElement('div');
         panel.className = 'edit-panel edit-panel--table';
         panel.dataset.tabKey = String(i);
-        panel.appendChild(buildTableEditor(i, parseData(row.values[i] || '', col.tableHeaders || []), col.tableHeaders || []));
+        panel.appendChild(buildTableEditor(i, parseData(row.values[i] || '', tableHeaderNames(col)), col.tableHeaders || []));
         form.appendChild(panel);
 
         const tabBtn = document.createElement('div');
@@ -1273,7 +1292,7 @@
       label.textContent = col.name;
       block.appendChild(label);
 
-      if (col.type === 'unit' || col.type === 'origin' || col.type === 'marital-status' || col.type === 'sex') {
+      if (col.dropdownOptions) {
         block.appendChild(buildDropdownField(col, i, row.values[i] || ''));
       } else if (VALIDATORS[col.type]) {
         const { input, errHint } = buildValidatedInput(col, row.values[i] || '', i);
@@ -1425,19 +1444,20 @@
    * Builds a read-only HTML table element from decoded *-table row data.
    * Used to display *-table column values in the list view.
    * @param {Object[]} rows - Array of row objects (field name → value).
-   * @param {string[]} headers - Ordered sub-column header names.
+   * @param {Array<{name: string}>} headers - Ordered sub-column descriptors.
    * @returns {HTMLTableElement}
    */
   function buildMiniTable(rows, headers) {
     const table = document.createElement('table');
     table.className = 'mini-table';
-    const colgroup = buildTableColgroup(rows, headers);
+    const headerNames = (headers || []).map(h => h.name);
+    const colgroup = buildTableColgroup(rows, headerNames);
     if (colgroup) table.appendChild(colgroup);
-    table.appendChild(buildTableHeaderRow(headers));
+    table.appendChild(buildTableHeaderRow(headerNames));
     const tbody = document.createElement('tbody');
     (rows || []).forEach(rowObj => {
       const tr = document.createElement('tr');
-      (headers || []).forEach(h => {
+      headerNames.forEach(h => {
         const td = document.createElement('td');
         td.textContent = rowObj[h] || '';
         tr.appendChild(td);
@@ -1455,7 +1475,7 @@
    * encodeTableEditor() can locate it during save.
    * @param {number} colIndex - Index of the column in schema.columns.
    * @param {Object[]} rows - Pre-decoded row objects.
-   * @param {string[]} headers - Sub-column header names.
+   * @param {Array<{name: string, type: string, dropdownOptions?: string[]}>} headers - Sub-column descriptors.
    * @returns {HTMLDivElement}
    */
   function buildTableEditor(colIndex, rows, headers) {
@@ -1464,9 +1484,10 @@
     wrapper.dataset.colIndex = colIndex;
     const table = document.createElement('table');
 
-    const colgroup = buildTableColgroup(rows, headers, true);
+    const headerNames = (headers || []).map(h => h.name);
+    const colgroup = buildTableColgroup(rows, headerNames, true);
     if (colgroup) table.appendChild(colgroup);
-    table.appendChild(buildTableHeaderRow(headers, true));
+    table.appendChild(buildTableHeaderRow(headerNames, true));
     const tbody = document.createElement('tbody');
     (rows || []).forEach(rowObj => addTableEditorRow(tbody, headers, rowObj));
     table.appendChild(tbody);
@@ -1481,21 +1502,40 @@
   }
 
   /**
-   * Appends a new editable row to a table editor tbody. Each cell contains a
-   * text input tagged with data-field (the header name). The last cell contains
-   * a delete button that removes the row from the DOM.
+   * Appends a new editable row to a table editor tbody. Each cell contains a text input
+   * (or, when the sub-column has dropdownOptions, a <select>) tagged with data-field (the
+   * header name). A sub-column whose type has a VALIDATORS entry (date/tin/number) gets the
+   * same live format validation as a top-level field of that type — placeholder, hint tooltip,
+   * and a red border while the value doesn't match. The last cell contains a delete button
+   * that removes the row from the DOM.
    * @param {HTMLTableSectionElement} tbody
-   * @param {string[]} headers - Sub-column header names.
+   * @param {Array<{name: string, type: string, dropdownOptions?: string[]}>} headers - Sub-column descriptors.
    * @param {Object|null} rowObj - Existing row data to pre-fill, or null for an empty row.
    */
   function addTableEditorRow(tbody, headers, rowObj) {
     const tr = document.createElement('tr');
     (headers || []).forEach(h => {
       const td = document.createElement('td');
-      const inp = document.createElement('input');
-      inp.type = 'text';
-      inp.value = rowObj?.[h] ?? '';
-      inp.dataset.field = h;
+      const currentVal = rowObj?.[h.name] ?? '';
+      let inp;
+      if (h.dropdownOptions) {
+        inp = document.createElement('select');
+        populateSelectOptions(inp, h.dropdownOptions, currentVal);
+      } else {
+        inp = document.createElement('input');
+        inp.type = 'text';
+        inp.value = currentVal;
+        const validator = VALIDATORS[h.type];
+        if (validator) {
+          inp.placeholder = validator.placeholder;
+          inp.title = validator.hint;
+          inp.addEventListener('input', () => {
+            const val = inp.value.trim();
+            inp.classList.toggle('input-error', !!val && !validator.regex.test(val));
+          });
+        }
+      }
+      inp.dataset.field = h.name;
       td.appendChild(inp);
       tr.appendChild(td);
     });
@@ -1511,11 +1551,11 @@
   }
 
   /**
-   * Reads all input values from a table editor widget and encodes them back into
-   * the pipe-delimited cell string using mergeData(). Rows where the first field
-   * is empty are excluded (treated as blank/deleted).
+   * Reads all input/select values from a table editor widget and encodes them back into
+   * the pipe-delimited cell string using mergeData(). Rows where every field is empty are
+   * excluded (treated as blank/deleted).
    * @param {number} colIndex - Index of the column whose editor to read.
-   * @param {{tableHeaders: string[]}} col - Column descriptor from schema.
+   * @param {{tableHeaders?: Array<{name: string}>}} col - Column descriptor from schema.
    * @returns {string} Encoded cell value ready to write to the sheet.
    */
   function encodeTableEditor(colIndex, col) {
@@ -1524,12 +1564,12 @@
     const rows = [];
     wrapper.querySelectorAll('tbody tr').forEach(tr => {
       const obj = {};
-      tr.querySelectorAll('input[data-field]').forEach(inp => {
+      tr.querySelectorAll('[data-field]').forEach(inp => {
         obj[inp.dataset.field] = inp.value;
       });
       rows.push(obj);
     });
-    return mergeData(rows, col.tableHeaders || [], (col.tableHeaders || [])[0] || '');
+    return mergeData(rows, tableHeaderNames(col));
   }
 
   /**
@@ -1564,13 +1604,28 @@
   }
 
   /**
-   * Collects new values for all columns from the edit form (plain inputs and table
+   * Validates every VALIDATORS-typed field — plain inputs and *-table sub-columns alike —
+   * then collects new values for all columns from the edit form (plain inputs and table
    * editors), stores them in pendingValues, and calls updateRow() on the server.
    * Disables the Save button for the duration of the async call.
    */
   function saveRow() {
     let validationError = null;
     schema.columns.forEach((col, i) => {
+      if (isTableType(col)) {
+        const wrapper = document.querySelector(`#edit-form .table-editor[data-col-index="${i}"]`);
+        if (!wrapper) return;
+        wrapper.querySelectorAll('input[data-field]').forEach(inp => {
+          const h = (col.tableHeaders || []).find(hh => hh.name === inp.dataset.field);
+          const validator = h && VALIDATORS[h.type];
+          if (!validator) return;
+          const val = inp.value.trim();
+          const valid = !val || validator.regex.test(val);
+          inp.classList.toggle('input-error', !valid);
+          if (!valid && !validationError) validationError = validator.msg;
+        });
+        return;
+      }
       const validator = VALIDATORS[col.type];
       if (!validator) return;
       const inp = document.querySelector(`#edit-form input[data-col-index="${i}"]`);

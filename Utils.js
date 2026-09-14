@@ -7,6 +7,57 @@ function getHandbookSheet() {
 }
 
 /**
+ * Reads the Handbook's Data Types & Allowed Values table (HANDBOOK_DATA_TYPES_RANGE) into a
+ * map from data type name (lowercased) to its ordered list of allowed values. Only rows with
+ * at least one non-empty value produce an entry — a type row left with no values (e.g. "text",
+ * "date") is documentation only and correctly gets no dropdown. Used by getSchemaAndData() to
+ * attach col.dropdownOptions to every column — top-level or *-table sub-column — whose type
+ * matches a row here.
+ * @returns {Object.<string, string[]>}
+ */
+function getDataTypeOptionsMap() {
+  const sheet = getHandbookSheet();
+  if (!sheet) return {};
+  const map = {};
+  try {
+    sheet.getRange(HANDBOOK_DATA_TYPES_RANGE).getValues().forEach(row => {
+      const type = String(row[0]).trim().toLowerCase();
+      if (!type) return;
+      const values = row.slice(1).map(v => String(v).trim()).filter(v => v !== '');
+      if (values.length) map[type] = values;
+    });
+  } catch (e) {
+    // skip if Handbook data-types range is inaccessible
+  }
+  return map;
+}
+
+/**
+ * Reads the Handbook's Table Columns table (HANDBOOK_TABLE_COLUMNS_RANGE) into a map from
+ * *-table column type (lowercased) to its ordered sub-column definitions. Used by
+ * getSchemaAndData() to attach col.tableHeaders to every *-table column.
+ * @returns {Object.<string, Array<{name: string, type: string}>>}
+ */
+function getTableColumnsMap() {
+  const sheet = getHandbookSheet();
+  if (!sheet) return {};
+  const map = {};
+  try {
+    sheet.getRange(HANDBOOK_TABLE_COLUMNS_RANGE).getValues().forEach(row => {
+      const tableType = String(row[0]).trim().toLowerCase();
+      const name = String(row[1]).trim();
+      const colType = String(row[2]).trim().toLowerCase();
+      if (!tableType || !name) return;
+      if (!map[tableType]) map[tableType] = [];
+      map[tableType].push({ name, type: colType });
+    });
+  } catch (e) {
+    // skip if Handbook table-columns range is inaccessible
+  }
+  return map;
+}
+
+/**
  * Validates that the active spreadsheet's Database and Handbook sheets exist.
  * Most Handbook reads in getSchemaAndData() individually fall back to a safe
  * empty default on error rather than throwing, so a missing Handbook sheet
@@ -234,7 +285,7 @@ function findFolderByNameCaseInsensitive(parentFolder, name) {
 }
 
 /**
- * Opens the export folder (Handbook!M13 / EXPORT_FOLDER_CELL) by ID, throwing
+ * Opens the export folder (Handbook!A13 / EXPORT_FOLDER_CELL) by ID, throwing
  * a clear, actionable error instead of DriveApp's raw "Unexpected error while
  * getting the method or property getFolderById on object DriveApp" — either
  * because the cell is empty, or because the current user's account lacks

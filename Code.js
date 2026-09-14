@@ -1,5 +1,5 @@
 /**
- * Returns the list of source spreadsheet IDs from Handbook N2:N.
+ * Returns the list of source spreadsheet IDs from Handbook!B2:B.
  * Used by Master Mode to aggregate data from multiple spreadsheets.
  *
  * @returns {string[]}
@@ -17,8 +17,8 @@ function getMasterSources() {
 }
 
 /**
- * Reads the Master Mode toggle from Handbook!M2.
- * When true, the webview aggregates data from all source spreadsheets listed in N2:N.
+ * Reads the Master Mode toggle from Handbook!A2.
+ * When true, the webview aggregates data from all source spreadsheets listed in B2:B.
  *
  * @returns {boolean}
  */
@@ -296,7 +296,7 @@ function openSpreadsheetSafely(id) {
 
 /**
  * Reads the actual personnel name list from the external spreadsheet configured
- * in Handbook M6 (spreadsheet link/ID) and M7 (range address).
+ * in Handbook A6 (spreadsheet link/ID) and A7 (range address).
  * Returns null if not configured or if the spreadsheet is inaccessible.
  *
  * @returns {string[]|null}
@@ -432,11 +432,19 @@ function movePersonnel(rowEntries, destinationSpreadsheetId) {
  *   Row 3+ — data rows
  *
  * Handbook layout (row 1 is a header and is skipped):
- *   Column A — data type name (e.g. relatives-table)
- *   Column B+ — sub-column headers for that type
+ *   Column A — single-value config (vertical label/value list; see Config.js constants)
+ *   Column B — Master Mode source spreadsheet list
+ *   Columns D:F — Export Correspondence table (Template Placeholder | Database Column | Computed Value)
+ *   Columns H:J — Table Columns table (Table Type | Column Name | Column Type)
+ *   Columns L:AL — Data Types & Allowed Values table (Data Type | Allowed Values...); a type
+ *     row with values is a dropdown type, a type row with no values is documentation only
  *
  * @returns {{
- *   columns: Array<{name: string, type: string, tableHeaders?: string[]}>,
+ *   columns: Array<{
+ *     name: string, type: string,
+ *     dropdownOptions?: string[],
+ *     tableHeaders?: Array<{name: string, type: string, dropdownOptions?: string[]}>
+ *   }>,
  *   rows: Array<{rowIndex: number, values: string[]}>,
  *   masterMode: boolean,
  *   masterSourceIds: string[],
@@ -469,35 +477,18 @@ function getSchemaAndData() {
   const masterMode = getMasterMode();
   const masterSourceIds = masterMode ? getMasterSources() : [];
 
-  const tableHeadersMap = {};
-  const handbookSheet = ss.getSheetByName(SHEET_HANDBOOK);
-  if (handbookSheet) {
-    try {
-      const hbData = handbookSheet.getRange(HANDBOOK_TYPES_RANGE).getValues();
-      for (let r = 0; r < hbData.length; r++) {
-        const dataType = String(hbData[r][0]).trim().toLowerCase();
-        if (!dataType) continue;
-        const headers = hbData[r].slice(1).map(h => String(h)).filter(h => h !== '');
-        if (headers.length) tableHeadersMap[dataType] = headers;
-      }
-    } catch (e) {
-      // skip if Handbook table-types range is inaccessible
-    }
-  }
+  const dataTypeOptionsMap = getDataTypeOptionsMap();
+  const tableColumnsMap = getTableColumnsMap();
   columns.forEach(col => {
-    if (col.type.endsWith('-table')) col.tableHeaders = tableHeadersMap[col.type] || [];
-  });
-
-  DROPDOWN_TYPES.forEach(({ type, range, key }) => {
-    let options = [];
-    if (handbookSheet) {
-      try {
-        options = handbookSheet.getRange(range).getValues().map(r => String(r[0])).filter(v => v !== '');
-      } catch (e) {
-        // skip if this Handbook range is inaccessible
-      }
+    if (col.type.endsWith('-table')) {
+      col.tableHeaders = (tableColumnsMap[col.type] || []).map(sub => {
+        const subCol = { name: sub.name, type: sub.type };
+        if (dataTypeOptionsMap[sub.type]) subCol.dropdownOptions = dataTypeOptionsMap[sub.type];
+        return subCol;
+      });
+    } else if (dataTypeOptionsMap[col.type]) {
+      col.dropdownOptions = dataTypeOptionsMap[col.type];
     }
-    columns.forEach(col => { if (col.type === type) col[key] = options; });
   });
 
   const masterSources = masterMode ? [{ id: null, name: ss.getName() }] : undefined;

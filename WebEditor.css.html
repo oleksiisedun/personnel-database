@@ -81,9 +81,18 @@
   .table-editor th, .table-editor td { border: 1px solid #ddd; padding: 4px 6px; }
   .table-editor thead th { background: #f5f5f5; font-weight: 600; font-size: 12px; color: #555; white-space: nowrap; }
   .table-editor td:last-child { width: 28px; text-align: center; }
-  .table-editor input[type="text"] {
+  .table-editor input[type="text"], .table-editor select {
     width: 100%; min-width: 80px; padding: 4px 6px; border: 1px solid var(--color-border);
     border-radius: var(--radius); font-size: 13px; outline: none; box-sizing: border-box;
+  }
+  .table-editor select {
+    cursor: pointer; padding-right: 22px;
+    appearance: none; -webkit-appearance: none; -moz-appearance: none;
+    background: #fff url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6' viewBox='0 0 10 6'%3E%3Cpath d='M1 1l4 4 4-4' stroke='%23555' stroke-width='1.5' fill='none' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E") no-repeat right 6px center;
+  }
+  .table-editor input.input-error {
+    border-color: var(--color-danger);
+    box-shadow: 0 0 0 2px rgba(198,40,40,0.2);
   }
   .btn-delete-row { background: none; border: none; cursor: pointer; color: var(--color-danger); font-size: 16px; padding: 0 4px; }
   .btn-delete-row:hover { color: var(--color-danger-hover); }

@@ -3,39 +3,44 @@ const SHEET_DATABASE = 'Database';
 const SHEET_HANDBOOK = 'Handbook';
 const SHEET_TRASH = 'Trash';
 
-// Handbook layout — Master Mode toggle cell and source spreadsheet IDs range
-const MASTER_MODE_CELL = 'M2';
-const MASTER_MODE_SOURCES_RANGE = 'N2:N';
+// Handbook layout — Master Mode toggle cell and source spreadsheet list. Column A holds
+// single-value config as a vertical (label row, then value row(s)) list — labels are
+// documentation only, values live at these fixed addresses. Column B holds the Master Mode
+// source spreadsheet list (open-ended rows, one URL/ID per row).
+const MASTER_MODE_CELL = 'A2';
+const MASTER_MODE_SOURCES_RANGE = 'B2:B';
 
 // Handbook layout — data folder cell
-const DATA_FOLDER = 'M4';
-
-// Handbook layout — table-type definitions
-const HANDBOOK_TYPES_RANGE = 'A2:K15';
-
-// Handbook layout — placeholder correspondence table
-const HANDBOOK_CORR_RANGE = 'A17:C40';
-
-// Handbook layout — allowed values for "unit" type columns
-const HANDBOOK_UNIT_RANGE = 'D17:D40';
-
-// Handbook layout — allowed values for "origin" type columns
-const HANDBOOK_ORIGIN_RANGE = 'E17:E40';
-
-// Handbook layout — allowed values for "marital-status" type columns
-const HANDBOOK_MARITAL_STATUS_RANGE = 'F17:F40';
-
-// Handbook layout — allowed values for "sex" type columns
-const HANDBOOK_SEX_RANGE = 'G17:G40';
+const DATA_FOLDER = 'A4';
 
 // Handbook layout — actual personnel list (external spreadsheet link and range address)
-const ACTUAL_PERSONNEL_SPREADSHEET_CELL = 'M6';
-const ACTUAL_PERSONNEL_RANGE_CELL = 'M7';
+const ACTUAL_PERSONNEL_SPREADSHEET_CELL = 'A6';
+const ACTUAL_PERSONNEL_RANGE_CELL = 'A7';
 
 // Handbook layout — export template and destination folder IDs
-const EXPORT_F1_TEMPLATE_CELL = 'M9';
-const EXPORT_WC_TEMPLATE_CELL = 'M11';
-const EXPORT_FOLDER_CELL = 'M13';
+const EXPORT_F1_TEMPLATE_CELL = 'A9';
+const EXPORT_WC_TEMPLATE_CELL = 'A11';
+const EXPORT_FOLDER_CELL = 'A13';
+
+// Handbook layout — placeholder correspondence table (Template Placeholder | Database Column |
+// Computed Value). Open-ended rows — no fixed cap to bump later, same pattern as
+// MASTER_MODE_SOURCES_RANGE.
+const HANDBOOK_CORR_RANGE = 'D2:F';
+
+// Handbook layout — *-table sub-column definitions. One row per (table type, column name,
+// column type) triple: column H = table type (e.g. "medical-table"), column I = sub-column
+// display name, column J = sub-column type — either an intrinsic type (text/date/number/...)
+// or a name from HANDBOOK_DATA_TYPES_RANGE (e.g. "blood-type"), which is what makes that
+// sub-column render as a dropdown instead of a plain text input in the editor. Open-ended rows.
+const HANDBOOK_TABLE_COLUMNS_RANGE = 'H2:J';
+
+// Handbook layout — data type definitions. One row per type: column L = type name, columns
+// M:AL (26 value columns — a practical cap, no dropdown needs more) hold its allowed values
+// listed across the row. A row with no values is a plain/intrinsic type (text/date/image/tin/
+// number) — documentation only. A row with values is automatically a dropdown type
+// (unit/origin/marital-status/sex/blood-type/any future type a colleague adds) — no separate
+// "kind" flag needed. Open-ended rows.
+const HANDBOOK_DATA_TYPES_RANGE = 'L2:AL';
 
 // Database column-name patterns — matched case-insensitively against literal
 // header text read from row 1 (row 1 is not required to be byte-exact across
@@ -139,16 +144,6 @@ const MASTER_MODE_FETCH_CONCURRENCY = 3;
 
 // Persistent IndexedDB image cache — how long an entry is kept before re-fetching from Drive.
 const IMAGE_CACHE_TTL_DAYS = 7;
-
-// Dropdown column type definitions used by both getSchemaAndData() and (via schema) the client.
-// Each entry maps a column type to its Handbook options range and the key name on the column object.
-/** @type {Array<{type: string, range: string, key: string}>} */
-const DROPDOWN_TYPES = [
-  { type: 'unit',           range: HANDBOOK_UNIT_RANGE,           key: 'unitOptions' },
-  { type: 'origin',         range: HANDBOOK_ORIGIN_RANGE,         key: 'originOptions' },
-  { type: 'marital-status', range: HANDBOOK_MARITAL_STATUS_RANGE, key: 'maritalStatusOptions' },
-  { type: 'sex',            range: HANDBOOK_SEX_RANGE,            key: 'sexOptions' },
-];
 
 // Regex patterns shared between server-side phone normalization and export logic.
 const PHONE_REGEX_9DIGIT  = /^\d{9}$/;
