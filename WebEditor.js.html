@@ -1342,7 +1342,6 @@
     });
 
     document.getElementById('edit-title').textContent = isNewRow ? 'Person' : (row.values[0] || 'Edit record');
-    document.getElementById('save-error').style.display = 'none';
     document.getElementById('save-status').textContent = '';
     document.getElementById('btn-save').disabled = false;
     const deleteBtn = document.getElementById('btn-delete');
@@ -1684,7 +1683,6 @@
 
     document.getElementById('btn-save').disabled = true;
     document.getElementById('save-status').textContent = 'Saving…';
-    document.getElementById('save-error').style.display = 'none';
 
     if (isNewRow) {
       const ssSelect = document.getElementById('add-spreadsheet-select');
@@ -1737,14 +1735,13 @@
   }
 
   /**
-   * Failure handler for saveRow(). Re-enables the Save button and displays
-   * the error message inside the edit view.
+   * Failure handler for saveRow(). Re-enables the Save button and alerts the error.
    * @param {Error} err
    */
   function onSaveError(err) {
     document.getElementById('btn-save').disabled = false;
     document.getElementById('save-status').textContent = '';
-    showError('save-error', 'Save failed', err);
+    alert(`Save failed: ${err.message || err}`);
   }
 
   /**
@@ -1754,7 +1751,6 @@
     if (!confirm('Move this person to Trash?')) return;
     document.getElementById('btn-delete').disabled = true;
     document.getElementById('btn-save').disabled = true;
-    document.getElementById('save-error').style.display = 'none';
     google.script.run
       .withSuccessHandler(onDeleteSuccess)
       .withFailureHandler(onDeleteError)
@@ -1777,13 +1773,13 @@
   }
 
   /**
-   * Failure handler for deletePerson(). Re-enables buttons and shows the error.
+   * Failure handler for deletePerson(). Re-enables buttons and alerts the error.
    * @param {Error} err
    */
   function onDeleteError(err) {
     document.getElementById('btn-delete').disabled = false;
     document.getElementById('btn-save').disabled = false;
-    showError('save-error', 'Delete failed', err);
+    alert(`Delete failed: ${err.message || err}`);
   }
 
   /**
