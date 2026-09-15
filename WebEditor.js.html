@@ -1625,13 +1625,26 @@
   }
 
   /**
+   * Human-readable label for one of the edit view's tabs, used only to point the user
+   * at the right place in a validation-error alert — not the UI tab text itself (the
+   * 'main' tab has no visible label of its own; #edit-title shows the person's name).
+   * @param {string} tabKey - 'main', 'documentPhotos', or a *-table column's index as a string.
+   * @returns {string}
+   */
+  function getEditTabLabel(tabKey) {
+    if (tabKey === 'main') return 'the main info tab';
+    if (tabKey === 'documentPhotos') return `the "${schema.documentPhotoTabName}" tab`;
+    return `the "${schema.columns[parseInt(tabKey)].name}" tab`;
+  }
+
+  /**
    * Validates every VALIDATORS-typed field — plain inputs and *-table sub-columns alike —
    * then collects new values for all columns from the edit form (plain inputs and table
    * editors), stores them in pendingValues, and calls updateRow() on the server.
    * Disables the Save button for the duration of the async call.
    */
   function saveRow() {
-    let validationError = null;
+    const invalidFields = []; // { tabKey, fieldName, message }
     schema.columns.forEach((col, i) => {
       if (isTableType(col)) {
         const wrapper = document.querySelector(`#edit-form .table-editor[data-col-index="${i}"]`);
@@ -1643,7 +1656,7 @@
           const val = inp.value.trim();
           const valid = !val || validator.regex.test(val);
           inp.classList.toggle('input-error', !valid);
-          if (!valid && !validationError) validationError = validator.msg;
+          if (!valid) invalidFields.push({ tabKey: String(i), fieldName: h.name, message: validator.msg });
         });
         return;
       }
@@ -1654,12 +1667,15 @@
       const val = inp.value.trim();
       const valid = !val || validator.regex.test(val);
       inp.classList.toggle('input-error', !valid);
-      if (!valid && !validationError) validationError = validator.msg;
+      if (!valid) {
+        const panel = inp.closest('.edit-panel');
+        invalidFields.push({ tabKey: panel ? panel.dataset.tabKey : 'main', fieldName: col.name, message: validator.msg });
+      }
     });
-    if (validationError) {
-      const el = document.getElementById('save-error');
-      el.textContent = validationError;
-      el.style.display = 'block';
+    if (invalidFields.length) {
+      switchEditTab(invalidFields[0].tabKey);
+      const lines = invalidFields.map(f => `- "${f.fieldName}" on ${getEditTabLabel(f.tabKey)}: ${f.message}`);
+      alert(`Cannot save — fix the following field(s) before saving:\n\n${lines.join('\n')}`);
       return;
     }
 
