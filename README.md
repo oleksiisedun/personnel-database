@@ -172,15 +172,17 @@ If the linked file is a **PDF**, the cell shows a red "PDF" badge instead of a t
 
 ### Date columns
 
-Values are stored as plain text in `DD.MM.YYYY` format. In the edit view, the input validates the format on every keystroke and highlights the field in red with an error hint if the format is wrong. The Save button is blocked until all date fields are valid (empty values are allowed).
-
-Values entered directly in the sheet that do not match the format are displayed as-is; no validation is applied outside the web editor.
+Values are stored as plain text in `DD.MM.YYYY` format. In the edit view, the input validates the format on every keystroke and highlights the field in red with an error hint if the format is wrong.
 
 ### TIN columns
 
-Values are stored as plain text. In the edit view, the input validates on every keystroke that the value is exactly 10 digits (digits only, no spaces or other characters). The Save button is blocked until all TIN fields are valid (empty values are allowed).
+Values are stored as plain text. In the edit view, the input validates on every keystroke that the value is exactly 10 digits (digits only, no spaces or other characters).
 
-Values entered directly in the sheet that do not match the format are displayed as-is; no validation is applied outside the web editor.
+### Save-time validation errors
+
+Clicking **Save** re-validates every `date`/`tin`/`number` field (plain columns and `*-table` sub-columns alike) across **all** edit-view tabs, not just the one currently visible — including fields the user never touched, such as a malformed value entered directly in the sheet before the record was opened in the editor (empty values always pass). If any field fails, the editor switches to the tab containing the first invalid field and shows an alert listing every invalid field together with its tab and the expected format, instead of a generic banner — this is deliberate so a stale bad value on a tab the user isn't looking at (e.g. a birth date typed wrong directly in the sheet) isn't mistaken for a problem with whatever field the user was just editing. No save request is sent while any field is invalid.
+
+Values entered directly in the sheet that do not match a validated column's expected format are displayed as-is in the list view; no validation is applied there — only the edit view enforces format, at save time as described above.
 
 ### Dropdown and table column types
 
