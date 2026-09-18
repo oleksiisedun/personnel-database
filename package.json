@@ -1,0 +1,24 @@
+{
+  "name": "personnel-database",
+  "version": "1.0.0",
+  "description": "A Google Sheets–based personnel database with a built-in web editor. Data lives in a Google Sheet; the web editor provides a richer UI for browsing, editing, and exporting records.",
+  "main": "Code.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/oleksiisedun/personnel-database.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "bugs": {
+    "url": "https://github.com/oleksiisedun/personnel-database/issues"
+  },
+  "homepage": "https://github.com/oleksiisedun/personnel-database#readme",
+  "devDependencies": {
+    "@types/google-apps-script": "^2.0.13"
+  }
+}
