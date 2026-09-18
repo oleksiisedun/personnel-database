@@ -8,7 +8,7 @@ clasp push
 ./clasp-push.sh
 ```
 
-There is no build step, linter, or test suite.
+There is no build step, linter, or test suite. The one machine-checkable guardrail is `npm run typecheck` (`tsc -p jsconfig.json`, `checkJs` over the root `*.js` files against `@types/google-apps-script`, non-strict) — run it after editing `.js` files. It can't see the JS embedded in `WebEditor.js.html`. Since JSDoc is the only source of type info, a failure often means a stale `@param`/`@returns`.
 
 **Never run `clasp push`/`clasp-push.sh` or otherwise deploy/test changes yourself.** These scripts push live to real bound spreadsheets (including production personnel data across all targets in `clasp-targets.json`). Leave deployment and live testing to the user.
 
