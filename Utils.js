@@ -161,7 +161,7 @@ function padRowToColumnCount(values, numCols) {
  * Row 0 is column names, row 1 is column types.
  *
  * @param {Array<Array<*>>} allData - Full sheet data including header rows.
- * @returns {Array<{name: string, type: string}>}
+ * @returns {Array<{name: string, type: string, dropdownOptions?: string[], tableHeaders?: Array<{name: string, type: string, dropdownOptions?: string[]}>}>}
  */
 function extractColumnSchema(allData) {
   return allData[0].map((name, i) => ({

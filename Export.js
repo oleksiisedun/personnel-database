@@ -24,7 +24,7 @@ function exportWC(rowEntries) {
  * source spreadsheet (by ID) is read from Sheets at most once per call.
  *
  * @param {GoogleAppsScript.Spreadsheet.Spreadsheet} localSs - Used when spreadsheetId is null/undefined.
- * @returns {function(string|null): ({all: Array<Array<*>>, columns: Array<{name: string, type: string}>}|null)}
+ * @returns {(spreadsheetId: string|null) => ({all: Array<Array<*>>, columns: Array<{name: string, type: string}>}|null)}
  */
 function _makeSheetDataLoader(localSs) {
   const sheetCache = new Map();
@@ -86,11 +86,11 @@ function _exportDoc(rowEntries, templateCell, docPrefix) {
   const getSheetData = _makeSheetDataLoader(localSs);
 
   const results = [];
-  const startTime = new Date();
+  const startTime = Date.now();
   let remaining = [];
 
   for (let i = 0; i < rowEntries.length; i++) {
-    if (new Date() - startTime > EXPORT_TIME_LIMIT_MS) {
+    if (Date.now() - startTime > EXPORT_TIME_LIMIT_MS) {
       remaining = rowEntries.slice(i);
       break;
     }
@@ -229,10 +229,10 @@ function exportXLSX(rowEntries, visibleColumnIndices) {
 
   const grid = [headerRow];
   const linkCells = []; // { a1: string, row: number, col: number, formula: string }
-  const startTime = new Date();
+  const startTime = Date.now();
 
   rowEntries.forEach(entry => {
-    if (new Date() - startTime > EXPORT_TIME_LIMIT_MS) {
+    if (Date.now() - startTime > EXPORT_TIME_LIMIT_MS) {
       throw new Error(`XLSX export timed out after building ${grid.length - 1} of ${rowEntries.length} rows. Select fewer rows and try again.`);
     }
     const sheetData = getSheetData(entry.spreadsheetId ?? null);
@@ -322,10 +322,10 @@ function startPhotoExport() {
   const seenCardIds = new Map(); // cardId -> fullName of first winner
   const eligible = [];
   const skipped = [];
-  const startTime = new Date();
+  const startTime = Date.now();
 
   sourceIds.forEach((spreadsheetId, idx) => {
-    if (new Date() - startTime > EXPORT_TIME_LIMIT_MS) {
+    if (Date.now() - startTime > EXPORT_TIME_LIMIT_MS) {
       throw new Error(`Timed out scanning personnel (${idx} of ${sourceIds.length} sources completed).`);
     }
     const sheetData = getSheetData(spreadsheetId);
@@ -382,11 +382,11 @@ function copyPhotosBatch(folderId, entries) {
   const folder = DriveApp.getFolderById(folderId);
   const results = [];
   const skipped = [];
-  const startTime = new Date();
+  const startTime = Date.now();
   let remaining = [];
 
   for (let i = 0; i < entries.length; i++) {
-    if (new Date() - startTime > EXPORT_TIME_LIMIT_MS) {
+    if (Date.now() - startTime > EXPORT_TIME_LIMIT_MS) {
       remaining = entries.slice(i);
       break;
     }
@@ -453,7 +453,7 @@ function _fetchXlsxExportBlob(spreadsheetId) {
  *
  * @param {{name: string, type: string}} col
  * @param {string} raw - Raw stringified cell value.
- * @param {function(string): ({type: string, viewUrl?: string})} resolveDriveInfo - Cached per-fileId Drive lookup.
+ * @param {(fileId: string) => ({type: string, viewUrl?: string})} resolveDriveInfo - Cached per-fileId Drive lookup.
  * @returns {string|null} An `=HYPERLINK("url","display")` formula, or null.
  */
 function _buildXlsxLinkCell(col, raw, resolveDriveInfo) {
@@ -800,8 +800,8 @@ function _fillServiceHistoryTable(body, data) {
   if (!found) return;
 
   // Navigate up: Text → Paragraph → TableCell → TableRow → Table
-  const placeholderRow = found.getElement().getParent().getParent().getParent();
-  const table = placeholderRow.getParent();
+  const placeholderRow = /** @type {GoogleAppsScript.Document.TableRow} */ (found.getElement().getParent().getParent().getParent());
+  const table = placeholderRow.getParent().asTable();
   const rowIndex = table.getChildIndex(placeholderRow);
 
   if (entries.length === 0) {

@@ -447,6 +447,7 @@ function movePersonnel(rowEntries, destinationSpreadsheetId) {
  *   masterMode: boolean,
  *   masterSourceIds: string[],
  *   masterSources: Array<{id: string|null, name: string}>|undefined,
+ *   actualPersonnelNames: string[]|null,
  *   filterDebounceMs: number,
  *   imageFetchBatchSize: number,
  *   imageFetchConcurrency: number,
