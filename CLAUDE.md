@@ -5,7 +5,7 @@
 clasp push
 
 # Push to all target spreadsheets listed in clasp-targets.json
-./clasp-push.sh
+./clasp-push.sh   # or: npm run clasp-push
 ```
 
 There is no build step, linter, or test suite. The one machine-checkable guardrail is `npm run typecheck` (`tsc -p jsconfig.json`, `checkJs` over the root `*.js` files against `@types/google-apps-script`, non-strict) — run it after editing `.js` files. It can't see the JS embedded in `WebEditor.js.html`. Since JSDoc is the only source of type info, a failure often means a stale `@param`/`@returns`.
