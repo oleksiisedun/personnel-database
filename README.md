@@ -2,9 +2,11 @@
 
 A Google Sheets–based personnel database with a built-in web editor. Data lives in a Google Sheet; the web editor provides a richer UI for browsing, editing, and exporting records.
 
+To set it up, see [Getting started](#getting-started). Detailed reference (spreadsheet layout, features, exports, configuration) is under [Documentation](#documentation).
+
 ## How it works
 
-The project is a [Google Apps Script](https://developers.google.com/apps-script) bound to a Google Spreadsheet, deployed locally with [CLASP](https://github.com/google/clasp).
+The project is a [Google Apps Script](https://developers.google.com/apps-script) bound to a Google Spreadsheet, deployed locally with [CLASP](https://github.com/google/clasp). The Sheets menu (`onOpen()` in `Code.js`) opens the web editor as a modal dialog; the browser-side UI (`WebEditor.*.html`) talks to the server only through `google.script.run`. `Code.js` handles data access and row CRUD, delegates document, XLSX and photo exports to `Export.js`, and shares helpers from `Utils.js` with `Export.js` and `Import.js`. All data lives in the `Database`, `Handbook` and `Trash` sheets (plus remote spreadsheets in Master Mode) and in Google Drive.
 
 ```mermaid
 flowchart TD
@@ -86,343 +88,55 @@ All deployable code lives in `src/` (the only directory clasp pushes); tooling a
 | `src/WebEditor.html` | Client app shell; includes CSS and JS via `<?!= HtmlService.createHtmlOutputFromFile(...) ?>` |
 | `src/WebEditor.css.html` | Styles for the web editor |
 | `src/WebEditor.js.html` | Client-side logic for the web editor |
+| `docs/` | User-facing reference (spreadsheet setup, features, exports, configuration) and contributor-level `architecture-*.md` notes per feature area |
+| `eslint.config.mjs`, `jsconfig.json` | Lint and typecheck config for `npm run check` |
+| `clasp-push.sh`, `clasp-targets.json` | Multi-spreadsheet deploy script and its (git-ignored) target list |
 
-## Spreadsheet structure
+## Features
 
-### `Database` sheet
+- **List view** with per-column filters (plain text or regex), column visibility, image thumbnails, and an optional "Actual personnel" filter
+- **Edit view** per person, with typed fields (dates, TIN, numbers, dropdowns, sub-tables), save-time validation, and a warning before unsaved edits are discarded
+- **Add / delete** — new rows go to the local `Database` sheet; deleted rows move to `Trash` rather than being destroyed
+- **Document export** — fill F-1 and Wanted Card Google Docs templates from the selected rows, or export them as a single `.xlsx`
+- **Master Mode** — aggregate several unit spreadsheets in one editor and move personnel between them
+- **Menu utilities** — fix phone numbers and full names in place; in Master Mode, S-КАДР photo export and award import
 
-| Row | Purpose |
-|-----|---------|
-| 1 | Column names |
-| 2 | Column types (`text`, `image`, `date`, `number`, `unit`, `tin`, `relatives-table`, `service-table`, …) |
-| 3+ | Data rows |
+See [Features](docs/features.md) for the details.
 
-### `Trash` sheet
+## Getting started
 
-Same structure as `Database` (row 1 = column names, row 2 = column types, row 3+ = data rows). Deleted records are appended here instead of being permanently removed. The sheet is created automatically on first delete if it does not exist.
+### Prerequisites
 
-### `Handbook` sheet
+- A Google account that can edit the target spreadsheet, which needs `Database` and `Handbook` sheets (see [Spreadsheet structure](docs/spreadsheet-setup.md#spreadsheet-structure) and [Sample files](docs/spreadsheet-setup.md#sample-files))
+- [Node.js](https://nodejs.org) and npm
+- [`jq`](https://jqlang.github.io/jq/) — only needed for `clasp-push.sh`
 
-Single-value config lives in column A as a vertical list (a documentation label, then its value on the row(s) below):
-
-| Cell | Purpose |
-|------|---------|
-| `A2` (`MASTER_MODE_CELL`) | Master Mode toggle (checkbox) — when checked, the webview aggregates data from all source spreadsheets listed in `B2:B` |
-| `A4` (`DATA_FOLDER`) | Google Drive folder ID of the shared "UNITS" parent folder (same value everywhere, imported like most other Handbook config) — each unit's own person images/PDFs subfolder inside it is resolved per spreadsheet by matching the unit name extracted from the spreadsheet's own title (e.g. `"УСТАНОВЧІ ДАНІ О/С - 7 РОП"` → `"7 РОП"`), *unless* Master Mode is on for that spreadsheet, in which case `DATA_FOLDER` is used directly as that spreadsheet's own dedicated folder |
-| `A6` (`ACTUAL_PERSONNEL_SPREADSHEET_CELL`) | Link or bare ID of the spreadsheet that holds the authoritative personnel list |
-| `A7` (`ACTUAL_PERSONNEL_RANGE_CELL`) | Range address within that spreadsheet (e.g. `Sheet1!A:A`) containing full names |
-| `A9` (`EXPORT_F1_TEMPLATE_CELL`) | Google Drive file ID (or shareable link) of the F-1 Docs template |
-| `A11` (`EXPORT_WC_TEMPLATE_CELL`) | Google Drive file ID (or shareable link) of the Wanted Card Docs template |
-| `A13` (`EXPORT_FOLDER_CELL`) | Google Drive folder ID (or shareable link) where exported documents are saved |
-| `B2:B` (`MASTER_MODE_SOURCES_RANGE`) | Source spreadsheet IDs/URLs — one per row; used when Master Mode is ON |
-
-Three more tables sit side by side across the rest of row 1 onward — each a header row followed by open-ended data rows (no fixed row cap; just add a row):
-
-| Range | Purpose |
-|-------|---------|
-| `D2:F` (`HANDBOOK_CORR_RANGE`) | Placeholder correspondence table for document exports (see [Correspondence table columns](#correspondence-table-columns)) |
-| `H2:J` (`HANDBOOK_TABLE_COLUMNS_RANGE`) | `*-table` sub-column definitions: `Table Type \| Column Name \| Column Type`, one row per sub-column |
-| `L2:AL` (`HANDBOOK_DATA_TYPES_RANGE`) | Data type definitions: `Data Type \| Allowed Values...`, one row per type name. A row with values (e.g. `unit`, `blood-type`) is a dropdown type; a row with no values (e.g. `text`, `date`) is documentation only |
-
-Adding a new dropdown type, or a new `*-table` type/column, is a Handbook edit — add a row to the relevant table above. No code change needed. See [Dropdown and table column types](#dropdown-and-table-column-types) below.
-
-#### Correspondence table columns
-
-| Column | Purpose |
-|--------|---------|
-| D | Placeholder name (used as `{placeholder}` in the template) |
-| E | Source Database column name (value is copied directly) |
-| F | Computed value key (see [Computed values](#computed-values) below) |
-
-Exactly one of E or F should be filled per row.
-
-## Column types
-
-| Type | List view | Edit view |
-|------|-----------|-----------|
-| `text` | Plain text | Text input |
-| `image` | Thumbnail (click to enlarge) | Google Drive link input with live preview |
-| `date` | Plain text | Text input with `DD.MM.YYYY` format validation |
-| `tin` | Plain text | Text input validated as exactly 10 digits |
-| `number` | Plain text | Text input validated as digits only |
-| *(any dropdown type, e.g.* `unit`*,* `origin`*,* `marital-status`*,* `sex`*,* `blood-type`*)* | Plain text | Dropdown of allowed values from the Handbook's Data Types table |
-| `*-table` | Decoded mini-table | Row/column editor with add & delete — a sub-column can itself be a dropdown type |
-
-### `*-table` encoding format
-
-Table data is stored in a single cell as a pipe-and-newline delimited string:
-
-```
-value1 | value2 | value3
-value1 | value2 | value3
-```
-
-### Image columns
-
-Images are stored as Google Drive sharing links. Supported URL formats:
-
-- `https://drive.google.com/file/d/FILE_ID/view`
-- `https://drive.google.com/drive/folders/FOLDER_ID`
-- `https://drive.google.com/open?id=FILE_ID`
-- Bare file ID
-
-Images are fetched server-side (via `DriveApp`) and returned as base64 data URLs, so all users with access to the spreadsheet can view images regardless of their personal Drive session.
-
-Fetched images are persisted in an **IndexedDB** database (`pdb_images`) so subsequent dialog opens display all thumbnails immediately without any server round-trips. Entries expire after `IMAGE_CACHE_TTL_DAYS` (default 7 days). To force a full re-fetch, clear the site data for the script origin in browser DevTools.
-
-If the linked file is a **PDF**, the cell shows a red "PDF" badge instead of a thumbnail; clicking it opens the file in Drive in a new tab. If the link points to a **Drive folder**, a blue "Folder" badge is shown instead. If the script owner does not have access to the linked file, a gray **"No access"** badge is shown.
-
-### Date columns
-
-Values are stored as plain text in `DD.MM.YYYY` format. In the edit view, the input validates the format on every keystroke and highlights the field in red with an error hint if the format is wrong.
-
-### TIN columns
-
-Values are stored as plain text. In the edit view, the input validates on every keystroke that the value is exactly 10 digits (digits only, no spaces or other characters).
-
-### Save-time validation errors
-
-Clicking **Save** re-validates every `date`/`tin`/`number` field (plain columns and `*-table` sub-columns alike) across **all** edit-view tabs, not just the one currently visible — including fields the user never touched, such as a malformed value entered directly in the sheet before the record was opened in the editor (empty values always pass). If any field fails, the editor switches to the tab containing the first invalid field and shows an alert listing every invalid field together with its tab and the expected format, instead of a generic banner — this is deliberate so a stale bad value on a tab the user isn't looking at (e.g. a birth date typed wrong directly in the sheet) isn't mistaken for a problem with whatever field the user was just editing. No save request is sent while any field is invalid.
-
-Values entered directly in the sheet that do not match a validated column's expected format are displayed as-is in the list view; no validation is applied there — only the edit view enforces format, at save time as described above.
-
-### Dropdown and table column types
-
-Dropdown types are entirely defined in the Handbook's Data Types table (`L2:AL`, `Data Type | Allowed Values...`) — no code change is needed to add one. A type name with at least one value in its row (e.g. `unit`, `origin`, `marital-status`, `sex`, `blood-type`) automatically becomes a dropdown: at page load its values are read and served to the client as part of the schema, and in the edit view the field renders as a `<select>` containing only those values. Values entered directly in the sheet that are not in the allowed list are appended to the dropdown as an extra option and shown selected, so no data is lost. A type name with no values in its row (e.g. `text`, `date`, `image`, `tin`, `number`) is documentation only.
-
-`*-table` sub-columns can be dropdown types too. The Table Columns table (`H2:J`, `Table Type | Column Name | Column Type`) assigns a type to every sub-column of every `*-table` — if that type has values in the Data Types table, the sub-column renders as a dropdown in the table editor; otherwise it's a plain text input. This is how, for example, a `medical-table`'s "Група крові" (blood type) column can be a dropdown while its other sub-columns stay free text.
-
-## Master Mode
-
-When the **Master Mode** checkbox (`Handbook!A2`) is checked, `getSchemaAndData()` returns the source spreadsheet IDs listed in `Handbook!B2:B` (`masterSourceIds`) without opening any of them itself, so the local `Database` rows render immediately. The client then calls `queueMasterSourceFetch()`, which fetches each source's rows one at a time through a concurrency-limited worker pool (`MASTER_MODE_FETCH_CONCURRENCY` in `Config.js`) via `getMasterSourceRows(spreadsheetId)`. Each remote row carries a `spreadsheetId` property so saves and deletes are routed back to the correct spreadsheet. As each source resolves, its rows are appended to the list and the view is silently re-filtered — so remote rows stream in over the following seconds while the local-only list is already visible. Inaccessible sources are skipped silently.
-
-Before accepting a remote source's rows, `getMasterSourceRows()` compares the remote sheet's column names and types (rows 1 and 2) against the local `Database` sheet. If they differ, the source's rows are **not loaded** and an amber **⚠** warning button appears to the left of the "All Units" checkbox in the toolbar. Clicking it opens a dialog listing each mismatched source by name and each differing column by its spreadsheet letter (A, B, C…) alongside the local and remote header names. Sources with a matching schema load normally.
-
-The displayed list is always sorted: local spreadsheet rows first, then each remote source in the order it appears in `Handbook!B2:B`, with rows within each source in their original sheet row order. This sort runs on every filter pass, so the order is stable even while sources are still loading.
-
-The **"All units"** toolbar checkbox (visible only in Master Mode, checked by default) hides all streamed-in remote rows so only the local `Database` sheet's own rows are shown.
-
-The green **Refresh** button (visible only in Master Mode, to the left of "All units") re-runs the same load — local rows plus every Master Mode source — without closing the dialog, so updates made by other admins in a source spreadsheet since the dialog was opened become visible. It preserves current filter text and column visibility, but clears the row selection checkboxes (row positions may have shifted upstream). Clicking it again while a previous refresh's remote sources are still streaming in safely discards the stale results instead of duplicating rows.
-
-When Master Mode is **OFF**, only the local `Database` sheet is shown. Editing (add / edit / delete) is always available regardless of Master Mode.
-
-New rows added via **Add person** always go to the local `Database` sheet, never to a remote source.
-
-### Move personnel (Master Mode only)
-
-The **Move** toolbar button appears only when Master Mode is on. Select one or more rows with the checkbox column, click **Move**, pick a destination spreadsheet from the dropdown, and confirm.
-
-What happens on the server:
-1. The row is appended to the destination `Database` sheet and **hard-deleted** from the source (not sent to Trash).
-2. The person's Drive folder — searched by full name (first column) inside the source spreadsheet's own unit folder (resolved as the subfolder of `DATA_FOLDER` matching the unit name extracted from that spreadsheet's title, or `DATA_FOLDER` itself directly if Master Mode is on for that spreadsheet) — is moved to the destination spreadsheet's own unit folder using `DriveApp`. If either unit folder can't be resolved, or the person's folder is not found inside it, the row move still completes; the result dialog shows a per-person note.
-3. Rows that already belong to the destination spreadsheet are skipped.
-
-After a successful move the rows reappear in the list immediately under their new spreadsheet, without reopening the webview.
-
-## Custom menu
-
-Opening the web editor (either "Open Web Editor" or "Export photos for S-КАДР" below) first checks that the `Database` and `Handbook` sheets exist. If either is missing, a dialog reports it instead of the editor opening in a silently broken state.
-
-The Sheets **More... ⭐️** menu (added by `onOpen()`) always has three items, plus two more shown only when Master Mode (`Handbook!A2`) is on:
-
-| Item | Action |
-|------|--------|
-| Open Web Editor | Opens the web editor dialog described below |
-| Fix phone numbers | Scans the `Database` sheet's `Номер телефону` column and rewrites two malformed shapes in place: bare 9-digit numbers missing the leading `0`, and 12-digit numbers carrying a `38` country-code prefix. Numbers already in canonical 10-digit form are left untouched. Runs synchronously over the whole sheet and reports the fixed count via a dialog. No undo beyond manual edit or `Trash` recovery. |
-| Fix full names | Scans the `Database` sheet's `ПІБ` column and rewrites each value: trims surrounding whitespace, collapses internal whitespace runs (including newlines) to a single space, and uppercases the surname (first word). Already-normalized values are left untouched. Runs synchronously over the whole sheet and reports the fixed count via a dialog. No undo beyond manual edit or `Trash` recovery. |
-| Export photos for S-КАДР *(Master Mode only)* | Opens the same web editor dialog in a dedicated progress view and copies photos for every Actual Personnel row across the local sheet and all Master Mode sources — see [Photo export for S-КАДР](#photo-export-for-s-кадр) |
-| Import awards from S-КАДР *(Master Mode only)* | Prompts for an external Google Sheets URL and merges its award rows into the local `Нагороди` column across the local sheet and all Master Mode sources — see [Award import from S-КАДР](#award-import-from-s-кадр) |
-
-## Photo export for S-КАДР
-
-Triggered by the **Export photos for S-КАДР** menu item (Master Mode only). It opens the same `WebEditor` dialog as **Open Web Editor**, but in a dedicated progress view instead of the normal list — there is no manual row selection here.
-
-Instead of operating on a checkbox selection, it sweeps **every** row on the Actual Personnel list (`Handbook!A6`/`A7`) across the local `Database` sheet and every Master Mode source, in two phases:
-
-1. **Discovery** — walks the local sheet, then each `Handbook!B2:B` source in order, reading only the `Фото` and `S-КАДР ID` columns (no image bytes fetched yet). A person missing either value is skipped with a reason. If the same `S-КАДР ID` appears more than once (e.g. duplicated across sources), the first occurrence found wins and later ones are recorded as duplicate skips.
-2. **Copy/convert** — for each eligible person, fetches the full-resolution photo from Drive, force-converts it to JPEG, and saves it as `{S-КАДР ID}.jpg` in a new destination folder named `Photos for S-КАДР DD.MM.YYYY` inside `Handbook!A13` (`EXPORT_FOLDER_CELL`). Runs in automatic time-boxed batches the same way F-1/WC export does, so large personnel lists don't hit the Apps Script execution limit.
-
-When finished, the dialog shows a link to the destination folder plus the accumulated list of skipped/duplicate entries with their reasons. Closing the dialog in this mode closes the whole window, since there's no list view to return to.
-
-## Award import from S-КАДР
-
-Triggered by the **Import awards from S-КАДР** menu item (Master Mode only). Unlike every other Master Mode feature, this one uses plain Sheets `ui.prompt()`/`ui.alert()` dialogs instead of the web editor — the whole operation is a synchronous sheet-to-sheet scan with no per-row Drive I/O, so it comfortably finishes within one execution.
-
-1. Prompts for the full URL of the external S-КАДР Google Sheet. If the URL contains a `gid` parameter it opens that exact tab; otherwise it uses the first tab.
-2. Reads award rows by **fixed column position** (not header text) — ID, award name, order number, and order date columns, configured in `Config.js` (`AWARDS_IMPORT_ID_COL`/`_NAME_COL`/`_ORDER_NUMBER_COL`/`_ORDER_DATE_COL`, data starting at row `AWARDS_IMPORT_DATA_START_ROW`). Rows with no ID or no award name are skipped. The award name's first letter is capitalized, and the order number is cleaned of surrounding text (e.g. `"Указ Президента України № 559/2022"` → `"559"`).
-3. Matches each imported ID against the local `Database` sheet and every Master Mode source's `S-КАДР ID` column. An ID found in more than one source resolves to the first match (local first, then sources in `Handbook!B2:B` order).
-4. Merges the new award entries into the matched person's `Нагороди` cell, skipping any entry that exactly duplicates one already there, and writes the merged cell back.
-
-The final alert shows counts (people updated, entries added, duplicates skipped, IDs not found) plus up to `AWARDS_IMPORT_NOT_FOUND_DISPLAY_LIMIT` not-found IDs by name. The full per-ID log is written to the Apps Script execution log (**Executions** in the Apps Script editor), since the alert dialog isn't scrollable.
-
-## Web editor features
-
-- **List view** — full-screen table with all columns and data
-- **Filtering** — debounced live filter input above every column; supports plain text and regular expressions (toggle per session); for `image` columns the search matches the raw Drive URL/ID (`""` to filter empty); for `*-table` columns the search runs against the raw encoded cell content, so any sub-field value is matched
-- **Actual personnel filter** — "Actual personnel" checkbox in the toolbar (enabled only when `Handbook!A6`/`A7` are configured and accessible), **checked by default** whenever it's enabled; when checked, only rows whose first-column value (full name) appears in the external personnel list are shown; composes with all other filters
-- **All units filter** (Master Mode only) — "All units" checkbox in the toolbar, checked by default; uncheck to hide rows streamed in from Master Mode source spreadsheets and show only the local `Database` sheet's rows; composes with all other filters. An amber ⚠ button appears to its left when one or more remote sources have a column schema mismatch; clicking it shows which columns differ so the issue can be fixed in the remote sheet
-- **Refresh** (Master Mode only) — green button to the left of "All units"; re-fetches local rows and every Master Mode source without closing the dialog, so changes made by other admins become visible; preserves filter text and column visibility, clears row selection
-- **Reset** — orange button to the left of Refresh, always visible; clears all column filters, the regex/"Actual personnel"/"All units" toggles, hidden-column visibility, and the row selection checkboxes back to their defaults, without re-fetching data from the server
-- **Add person** — appends a new empty row to the local `Database` sheet and opens it in the edit view immediately
-- **Delete** — red "Delete" button in the edit view moves the record to the `Trash` sheet of its source spreadsheet (not available for unsaved new rows)
-- **Unsaved changes confirmation** — clicking "Back" in the edit view with pending edits (including `*-table` fields) shows a "Keep Editing" / "Discard Changes" prompt instead of silently discarding them; no prompt if nothing changed
-- **Column visibility** — "Columns ▾" button to hide/show individual columns; first column is always visible
-- **Image thumbnails** — loaded asynchronously; persisted in IndexedDB so subsequent opens display instantly
-- **Lightbox** — click any thumbnail to view the full image
-- **Row selection** — checkbox column at the left of the table; master checkbox in the filter row selects/deselects all visible rows; indeterminate state when a subset is selected; drives which rows are exported and moved
-- **Export XLSX** — exports the selected rows, restricted to currently visible columns, as a single `.xlsx` file (see [XLSX export](#xlsx-export))
-- **Move** (Master Mode only) — moves selected rows to another spreadsheet and relocates the person's Drive folder; button is hidden when Master Mode is off
-- **Edit view** — click a name in the first column to open a per-record editor. All regular (non-`*-table`, non-`image`) fields share one "main" tab; every `image`-type field is grouped into its own dedicated tab (labeled from `Config.js`'s `DOCUMENT_PHOTO_TAB_NAME`, shown only if the record has at least one `image` column); each `*-table` column (e.g. service history, close relatives, awards) also gets its own tab in the header next to the person's name, so wide sub-tables and photo fields don't crowd the main form. Switching tabs never discards edits — every tab stays mounted in the background for the life of the edit session
-
-## Document export
-
-Two export types are available from the toolbar. Both operate on the **selected** rows (rows checked via the checkbox column). The export buttons are disabled until at least one row is selected.
-
-| Button | Template cell | Output prefix |
-|--------|---------------|---------------|
-| Export F-1 | `Handbook!A9` (`EXPORT_F1_TEMPLATE_CELL`) | `Ф-1 ` |
-| Export WC | `Handbook!A11` (`EXPORT_WC_TEMPLATE_CELL`) | `РК ` |
-
-Exported files are saved to the Google Drive folder configured in `Handbook!A13` (`EXPORT_FOLDER_CELL`). Each cell accepts either a bare Drive ID or a full shareable link.
-
-### How export works
-
-Placeholders in the template use the format `{Column Name}`. Four passes run per document:
-
-1. **Images** — `image`-type column placeholders are replaced with a compressed image blob
-2. **Service history table** — `{Проходження служби}` is expanded into one table row per entry
-3. **Direct text** — remaining `{Column Name}` placeholders are replaced with cell values
-4. **Correspondence table** — Handbook-defined aliases and computed values fill any remaining placeholders
-
-After all passes, the marital status line is underlined based on the `Сімейний стан` value.
-
-### Image compression
-
-Google Docs embeds an inserted image's actual bytes regardless of the display size set afterward, so inserting a full-resolution photo (often several MB) made exported documents unnecessarily large even though they only displayed at `IMAGE_MAX_HEIGHT` px tall. Image placeholders are now filled with a resized thumbnail fetched via the Advanced Drive Service (`Drive.Files.get(fileId, {fields: 'thumbnailLink'})`, enabled in `appsscript.json`) requested at `EXPORT_IMAGE_THUMBNAIL_SIZE` px wide, rather than the original file. If the Drive advanced service or thumbnail fetch fails for any reason, export falls back to the original full-resolution blob, so this never breaks or blanks an export.
-
-### Computed values
-
-These keys can be placed in column C of the correspondence table:
-
-| Key | Description |
-|-----|-------------|
-| `totalServiceLength` | Duration from last date in `Дата призову` to today, e.g. `3 роки, 8 місяців, 17 днів (станом на 09.05.2026)` |
-| `contractSignDate` | First date in `Дата призову` + unit number from first service entry, e.g. `07.05.2015 з в/ч 3011` |
-| `currentPosition` | Position title from the last entry in `Проходження служби` |
-| `currentPositionStartDate` | Start date of the last entry in `Проходження служби` |
-| `motherFullName` | Full name of relative with relation `мати` |
-| `fatherFullName` | Full name of relative with relation `батько` |
-| `spouseFullName` | Full name of relative with relation `дружина` or `чоловік` |
-| `motherActualAddress` | Address of relative with relation `мати` |
-| `fatherActualAddress` | Address of relative with relation `батько` |
-| `spouseActualAddress` | Address of relative with relation `дружина` or `чоловік` |
-| `motherPhoneNumber` | Phone of relative with relation `мати` |
-| `fatherPhoneNumber` | Phone of relative with relation `батько` |
-| `spousePhoneNumber` | Phone of relative with relation `дружина` or `чоловік` |
-| `childrenNamesBirthDates` | Numbered list of children's names and birth dates |
-| `childrenPhoneNumbers` | Comma-separated phone numbers of all children |
-| `relativesWithPhoneNumbers` | Semicolon-separated list of all relatives with a phone number, formatted as `relation, name, address, phone` |
-| `awardsList` | Semicolon-joined sentence built from the `Нагороди` sub-table, each entry formatted `{name} №{order number} від {order date}`, with the number/date parts individually omitted when empty |
-
-### Large exports
-
-When more than `EXPORT_CONFIRM_THRESHOLD` (default 10) rows are selected, clicking an export button shows a confirmation dialog with a time estimate before the export begins. This prevents accidental long-running exports, since there is no way to cancel once started. The estimate is computed as `total × EXPORT_SECONDS_PER_DOC` (default 6 s/doc, so 5 docs ≈ 30 s).
-
-Exports run in automatic batches capped at `EXPORT_TIME_LIMIT_MS` (5 minutes) to stay within the Google Apps Script execution limit. The client automatically fires the next batch until all rows are done — no user interaction required. The progress bar in the export dialog shows real-time progress across batches.
-
-## XLSX export
-
-The "Export XLSX" toolbar button exports the **selected** rows (checkbox column), restricted to the columns currently **visible** in the list view (toggle via "Columns ▾"), as a single `.xlsx` file:
-
-- Regular columns → cell value as-is
-- `*-table` columns → the raw pipe/newline-encoded storage string, unchanged
-- `image` columns, and any other column whose value looks like a Drive sharing URL → a clickable `HYPERLINK()` formula pointing at the file/folder's Drive view URL (no image embedding, no blob fetch — link only)
-
-The file is named `Export DD.MM.YYYY.xlsx` (today's date) and saved to the same Drive folder as F-1/WC exports (`Handbook!A13`). Repeated exports on the same day are saved as separate files — Drive allows duplicate filenames, so no overwrite/suffix logic is applied.
-
-Since Apps Script has no way to author `.xlsx` bytes directly and this project has no build step (so no bundling a library like ExcelJS), the export is built as a temporary Google Sheet and converted by fetching the Sheets export URL (`.../export?format=xlsx`) via `UrlFetchApp`, authorized with the script's own OAuth token (`Blob.getAs()` doesn't support this conversion); the temp sheet is always deleted afterward, even on error. Unlike F-1/WC export, this is a single `google.script.run` call with no batching — it produces one file for the whole selection, not one file per row, so there's no partial result to resume. See `exportXLSX()` in `Export.js` and `runExportXlsx()` in `WebEditor.js.html`.
-
-## Sample files
-
-The `samples/` directory contains example files for setting up a new deployment:
-
-| File | Purpose |
-|------|---------|
-| `УСТАНОВЧІ ДАНІ ОС.xlsx` | Sample `Database` sheet layout — column headers matching the schema described in [Spreadsheet structure](#spreadsheet-structure), usable as a starting point for a new spreadsheet |
-| `ДОВІДКА (Ф-1).docx` | Sample F-1 export template (see [Document export](#document-export)) with `{Column Name}` placeholders matching this schema |
-| `РОЗШУКОВА КАРТКА.docx` | Sample Wanted Card export template (see [Document export](#document-export)) with `{Column Name}` placeholders matching this schema |
-
-To use a template, upload it to Google Drive (converting to Google Docs format if needed) and set its file ID or link in `Handbook!A9` (`EXPORT_F1_TEMPLATE_CELL`) for the F-1 template, or `Handbook!A11` (`EXPORT_WC_TEMPLATE_CELL`) for the Wanted Card template.
-
-## Configuration (`Config.js`)
-
-| Constant | Default | Purpose |
-|----------|---------|---------|
-| `SHEET_DATABASE` | `'Database'` | Name of the data sheet |
-| `SHEET_HANDBOOK` | `'Handbook'` | Name of the handbook sheet |
-| `SHEET_TRASH` | `'Trash'` | Name of the trash sheet (created automatically on first delete) |
-| `MASTER_MODE_CELL` | `'A2'` | Cell that holds the Master Mode checkbox |
-| `DATA_FOLDER` | `'A4'` | Cell that holds the Google Drive folder ID of the shared "UNITS" parent folder |
-| `MASTER_MODE_SOURCES_RANGE` | `'B2:B'` | Range of source spreadsheet IDs/URLs for Master Mode |
-| `ACTUAL_PERSONNEL_SPREADSHEET_CELL` | `'A6'` | Cell holding the link/ID of the external spreadsheet with the actual personnel list |
-| `ACTUAL_PERSONNEL_RANGE_CELL` | `'A7'` | Cell holding the range address within that spreadsheet (e.g. `Sheet1!A:A`) |
-| `EXPORT_F1_TEMPLATE_CELL` | `'A9'` | Cell holding the Drive ID or link of the F-1 Docs template |
-| `EXPORT_WC_TEMPLATE_CELL` | `'A11'` | Cell holding the Drive ID or link of the Wanted Card Docs template |
-| `EXPORT_FOLDER_CELL` | `'A13'` | Cell holding the Drive ID or link of the folder for exported documents |
-| `HANDBOOK_CORR_RANGE` | `'D2:F'` | Range of the placeholder correspondence table |
-| `HANDBOOK_TABLE_COLUMNS_RANGE` | `'H2:J'` | Range of `*-table` sub-column definitions (`Table Type \| Column Name \| Column Type`) |
-| `HANDBOOK_DATA_TYPES_RANGE` | `'L2:AL'` | Range of data type definitions (`Data Type \| Allowed Values...`) — a type with values is a dropdown type |
-| `COL_DRAFT_DATE` / `_SERVICE_HISTORY` / `_CLOSE_RELATIVES` / `_AWARDS` / `_MARITAL_STATUS` / `_CONTRACT_UNTIL` / `_PHONE_NUMBER` / `_FULL_NAME` / `_PHOTO` / `_CARD_ID` | case-insensitive regexes, e.g. `/дата призову/i` | Match `Database` column headers by name (not exact string) so several features keep working even if header casing drifts across Master Mode sources. The `Database` sheet's headers must contain text matching each of these for the corresponding feature to work: `Дата призову` (service length), `Проходження служби` (service table), `Близькі родичі` (relative lookups), `Нагороди` (award import/export), `Сімейний стан` (export underline), `Контракт укладено до`, `Номер телефону` (Fix phone numbers), `ПІБ` (Fix full names), `Фото`/`S-КАДР ID` (photo export) — the sample `Database` layout in `samples/` already uses matching headers |
-| `DOCUMENT_PHOTO_TAB_NAME` | `'Фото документи'` | Tab label grouping all `image`-type fields together in the edit view (see [Web editor features](#web-editor-features)) |
-| `EXPORT_TIME_LIMIT_MS` | `300000` | Max server execution time per batch (ms) |
-| `EXPORT_CONFIRM_THRESHOLD` | `10` | Row count above which a confirmation dialog is shown before export starts |
-| `EXPORT_SECONDS_PER_DOC` | `6` | Seconds per document used to estimate export duration in the confirmation dialog |
-| `F1_DOC_PREFIX` | `'Ф-1 '` | Filename prefix for F-1 exports |
-| `WC_DOC_PREFIX` | `'РК '` | Filename prefix for Wanted Card exports |
-| `DEFAULT_UNIT_NUMBER` | `'3102'` | Fallback military unit number for `contractSignDate` |
-| `IMAGE_MAX_HEIGHT` | `500` | Max image height (px) when inserting into a document |
-| `EXPORT_IMAGE_THUMBNAIL_SIZE` | `800` | Width (px) requested from Drive's thumbnail service for export images, before the `IMAGE_MAX_HEIGHT` display clamp is applied |
-| `PHOTO_EXPORT_FOLDER_PREFIX` | `'Photos for S-КАДР '` | Destination folder name prefix for [Photo export for S-КАДР](#photo-export-for-s-кадр), combined with today's date |
-| `GID_REGEX` | `/[?&]gid=(\d+)/` | Extracts the tab id from a Google Sheets URL's `gid` parameter; used by [Award import](#award-import-from-s-кадр) to pick the correct tab |
-| `UNIT_NAME_SEPARATOR` | `' - '` | Separator between a unit spreadsheet's fixed title prefix and its actual unit name (e.g. `"УСТАНОВЧІ ДАНІ О/С - 7 РОП"` → `"7 РОП"`); used by `extractUnitName()` to match against Drive folder names in `getUnitDataFolder()` |
-| `AWARDS_IMPORT_ID_COL` / `_NAME_COL` / `_ORDER_NUMBER_COL` / `_ORDER_DATE_COL` | `'A'` / `'F'` / `'G'` / `'H'` | Fixed column letters (A1 notation) for the ID/name/order-number/order-date fields in the external award import sheet |
-| `AWARDS_IMPORT_DATA_START_ROW` | `2` | First data row (after the header) in the external award import sheet |
-| `AWARDS_ORDER_NUMBER_CLEAN_REGEX` | `/\/\d+\|[\W]+/g` | Strips surrounding text/punctuation from the import sheet's free-text order-number field, keeping just the leading number |
-| `AWARDS_IMPORT_NOT_FOUND_DISPLAY_LIMIT` | `20` | Max "not found" IDs listed by name in the award import summary alert before collapsing the rest into a `(+N more)` suffix |
-| `TABLE_FIELD_SEP` | `' \| '` | Field separator used to encode/decode `*-table` cell values (shared by `Export.js` and `Import.js`; the client declares its own copy) |
-| `TABLE_ROW_SEP` | `'\n'` | Row separator used to encode/decode `*-table` cell values (same sharing as `TABLE_FIELD_SEP`) |
-| `COLUMN_MIN_WIDTHS` | `{ text: 150, image: 150, table: 900 }` | Minimum column widths (px) in the list view |
-| `COLUMN_MAX_WIDTHS` | `{ image: 250 }` | Maximum column widths (px) in the list view |
-| `FILTER_DEBOUNCE_MS` | `500` | Debounce delay (ms) for filter text inputs |
-| `IMAGE_FETCH_BATCH_SIZE` | `10` | Number of Drive files resolved per `google.script.run` call |
-| `IMAGE_FETCH_CONCURRENCY` | `3` | Number of image-fetch batches running in parallel; raising it speeds up large lists but risks the Apps Script 30-concurrent-execution limit |
-| `MASTER_MODE_FETCH_CONCURRENCY` | `3` | Number of remote Master Mode source spreadsheets fetched in parallel after the initial local-only row set has rendered |
-| `IMAGE_CACHE_TTL_DAYS` | `7` | How many days a cached image entry survives in IndexedDB before being re-fetched |
-| `DRIVE_URL_REGEX` | `/(?:\/folders\/\|\/d\/\|[?&]id=)([-\w]+)/` | Extracts a Drive file/folder ID from a sharing URL; shared by `parseDriveId()` and `looksLikeDriveUrl()` |
-| `XLSX_EXPORT_FILENAME_PREFIX` | `'Export '` | Filename prefix for XLSX exports, e.g. `Export 11.08.2026.xlsx` |
-| `XLSX_EXPORT_SECONDS_PER_ROW` | `0.2` | Seconds per row used to estimate XLSX export duration in the confirmation dialog |
-
-## Local development
+### Install and connect
 
 ```bash
-# Install CLASP globally
-npm install -g @google/clasp
-
-# Authenticate
+npm install                    # local tooling: TypeScript + ESLint
+npm install -g @google/clasp   # the Apps Script CLI
 clasp login
-
-# Push changes to the bound script project
-clasp push
-
-# Open the script editor in the browser
-clasp open
 ```
 
-The `.clasp.json` file (git-ignored) links this directory to the deployed project. Besides `scriptId` it must set `"rootDir": "src"`, so clasp pushes only `src/` (including `src/appsscript.json`) and never the repo-root tooling files.
+Create `.clasp.json` in the repo root (it's git-ignored). Use the script ID from the spreadsheet's **Extensions → Apps Script → Project Settings**:
+
+```json
+{ "scriptId": "<script-id>", "rootDir": "src" }
+```
+
+`rootDir` is required: it makes clasp push only `src/` (including `src/appsscript.json`) and never the repo-root tooling files. Re-add it if you ever regenerate the file with `clasp clone`/`clasp create`.
+
+```bash
+clasp push          # deploy src/ to the bound script project
+clasp open-script   # open the Apps Script editor in the browser
+```
+
+Then reload the spreadsheet: the **More... ⭐️** menu appears, and **Open Web Editor** launches the editor.
 
 ### Deploying to multiple spreadsheets
 
-Script IDs for all target spreadsheets are listed in `clasp-targets.json`:
+Script IDs for all target spreadsheets are listed in `clasp-targets.json` (git-ignored — create it yourself on a fresh clone):
 
 ```json
 {
@@ -431,10 +145,28 @@ Script IDs for all target spreadsheets are listed in `clasp-targets.json`:
 }
 ```
 
-Run `clasp-push.sh` to push to all targets in sequence:
+Run `clasp-push.sh` (or `npm run clasp-push`) to `clasp push --force` to every target in sequence:
 
 ```bash
 ./clasp-push.sh
 ```
 
 The script temporarily swaps the `scriptId` in `.clasp.json` for each target and restores the original on exit.
+
+## Development
+
+```bash
+npm run check       # typecheck + lint, in sequence
+npm run typecheck   # tsc over src/*.js against @types/google-apps-script (non-strict)
+npm run lint        # ESLint over src/*.js and the <script> in WebEditor.js.html
+```
+
+There is no build step or test suite. Because JSDoc is the only source of type info, a typecheck failure often means a stale `@param`/`@returns`. Lint's main job is `no-undef` on `WebEditor.js.html`, which `tsc` can't see into. Feature-level internals are in [`docs/`](docs/).
+
+## Documentation
+
+- [Spreadsheet setup](docs/spreadsheet-setup.md) — `Database`, `Trash` and `Handbook` layout, column types, sample files
+- [Features](docs/features.md) — Master Mode, custom menu, S-КАДР photo export and award import, web editor features
+- [Exports](docs/exports.md) — F-1 / Wanted Card documents, computed values, XLSX export
+- [Configuration](docs/configuration.md) — every `Config.js` constant
+- Contributors: [Master Mode](docs/architecture-master-mode.md), [export and import](docs/architecture-export-import.md) and [web editor](docs/architecture-web-editor.md) internals
