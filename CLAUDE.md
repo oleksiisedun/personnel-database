@@ -8,7 +8,10 @@ clasp push
 ./clasp-push.sh   # or: npm run clasp-push
 ```
 
-There is no build step, linter, or test suite. The one machine-checkable guardrail is `npm run typecheck` (`tsc -p jsconfig.json`, `checkJs` over the root `*.js` files against `@types/google-apps-script`, non-strict) — run it after editing `.js` files. It can't see the JS embedded in `WebEditor.js.html`. Since JSDoc is the only source of type info, a failure often means a stale `@param`/`@returns`.
+There is no build step or test suite. Machine-checkable guardrails — run `npm run check` (both, in sequence) after editing code:
+
+- `npm run typecheck` (`tsc -p jsconfig.json`, `checkJs` over the root `*.js` files against `@types/google-apps-script`, non-strict). It can't see the JS embedded in `WebEditor.js.html`. Since JSDoc is the only source of type info, a failure often means a stale `@param`/`@returns`.
+- `npm run lint` (ESLint, `eslint.config.mjs`) — correctness-only rules over the root `*.js` files and the `<script>` body of `WebEditor.js.html` (extracted by a small inline processor in the config, since `eslint-plugin-html` doesn't support ESLint 10). Its main value is `no-undef` on `WebEditor.js.html`, the one place `tsc` can't reach: everything there is a global, so a typo'd function name otherwise only fails at runtime. `no-undef`/`no-unused-vars` are off for the server `.js` files (Apps Script shares one global scope across files; `tsc` covers undefined names there). Globals declared outside that `<script>` (e.g. `INITIAL_MODE`, set by a scriptlet in `WebEditor.html`) must be added to the config's `globals`. `preserve-caught-error` is off because `Error` `cause` needs ES2022 typings.
 
 **Never run `clasp push`/`clasp-push.sh` or otherwise deploy/test changes yourself.** These scripts push live to real bound spreadsheets (including production personnel data across all targets in `clasp-targets.json`). Leave deployment and live testing to the user.
 
