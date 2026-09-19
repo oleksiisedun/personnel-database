@@ -6,9 +6,9 @@
   let filteredRows = [];   // subset of schema.rows currently shown after filters
   let editingRow = null;   // row object open in the edit view
   let pendingValues = null; // newValues[] staged by saveRow(), consumed by onSaveSuccess()
-  let hiddenColumns = new Set(); // column indices hidden by the user
-  let imageCache = {};     // fileId → { type:'image', dataUrl } | { type:'pdf', viewUrl } | null
-  let pendingImages = new Set(); // fileIds currently being fetched to avoid duplicate requests
+  const hiddenColumns = new Set(); // column indices hidden by the user
+  const imageCache = {};     // fileId → { type:'image', dataUrl } | { type:'pdf', viewUrl } | null
+  const pendingImages = new Set(); // fileIds currently being fetched to avoid duplicate requests
   let isNewRow = false;    // true when the edit view holds a freshly appended row
   let originalFormValues = null; // snapshot of collectFormValues() taken right after openEditView() builds the form
   let activeEditTab = 'main';    // 'main', or a *-table column's index as a string — reset to 'main' on every openEditView() call
@@ -1899,7 +1899,7 @@
 
     const fire = batch => {
       progressBar.classList.add('indeterminate');
-      google.script.run
+      const runner = google.script.run
         .withSuccessHandler(response => {
           response.results.forEach(r => {
             const li = document.createElement('li');
@@ -1932,8 +1932,8 @@
             doneCount > 0 ? `Exported ${doneCount} before error:` : '';
           showError('export-error', 'Export failed', err);
           document.getElementById('btn-export-close').style.display = 'inline-block';
-        })
-        [serverFnName](batch);
+        });
+      runner[serverFnName](batch);
     };
 
     fire(entries);

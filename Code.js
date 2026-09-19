@@ -394,7 +394,7 @@ function movePersonnel(rowEntries, destinationSpreadsheetId) {
       movedRows.push(newRow);
 
       // Try to move the person's Drive folder.
-      let folderNote = '';
+      let folderNote;
       if (!srcFolderId || !destFolderId) {
         folderNote = 'Unit data folder not found — folder not moved';
       } else {
