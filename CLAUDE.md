@@ -124,6 +124,8 @@ Related helpers (`Utils.js`) — use them instead of repeating the inline patter
 - [docs/architecture-export-import.md](docs/architecture-export-import.md) — F-1/WC Docs export (4-pass order), XLSX export, S-КАДР photo export (two-phase, `mode = 'photoExport'`), award import.
 - [docs/architecture-web-editor.md](docs/architecture-web-editor.md) — edit view tabs/panels, unsaved-changes and validation flow, `*-table` widths, dropdown/typed sub-column types, image loading/caching, Trash soft delete, `fixPhoneNumbers`/`fixFullNames`.
 
+The user-facing reference (for people using/deploying the tool, not for changing its code) lives in `docs/` too, linked from the README: `spreadsheet-setup.md` (Database/Handbook layout, column types), `features.md`, `exports.md`, `configuration.md` (the `Config.js` constant table). When you add/rename a `Config.js` constant, a Handbook cell, a column type, a menu item, or a user-visible feature, update the matching one of these; keep the README itself short.
+
 Rules that apply even if you don't open those docs:
 
 - Client selection actions (export/move/delete) use `getSelectedRowEntries()`/`getSelectedRows()`; both exclude off-list rows when the Actual personnel filter is on.
