@@ -74,16 +74,18 @@ flowchart TD
     class clasp,claspPush,manifest devtools
 ```
 
+All deployable code lives in `src/` (the only directory clasp pushes); tooling and docs stay at the repo root.
+
 | File | Purpose |
 |------|---------|
-| `Config.js` | All constants — sheet names, column names, Drive IDs, export settings |
-| `Code.js` | Server-side script: menu, data access, image proxy |
-| `Utils.js` | Shared server-side helpers (spreadsheet resolution, schema comparison, column lookups) used by `Code.js`, `Export.js`, and `Import.js` |
-| `Export.js` | Server-side export logic for F-1 and Wanted Card documents, the single-file XLSX export, and the S-КАДР photo export |
-| `Import.js` | Server-side award import from an external S-КАДР sheet |
-| `WebEditor.html` | Client app shell; includes CSS and JS via `<?!= HtmlService.createHtmlOutputFromFile(...) ?>` |
-| `WebEditor.css.html` | Styles for the web editor |
-| `WebEditor.js.html` | Client-side logic for the web editor |
+| `src/Config.js` | All constants — sheet names, column names, Drive IDs, export settings |
+| `src/Code.js` | Server-side script: menu, data access, image proxy |
+| `src/Utils.js` | Shared server-side helpers (spreadsheet resolution, schema comparison, column lookups) used by `Code.js`, `Export.js`, and `Import.js` |
+| `src/Export.js` | Server-side export logic for F-1 and Wanted Card documents, the single-file XLSX export, and the S-КАДР photo export |
+| `src/Import.js` | Server-side award import from an external S-КАДР sheet |
+| `src/WebEditor.html` | Client app shell; includes CSS and JS via `<?!= HtmlService.createHtmlOutputFromFile(...) ?>` |
+| `src/WebEditor.css.html` | Styles for the web editor |
+| `src/WebEditor.js.html` | Client-side logic for the web editor |
 
 ## Spreadsheet structure
 
@@ -416,7 +418,7 @@ clasp push
 clasp open
 ```
 
-The `.clasp.json` file already contains the script ID linking this directory to the deployed project.
+The `.clasp.json` file (git-ignored) links this directory to the deployed project. Besides `scriptId` it must set `"rootDir": "src"`, so clasp pushes only `src/` (including `src/appsscript.json`) and never the repo-root tooling files.
 
 ### Deploying to multiple spreadsheets
 
