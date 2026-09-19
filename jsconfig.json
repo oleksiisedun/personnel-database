@@ -8,6 +8,6 @@
     "skipLibCheck": true,
     "types": ["google-apps-script"]
   },
-  "include": ["*.js"],
+  "include": ["src/*.js"],
   "exclude": ["node_modules"]
 }

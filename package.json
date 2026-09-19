@@ -2,11 +2,11 @@
   "name": "personnel-database",
   "version": "1.0.0",
   "description": "A Google Sheets–based personnel database with a built-in web editor. Data lives in a Google Sheet; the web editor provides a richer UI for browsing, editing, and exporting records.",
-  "main": "Code.js",
+  "main": "src/Code.js",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
     "typecheck": "tsc -p jsconfig.json",
-    "lint": "eslint '*.js' WebEditor.js.html",
+    "lint": "eslint 'src/*.js' src/WebEditor.js.html",
     "check": "npm run typecheck && npm run lint",
     "clasp-push": "./clasp-push.sh"
   },

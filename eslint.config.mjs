@@ -22,7 +22,7 @@ const htmlScript = {
 };
 
 // Correctness-only rules. Types are already covered by `npm run typecheck`
-// (root *.js files); the main gap this fills is the JS embedded in
+// (src/*.js files); the main gap this fills is the JS embedded in
 // WebEditor.js.html, which tsc cannot see.
 const rules = {
   ...js.configs.recommended.rules,
@@ -43,7 +43,7 @@ export default [
   // cross-file references are legitimate; tsc's checkJs already flags
   // genuinely undefined names here.
   {
-    files: ['*.js'],
+    files: ['src/*.js'],
     languageOptions: {
       ecmaVersion: 2020,
       sourceType: 'script',
@@ -55,7 +55,7 @@ export default [
   // Client-side script inside the HtmlService dialog. Not a module: every
   // top-level function is a global, so no-undef is the check tsc can't do.
   {
-    files: ['WebEditor.js.html'],
+    files: ['src/WebEditor.js.html'],
     plugins: { html: htmlScript },
     processor: 'html/script',
     languageOptions: {
