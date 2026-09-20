@@ -85,7 +85,7 @@ const PHOTO_EXPORT_FOLDER_PREFIX = 'Photos for S-КАДР ';
 const DRIVE_URL_REGEX = /(?:\/folders\/|\/d\/|[?&]id=)([-\w]+)/;
 
 // Extracts the gid (tab id) from a Google Sheets URL's ?gid=... / #gid=... param.
-const GID_REGEX = /[?&]gid=(\d+)/;
+const GID_REGEX = /[?&#]gid=(\d+)/;
 
 // Separator between a unit spreadsheet's fixed prefix and its actual unit
 // name, e.g. "УСТАНОВЧІ ДАНІ О/С - 7 РОП" → "7 РОП". Used by

@@ -29,7 +29,7 @@ All tuneable constants live in `src/Config.js`. Back to the [README](../README.m
 | `IMAGE_MAX_HEIGHT` | `500` | Max image height (px) when inserting into a document |
 | `EXPORT_IMAGE_THUMBNAIL_SIZE` | `800` | Width (px) requested from Drive's thumbnail service for export images, before the `IMAGE_MAX_HEIGHT` display clamp is applied |
 | `PHOTO_EXPORT_FOLDER_PREFIX` | `'Photos for S-КАДР '` | Destination folder name prefix for [Photo export for S-КАДР](features.md#photo-export-for-s-кадр), combined with today's date |
-| `GID_REGEX` | `/[?&]gid=(\d+)/` | Extracts the tab id from a Google Sheets URL's `gid` parameter; used by [Award import](features.md#award-import-from-s-кадр) to pick the correct tab |
+| `GID_REGEX` | `/[?&#]gid=(\d+)/` | Extracts the tab id from a Google Sheets URL's `gid` parameter; used by [Award import](features.md#award-import-from-s-кадр) to pick the correct tab |
 | `UNIT_NAME_SEPARATOR` | `' - '` | Separator between a unit spreadsheet's fixed title prefix and its actual unit name (e.g. `"УСТАНОВЧІ ДАНІ О/С - 7 РОП"` → `"7 РОП"`); used by `extractUnitName()` to match against Drive folder names in `getUnitDataFolder()` |
 | `AWARDS_IMPORT_ID_COL` / `_NAME_COL` / `_ORDER_NUMBER_COL` / `_ORDER_DATE_COL` | `'A'` / `'F'` / `'G'` / `'H'` | Fixed column letters (A1 notation) for the ID/name/order-number/order-date fields in the external award import sheet |
 | `AWARDS_IMPORT_DATA_START_ROW` | `2` | First data row (after the header) in the external award import sheet |
