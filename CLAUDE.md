@@ -27,6 +27,7 @@ Google Apps Script project (V8 runtime) bound to a Google Spreadsheet; the web e
 - `Import.js` — award import from S-КАДР
 - `Config.js` — all constants
 - `WebEditor.html` / `WebEditor.css.html` / `WebEditor.js.html` — client shell, styles, client logic (one global scope, no modules)
+- `samples/` (repo root) — example Database layout and F-1/Wanted Card templates for setting up a new deployment; not deployed
 
 ## Code conventions
 
