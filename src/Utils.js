@@ -143,6 +143,20 @@ function normalizeFullName(value) {
 }
 
 /**
+ * Normalizes a Ukrainian phone number: adds a leading zero to a bare 9-digit
+ * number, and strips the "38" country prefix from a 12-digit number. Anything
+ * else is returned unchanged.
+ *
+ * @param {string} phone - Already-trimmed phone number.
+ * @returns {string}
+ */
+function normalizePhoneNumber(phone) {
+  if (PHONE_REGEX_9DIGIT.test(phone) && phone[0] !== '0') return '0' + phone;
+  if (PHONE_REGEX_COUNTRY.test(phone)) return phone.slice(2);
+  return phone;
+}
+
+/**
  * Trims or pads a values array to exactly numCols elements. Excess values are
  * dropped; missing values are filled with empty strings.
  *

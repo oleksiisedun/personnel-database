@@ -141,13 +141,10 @@ function fixPhoneNumbers() {
 
   const result = values.map(row => {
     const phone = String(row[0]).trim();
-    if (PHONE_REGEX_9DIGIT.test(phone) && phone[0] !== '0') {
+    const fixed = normalizePhoneNumber(phone);
+    if (fixed !== phone) {
       fixedCount++;
-      return ['0' + phone];
-    }
-    if (PHONE_REGEX_COUNTRY.test(phone)) {
-      fixedCount++;
-      return [phone.slice(2)];
+      return [fixed];
     }
     return row;
   });
