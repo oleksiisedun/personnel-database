@@ -91,6 +91,7 @@ All deployable code lives in `src/` (the only directory clasp pushes); tooling a
 | `src/WebEditor.js.html` | Client-side logic for the web editor |
 | `docs/` | User-facing reference (spreadsheet setup, features, exports, configuration) and contributor-level `architecture-*.md` notes per feature area |
 | `eslint.config.mjs`, `jsconfig.json` | Lint and typecheck config for `npm run check` |
+| `test/` | Node unit tests (`npm test`) and the `vm` loader that runs the Apps Script sources under Node; not deployed |
 | `clasp-push.sh`, `clasp-targets.json` | Multi-spreadsheet deploy script and its (git-ignored) target list |
 
 ## Features
@@ -170,9 +171,10 @@ The script temporarily swaps the `scriptId` in `.clasp.json` for each target and
 npm run check       # typecheck + lint, in sequence
 npm run typecheck   # tsc over src/*.js against @types/google-apps-script (non-strict)
 npm run lint        # ESLint over src/*.js and the <script> in WebEditor.js.html
+npm test            # node --test unit tests for the pure helpers (no dependencies)
 ```
 
-There is no build step or test suite. Because JSDoc is the only source of type info, a typecheck failure often means a stale `@param`/`@returns`. Lint's main job is `no-undef` on `WebEditor.js.html`, which `tsc` can't see into. Feature-level internals are in [`docs/`](docs/).
+There is no build step. Unit tests in `test/` cover the pure helpers (`Utils.js`) and keep the server and client Drive-ID parsers in sync; they run under Node, not Apps Script. Because JSDoc is the only source of type info, a typecheck failure often means a stale `@param`/`@returns`. Lint's main job is `no-undef` on `WebEditor.js.html`, which `tsc` can't see into. Feature-level internals are in [`docs/`](docs/).
 
 ## Documentation
 
