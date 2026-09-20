@@ -168,7 +168,7 @@ The script temporarily swaps the `scriptId` in `.clasp.json` for each target and
 ## Development
 
 ```bash
-npm run check       # typecheck + lint, in sequence
+npm run check       # typecheck + lint + tests, in sequence
 npm run typecheck   # tsc over src/*.js against @types/google-apps-script (non-strict)
 npm run lint        # ESLint over src/*.js and the <script> in WebEditor.js.html
 npm test            # node --test unit tests for the pure helpers (no dependencies)
