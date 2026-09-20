@@ -85,6 +85,7 @@ All deployable code lives in `src/` (the only directory clasp pushes); tooling a
 | `src/Utils.js` | Shared server-side helpers (spreadsheet resolution, schema comparison, column lookups) used by `Code.js`, `Export.js`, and `Import.js` |
 | `src/Export.js` | Server-side export logic for F-1 and Wanted Card documents, the single-file XLSX export, and the S-КАДР photo export |
 | `src/Import.js` | Server-side award import from an external S-КАДР sheet |
+| `src/appsscript.json` | Apps Script manifest — time zone, V8 runtime, and the Advanced Drive Service used for export thumbnails |
 | `src/WebEditor.html` | Client app shell; includes CSS and JS via `<?!= HtmlService.createHtmlOutputFromFile(...) ?>` |
 | `src/WebEditor.css.html` | Styles for the web editor |
 | `src/WebEditor.js.html` | Client-side logic for the web editor |
@@ -108,7 +109,7 @@ See [Features](docs/features.md) for the details.
 ### Prerequisites
 
 - A Google account that can edit the target spreadsheet, which needs `Database` and `Handbook` sheets (see [Spreadsheet structure](docs/spreadsheet-setup.md#spreadsheet-structure) and [Sample files](docs/spreadsheet-setup.md#sample-files))
-- [Node.js](https://nodejs.org) and npm
+- [Node.js](https://nodejs.org) 20.19+ / 22.13+ (required by ESLint 10) and npm
 - [`jq`](https://jqlang.github.io/jq/) — only needed for `clasp-push.sh`
 
 ### Install and connect
@@ -132,7 +133,17 @@ clasp push          # deploy src/ to the bound script project
 clasp open-script   # open the Apps Script editor in the browser
 ```
 
+`src/appsscript.json` (the manifest) is pushed along with the code and enables the [Advanced Drive Service](https://developers.google.com/apps-script/advanced/drive), which document export uses to fetch resized photo thumbnails — there's nothing to switch on by hand.
+
 Then reload the spreadsheet: the **More... ⭐️** menu appears, and **Open Web Editor** launches the editor.
+
+### First run
+
+1. In the spreadsheet, choose **More... ⭐️ → Open Web Editor**. Google asks you to authorize the script the first time.
+2. The list view shows every row of the `Database` sheet. Type in a filter box above a column to narrow the list (plain text, or regex if you toggle it).
+3. Click a name in the first column to open that person's edit view, change a field and press **Save**; **← Back** returns to the list.
+4. Press **Add Person** to append a new empty row and edit it straight away. **Delete** in the edit view moves a record to the `Trash` sheet.
+5. Tick the checkboxes at the left of some rows, then **Export XLSX** to save them as one `.xlsx` in the Drive export folder. **Export F-1** / **Export Wanted Card** fill the Docs templates instead. All exports need the export-folder cell in `Handbook` filled in, and the document exports also need their template cells (see [Exports](docs/exports.md)).
 
 ### Deploying to multiple spreadsheets
 
