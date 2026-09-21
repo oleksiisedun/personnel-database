@@ -230,6 +230,7 @@ function openSpreadsheetSafely(id) {
     return null;
   }
   try {
+    // eslint-disable-next-line no-restricted-properties -- this is the safe wrapper itself
     return SpreadsheetApp.openById(id);
   } catch (e) {
     return null;
