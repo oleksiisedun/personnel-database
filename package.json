@@ -7,7 +7,8 @@
     "test": "node --test 'tests/*.test.js'",
     "typecheck": "tsc -p jsconfig.json",
     "lint": "eslint 'src/*.js' src/WebEditor.js.html",
-    "check": "npm run typecheck && npm run lint && npm test",
+    "lint:sh": "shellcheck clasp-push.sh && shfmt -d clasp-push.sh",
+    "check": "npm run typecheck && npm run lint && npm run lint:sh && npm test",
     "clasp-push": "./clasp-push.sh"
   },
   "repository": {

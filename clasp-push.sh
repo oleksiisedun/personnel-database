@@ -4,7 +4,7 @@
 set -euo pipefail
 
 DIR="$(dirname "$0")"
-TARGETS_FILE="$DIR/clasp-targets.json"  # {"name": "scriptId", ...}
+TARGETS_FILE="$DIR/clasp-targets.json" # {"name": "scriptId", ...}
 CLASP_JSON="$DIR/.clasp.json"
 
 # Save the scriptId that was in .clasp.json before we started.
