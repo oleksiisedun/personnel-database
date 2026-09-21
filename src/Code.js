@@ -218,7 +218,7 @@ function getMasterSourceRows(spreadsheetId) {
 /**
  * Opens a spreadsheet by ID, first probing Drive access so a permission error
  * on an inaccessible spreadsheet can't poison the overall execution status
- * (see CLAUDE.md "Actual personnel filter" for background).
+ * (see docs/architecture-master-mode.md "Actual personnel filter" for background).
  *
  * @param {string} id - Spreadsheet (Drive file) ID.
  * @returns {GoogleAppsScript.Spreadsheet.Spreadsheet|null} The opened spreadsheet, or null if inaccessible.
@@ -409,7 +409,7 @@ function movePersonnel(rowEntries, destinationSpreadsheetId) {
 function getSchemaAndData() {
   const ss = SpreadsheetApp.getActiveSpreadsheet();
   const sheet = ss.getSheetByName(SHEET_DATABASE);
-  if (!sheet) throw new Error('Sheet "Database" not found.');
+  if (!sheet) throw new Error(`Sheet "${SHEET_DATABASE}" not found.`);
   const all = sheet.getDataRange().getValues();
   if (all.length < 2) throw new Error('Sheet must have at least 2 rows (names + types).');
   const columns = extractColumnSchema(all);

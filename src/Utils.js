@@ -102,7 +102,7 @@ function getDatabaseSheet(spreadsheetId) {
   const ss = resolveSpreadsheet(spreadsheetId);
   if (!ss) throw new Error('Spreadsheet is not accessible.');
   const sheet = ss.getSheetByName(SHEET_DATABASE);
-  if (!sheet) throw new Error('Sheet "Database" not found.');
+  if (!sheet) throw new Error(`Sheet "${SHEET_DATABASE}" not found.`);
   return { ss, sheet };
 }
 
