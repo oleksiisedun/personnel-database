@@ -302,15 +302,16 @@
   }
 
   /**
-   * Decrements the cached rowIndex of remaining rows in schema.rows when one or
-   * more rows have been hard-deleted from a source sheet. Rows above the deletion
-   * point in the same spreadsheet have their sheet row numbers shifted up by one
+   * Decrements, in place, the cached rowIndex of the given rows when one or
+   * more rows have been hard-deleted from a source sheet. Rows below a deleted
+   * row in the same spreadsheet have their sheet row numbers shifted up by one
    * per deletion, so the cached indexes must be adjusted to match the new reality.
+   * @param {Array<{rowIndex: number, spreadsheetId?: string|null}>} rows - Cached rows, typically schema.rows.
    * @param {Map<string|null, number[]>} deletedBySource - Map of spreadsheetId (null=local)
    *   to the array of deleted rowIndexes within that spreadsheet.
    */
-  function adjustRowIndexesAfterDelete(deletedBySource) {
-    schema.rows.forEach(r => {
+  function adjustRowIndexesAfterDelete(rows, deletedBySource) {
+    rows.forEach(r => {
       const deletedIndexes = deletedBySource.get(r.spreadsheetId ?? null);
       if (!deletedIndexes) return;
       r.rowIndex -= deletedIndexes.filter(idx => idx < r.rowIndex).length;
@@ -1766,7 +1767,7 @@
     const deletedIndex = editingRow.rowIndex;
     const deletedSpreadsheetId = editingRow.spreadsheetId ?? null;
     schema.rows = schema.rows.filter(r => r !== editingRow);
-    adjustRowIndexesAfterDelete(new Map([[deletedSpreadsheetId, [deletedIndex]]]));
+    adjustRowIndexesAfterDelete(schema.rows, new Map([[deletedSpreadsheetId, [deletedIndex]]]));
     editingRow = null;
     applyFilters();
     showView('list');
@@ -1807,7 +1808,7 @@
     schema.rows = schema.rows.filter(r => !deletedKeys.has(rowKey(r)));
     deletedKeys.forEach(k => selectedKeys.delete(k));
 
-    adjustRowIndexesAfterDelete(groupRowIndexesBySource(deletedEntries));
+    adjustRowIndexesAfterDelete(schema.rows, groupRowIndexesBySource(deletedEntries));
 
     applyFilters();
   }
@@ -2233,7 +2234,7 @@
     // subsequent row's real sheet row number up by one per deletion. Decrement the
     // cached rowIndex of remaining same-source rows so later actions (edit/delete/
     // move) target the correct physical row instead of a stale one.
-    adjustRowIndexesAfterDelete(groupRowIndexesBySource(movedEntries));
+    adjustRowIndexesAfterDelete(schema.rows, groupRowIndexesBySource(movedEntries));
     pendingMoveEntries = null;
 
     (response.movedRows ?? []).forEach(r => schema.rows.push(r));
