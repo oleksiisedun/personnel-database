@@ -1102,7 +1102,7 @@
    *   https://drive.google.com/drive/u/0/folders/FOLDER_ID (or without the /u/0/ account segment)
    *   https://drive.google.com/open?id=FILE_ID
    *   FILE_ID (bare alphanumeric string ≥ 10 chars)
-   * Server-side counterpart: parseDriveId() in Code.js — keep URL patterns aligned.
+   * Server-side counterpart: parseDriveId() in Utils.js — keep URL patterns aligned.
    * @param {string} url
    * @returns {string|null} File ID, or null if not parseable.
    */
@@ -1833,6 +1833,59 @@
   }
 
   /**
+   * Shows the export overlay in its confirm state (before a large export),
+   * with an estimated duration derived from the per-item server time.
+   * @param {string} message - Confirmation text, e.g. "You are about to export 30 documents…".
+   * @param {number} estimatedSeconds - Expected total server time.
+   */
+  function showExportConfirm(message, estimatedSeconds) {
+    const estimate = estimatedSeconds < 90
+      ? `about ${Math.round(estimatedSeconds / 10) * 10} seconds`
+      : `about ${Math.round(estimatedSeconds / 60)} minutes`;
+    document.getElementById('export-confirm-msg').textContent = message;
+    document.getElementById('export-confirm-estimate').textContent = `Estimated time: ${estimate}.`;
+    document.getElementById('export-confirm-wrap').style.display = 'block';
+    document.getElementById('export-progress-wrap').style.display = 'none';
+    document.getElementById('export-msg').textContent = '';
+    document.getElementById('export-links').style.display = 'none';
+    document.getElementById('export-error').style.display = 'none';
+    document.getElementById('btn-export-close').style.display = 'none';
+    document.getElementById('export-overlay').style.display = 'flex';
+  }
+
+  /**
+   * Shows the export overlay in its progress state: hides the confirm/error/close
+   * parts, clears the result list, and sets the status line.
+   * @param {string} message - Initial status text.
+   */
+  function showExportProgress(message) {
+    const ul = document.getElementById('export-links');
+    document.getElementById('export-confirm-wrap').style.display = 'none';
+    document.getElementById('export-msg').textContent = message;
+    ul.style.display = 'none';
+    ul.innerHTML = '';
+    document.getElementById('export-error').style.display = 'none';
+    document.getElementById('btn-export-close').style.display = 'none';
+    document.getElementById('export-progress-wrap').style.display = 'block';
+    document.getElementById('export-overlay').style.display = 'flex';
+  }
+
+  /**
+   * Appends a result link (opens in a new tab) to the export overlay's list.
+   * @param {HTMLElement} ul - The #export-links list.
+   * @param {{name: string, url: string}} file
+   */
+  function appendExportLink(ul, { name, url }) {
+    const li = document.createElement('li');
+    const a = document.createElement('a');
+    a.href = url;
+    a.target = '_blank';
+    a.textContent = name;
+    li.appendChild(a);
+    ul.appendChild(li);
+  }
+
+  /**
    * Exports documents for every currently visible (filtered) row using the
    * given server-side function. Automatically continues in subsequent batches
    * if the server hits its time limit before finishing all rows.
@@ -1849,20 +1902,9 @@
 
     if (total > schema.exportConfirmThreshold) {
       pendingExportState = { mode: 'batch', btnId, serverFnName, entries, total };
-      const estSecs = total * schema.exportSecondsPerDoc;
-      const estStr = estSecs < 90
-        ? `about ${Math.round(estSecs / 10) * 10} seconds`
-        : `about ${Math.round(estSecs / 60)} minutes`;
-      document.getElementById('export-confirm-msg').textContent =
-        `You are about to export ${total} documents. Export cannot be cancelled once started.`;
-      document.getElementById('export-confirm-estimate').textContent = `Estimated time: ${estStr}.`;
-      document.getElementById('export-confirm-wrap').style.display = 'block';
-      document.getElementById('export-progress-wrap').style.display = 'none';
-      document.getElementById('export-msg').textContent = '';
-      document.getElementById('export-links').style.display = 'none';
-      document.getElementById('export-error').style.display = 'none';
-      document.getElementById('btn-export-close').style.display = 'none';
-      document.getElementById('export-overlay').style.display = 'flex';
+      showExportConfirm(
+        `You are about to export ${total} documents. Export cannot be cancelled once started.`,
+        total * schema.exportSecondsPerDoc);
       return;
     }
 
@@ -1880,14 +1922,7 @@
     const btn = document.getElementById(btnId);
     const ul = document.getElementById('export-links');
 
-    document.getElementById('export-confirm-wrap').style.display = 'none';
-    document.getElementById('export-msg').textContent = `Exporting ${total} document${total !== 1 ? 's' : ''}…`;
-    ul.style.display = 'none';
-    ul.innerHTML = '';
-    document.getElementById('export-error').style.display = 'none';
-    document.getElementById('btn-export-close').style.display = 'none';
-    document.getElementById('export-progress-wrap').style.display = 'block';
-    document.getElementById('export-overlay').style.display = 'flex';
+    showExportProgress(`Exporting ${total} document${total !== 1 ? 's' : ''}…`);
 
     let doneCount = 0;
     const progressBar = document.getElementById('export-progress-bar');
@@ -1901,15 +1936,7 @@
       progressBar.classList.add('indeterminate');
       const runner = google.script.run
         .withSuccessHandler(response => {
-          response.results.forEach(r => {
-            const li = document.createElement('li');
-            const a = document.createElement('a');
-            a.href = r.url;
-            a.target = '_blank';
-            a.textContent = r.name;
-            li.appendChild(a);
-            ul.appendChild(li);
-          });
+          response.results.forEach(r => appendExportLink(ul, r));
           ul.style.display = 'block';
           doneCount += response.results.length;
           setProgress(Math.round(doneCount / total * 100));
@@ -1947,19 +1974,11 @@
    * progress state and starts the server-side discovery phase.
    */
   function startPhotoExportFlow() {
-    const ul = document.getElementById('export-links');
     const skipLog = document.getElementById('export-skip-log');
 
-    document.getElementById('export-confirm-wrap').style.display = 'none';
-    document.getElementById('export-progress-wrap').style.display = 'block';
-    document.getElementById('export-msg').textContent = 'Finding personnel with photos…';
-    ul.style.display = 'none';
-    ul.innerHTML = '';
+    showExportProgress('Finding personnel with photos…');
     skipLog.style.display = 'none';
     skipLog.innerHTML = '';
-    document.getElementById('export-error').style.display = 'none';
-    document.getElementById('btn-export-close').style.display = 'none';
-    document.getElementById('export-overlay').style.display = 'flex';
     document.getElementById('export-progress-bar').classList.add('indeterminate');
 
     google.script.run
@@ -2002,15 +2021,7 @@
     google.script.run
       .withSuccessHandler(response => {
         const ul = document.getElementById('export-links');
-        response.results.forEach(r => {
-          const li = document.createElement('li');
-          const a = document.createElement('a');
-          a.href = r.url;
-          a.target = '_blank';
-          a.textContent = r.name;
-          li.appendChild(a);
-          ul.appendChild(li);
-        });
+        response.results.forEach(r => appendExportLink(ul, r));
         if (response.results.length) ul.style.display = 'block';
         photoExportSkipEntries.push(...response.skipped);
         const newDone = doneCount + response.results.length + response.skipped.length;
@@ -2087,20 +2098,9 @@
 
     if (total > schema.exportConfirmThreshold) {
       pendingExportState = { mode: 'xlsx', btnId: 'btn-export-xlsx', entries, total };
-      const estSecs = total * schema.xlsxExportSecondsPerRow;
-      const estStr = estSecs < 90
-        ? `about ${Math.round(estSecs / 10) * 10} seconds`
-        : `about ${Math.round(estSecs / 60)} minutes`;
-      document.getElementById('export-confirm-msg').textContent =
-        `You are about to export ${total} rows into a single XLSX file. Export cannot be cancelled once started.`;
-      document.getElementById('export-confirm-estimate').textContent = `Estimated time: ${estStr}.`;
-      document.getElementById('export-confirm-wrap').style.display = 'block';
-      document.getElementById('export-progress-wrap').style.display = 'none';
-      document.getElementById('export-msg').textContent = '';
-      document.getElementById('export-links').style.display = 'none';
-      document.getElementById('export-error').style.display = 'none';
-      document.getElementById('btn-export-close').style.display = 'none';
-      document.getElementById('export-overlay').style.display = 'flex';
+      showExportConfirm(
+        `You are about to export ${total} rows into a single XLSX file. Export cannot be cancelled once started.`,
+        total * schema.xlsxExportSecondsPerRow);
       return;
     }
 
@@ -2117,14 +2117,7 @@
     const btn = document.getElementById('btn-export-xlsx');
     const ul = document.getElementById('export-links');
 
-    document.getElementById('export-confirm-wrap').style.display = 'none';
-    document.getElementById('export-msg').textContent = `Building XLSX export of ${total} row${total !== 1 ? 's' : ''}…`;
-    ul.style.display = 'none';
-    ul.innerHTML = '';
-    document.getElementById('export-error').style.display = 'none';
-    document.getElementById('btn-export-close').style.display = 'none';
-    document.getElementById('export-progress-wrap').style.display = 'block';
-    document.getElementById('export-overlay').style.display = 'flex';
+    showExportProgress(`Building XLSX export of ${total} row${total !== 1 ? 's' : ''}…`);
 
     const progressBar = document.getElementById('export-progress-bar');
     progressBar.classList.add('indeterminate');
@@ -2133,13 +2126,7 @@
       .withSuccessHandler(result => {
         progressBar.classList.remove('indeterminate');
         progressBar.style.width = '100%';
-        const li = document.createElement('li');
-        const a = document.createElement('a');
-        a.href = result.url;
-        a.target = '_blank';
-        a.textContent = result.name;
-        li.appendChild(a);
-        ul.appendChild(li);
+        appendExportLink(ul, result);
         ul.style.display = 'block';
         document.getElementById('export-msg').textContent = 'Exported:';
         btn.disabled = false;
