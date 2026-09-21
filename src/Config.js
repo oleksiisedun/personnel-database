@@ -79,7 +79,7 @@ const EXPORT_IMAGE_THUMBNAIL_SIZE = 800;
 const PHOTO_EXPORT_FOLDER_PREFIX = 'Photos for S-КАДР ';
 
 // Regex extracting a Drive file/folder ID out of a sharing URL. Shared by
-// parseDriveId() (existing) and looksLikeDriveUrl() (Code.js) — the latter
+// parseDriveId() (existing) and looksLikeDriveUrl() (both Utils.js) — the latter
 // only needs to test whether a raw cell value looks like a Drive URL at all,
 // without caring what the ID is.
 const DRIVE_URL_REGEX = /(?:\/folders\/|\/d\/|[?&]id=)([-\w]+)/;

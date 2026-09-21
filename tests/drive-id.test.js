@@ -1,13 +1,13 @@
 'use strict';
 
-// parseDriveId() (server, Code.js) and extractDriveId() (client, WebEditor.js.html)
+// parseDriveId() (server, Utils.js) and extractDriveId() (client, WebEditor.js.html)
 // are hand-maintained copies of the same URL patterns; these tests keep them aligned.
 
 const { test, describe } = require('node:test');
 const assert = require('node:assert/strict');
 const { loadServer, loadClientFunction } = require('./load.js');
 
-const { parseDriveId, looksLikeDriveUrl } = loadServer(['Config.js', 'Code.js'], ['parseDriveId', 'looksLikeDriveUrl']);
+const { parseDriveId, looksLikeDriveUrl } = loadServer(['Config.js', 'Utils.js'], ['parseDriveId', 'looksLikeDriveUrl']);
 const extractDriveId = loadClientFunction('extractDriveId');
 
 const ID = '1AbC_dEf-GhIjKlMnOpQrStUvWxYz012345';

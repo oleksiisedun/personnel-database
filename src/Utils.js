@@ -458,3 +458,32 @@ function _parseSubTable(rawValue) {
 function _encodeSubTable(rows) {
   return rows.map(fields => fields.join(TABLE_FIELD_SEP)).join(TABLE_ROW_SEP);
 }
+
+/**
+ * Extracts a bare Drive resource ID from a raw ID string or any Drive URL form:
+ *   https://drive.google.com/drive/folders/<ID>
+ *   https://drive.google.com/file/d/<ID>/view
+ *   https://drive.google.com/open?id=<ID>
+ * Returns the input unchanged when it does not look like a URL.
+ * Client-side counterpart: extractDriveId() in WebEditor.js.html — keep URL patterns aligned.
+ *
+ * @param {string} value
+ * @returns {string}
+ */
+function parseDriveId(value) {
+  const m = value.match(DRIVE_URL_REGEX);
+  return m ? m[1] : value;
+}
+
+/**
+ * Tests whether a raw cell value looks like a Drive sharing URL (as opposed to
+ * a bare ID or ordinary text). Used by XLSX export to decide whether a
+ * non-image column's cell should be linkified — image columns always attempt
+ * resolution regardless (see _buildXlsxLinkCell() in Export.js).
+ *
+ * @param {string} value
+ * @returns {boolean}
+ */
+function looksLikeDriveUrl(value) {
+  return DRIVE_URL_REGEX.test(value);
+}
