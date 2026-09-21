@@ -109,12 +109,16 @@ function openPhotoExport() {
 }
 
 /**
- * Normalizes phone numbers in the Database sheet's "Номер телефону" column:
- * adds a leading zero to bare 9-digit numbers, and strips the "38" country
- * prefix from 12-digit numbers. Triggered only from the custom menu.
+ * Rewrites every data cell of the Database sheet's column whose header matches
+ * `columnPattern` through `normalize`, then alerts how many cells changed.
+ * Shared by the menu commands fixPhoneNumbers() and fixFullNames().
+ * @param {RegExp} columnPattern - Header pattern locating the column in row 1.
+ * @param {(cell: string) => string} normalize - Returns the cell text unchanged
+ *   when nothing needs fixing (so it isn't counted or rewritten), else the fixed text.
+ * @param {string} noun - Singular label for the summary alert, e.g. "phone number".
  * @returns {void}
  */
-function fixPhoneNumbers() {
+function _normalizeDatabaseColumn(columnPattern, normalize, noun) {
   const ui = SpreadsheetApp.getUi();
   const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(SHEET_DATABASE);
   if (!sheet) {
@@ -123,9 +127,9 @@ function fixPhoneNumbers() {
   }
 
   const headers = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
-  const colIndex = findColumnIndex(headers, COL_PHONE_NUMBER);
+  const colIndex = findColumnIndex(headers, columnPattern);
   if (colIndex === -1) {
-    ui.alert(`Column matching "${COL_PHONE_NUMBER.source}" not found in row 1.`);
+    ui.alert(`Column matching "${columnPattern.source}" not found in row 1.`);
     return;
   }
 
@@ -136,21 +140,32 @@ function fixPhoneNumbers() {
   }
 
   const range = sheet.getRange(3, colIndex + 1, numRows, 1);
-  const values = range.getValues();
   let fixedCount = 0;
 
-  const result = values.map(row => {
-    const phone = String(row[0]).trim();
-    const fixed = normalizePhoneNumber(phone);
-    if (fixed !== phone) {
-      fixedCount++;
-      return [fixed];
-    }
-    return row;
+  const result = range.getValues().map(row => {
+    const original = String(row[0]);
+    const normalized = normalize(original);
+    if (normalized === original) return row;
+    fixedCount++;
+    return [normalized];
   });
 
   range.setValues(result);
-  ui.alert(`Fixed ${fixedCount} phone number(s).`);
+  ui.alert(`Fixed ${fixedCount} ${noun}(s).`);
+}
+
+/**
+ * Normalizes phone numbers in the Database sheet's "Номер телефону" column:
+ * adds a leading zero to bare 9-digit numbers, and strips the "38" country
+ * prefix from 12-digit numbers. Triggered only from the custom menu.
+ * @returns {void}
+ */
+function fixPhoneNumbers() {
+  _normalizeDatabaseColumn(COL_PHONE_NUMBER, cell => {
+    const phone = cell.trim();
+    const fixed = normalizePhoneNumber(phone);
+    return fixed === phone ? cell : fixed;
+  }, 'phone number');
 }
 
 /**
@@ -161,42 +176,7 @@ function fixPhoneNumbers() {
  * @returns {void}
  */
 function fixFullNames() {
-  const ui = SpreadsheetApp.getUi();
-  const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(SHEET_DATABASE);
-  if (!sheet) {
-    ui.alert(`Sheet "${SHEET_DATABASE}" not found.`);
-    return;
-  }
-
-  const headers = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
-  const colIndex = findColumnIndex(headers, COL_FULL_NAME);
-  if (colIndex === -1) {
-    ui.alert(`Column matching "${COL_FULL_NAME.source}" not found in row 1.`);
-    return;
-  }
-
-  const numRows = sheet.getLastRow() - 2;
-  if (numRows <= 0) {
-    ui.alert('No data rows to process.');
-    return;
-  }
-
-  const range = sheet.getRange(3, colIndex + 1, numRows, 1);
-  const values = range.getValues();
-  let fixedCount = 0;
-
-  const result = values.map(row => {
-    const original = String(row[0]);
-    const normalized = normalizeFullName(original);
-    if (normalized !== original) {
-      fixedCount++;
-      return [normalized];
-    }
-    return row;
-  });
-
-  range.setValues(result);
-  ui.alert(`Fixed ${fixedCount} full name(s).`);
+  _normalizeDatabaseColumn(COL_FULL_NAME, normalizeFullName, 'full name');
 }
 
 /**
