@@ -45,10 +45,10 @@
     <!-- Schema warning overlay -->
     <div id="schema-warning-overlay" class="overlay" style="display:none">
       <div id="schema-warning-dialog" class="overlay-dialog">
-        <h2 style="font-size:16px;margin-bottom:12px;">Column Schema Mismatch</h2>
-        <p style="font-size:13px;color:#666;margin-bottom:16px;">These remote spreadsheets have a column layout that differs from the local Database sheet. Their rows were not loaded.</p>
+        <h2>Column Schema Mismatch</h2>
+        <p class="overlay-text">These remote spreadsheets have a column layout that differs from the local Database sheet. Their rows were not loaded.</p>
         <div id="schema-warning-content"></div>
-        <div id="schema-warning-actions">
+        <div id="schema-warning-actions" class="dialog-actions">
           <button id="btn-schema-warning-close" class="btn-secondary btn-dialog-action">Close</button>
         </div>
       </div>
@@ -57,12 +57,12 @@
     <!-- Move overlay -->
     <div id="move-overlay" class="overlay" style="display:none">
       <div id="move-dialog" class="overlay-dialog">
-        <div id="move-dialog-title">Move selected persons to:</div>
+        <div id="move-dialog-title" class="overlay-title">Move selected persons to:</div>
         <select id="move-destination"></select>
         <div id="move-status" style="display:none"></div>
         <div id="move-log" class="log-list" style="display:none"></div>
         <div id="move-error" style="display:none"></div>
-        <div id="move-actions">
+        <div id="move-actions" class="dialog-actions">
           <button id="btn-move-cancel" class="btn-secondary btn-dialog-action">Cancel</button>
           <button id="btn-move-confirm" class="btn-primary btn-dialog-action">Move</button>
         </div>
@@ -75,7 +75,7 @@
         <div id="export-confirm-wrap" style="display:none">
           <div id="export-confirm-msg"></div>
           <div id="export-confirm-estimate"></div>
-          <div id="export-confirm-actions">
+          <div id="export-confirm-actions" class="dialog-actions dialog-actions--center">
             <button id="btn-export-cancel" class="btn-secondary btn-dialog-action">Cancel</button>
             <button id="btn-export-proceed" class="btn-primary btn-dialog-action">Export</button>
           </div>
@@ -121,8 +121,8 @@
   <!-- Unsaved changes overlay -->
   <div id="unsaved-changes-overlay" class="overlay" style="display:none">
     <div id="unsaved-changes-dialog" class="overlay-dialog">
-      <div id="unsaved-changes-title">You have unsaved changes</div>
-      <p id="unsaved-changes-msg">Leaving now will discard your changes to this record.</p>
+      <div id="unsaved-changes-title" class="overlay-title">You have unsaved changes</div>
+      <p id="unsaved-changes-msg" class="overlay-text">Leaving now will discard your changes to this record.</p>
       <div class="dialog-actions">
         <button id="btn-unsaved-cancel" class="btn-secondary btn-dialog-action">Keep Editing</button>
         <button id="btn-unsaved-discard" class="btn-danger btn-dialog-action">Discard Changes</button>
