@@ -61,6 +61,7 @@ function _groupAwardsById(importData) {
   const orderNumberColIndex = columnLetterToIndex(AWARDS_IMPORT_ORDER_NUMBER_COL);
   const orderDateColIndex = columnLetterToIndex(AWARDS_IMPORT_ORDER_DATE_COL);
 
+  /** @type {Object.<string, string[][]>} */
   const map = {};
   for (let i = AWARDS_IMPORT_DATA_START_ROW - 1; i < importData.length; i++) {
     const row = importData[i];

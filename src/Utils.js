@@ -18,6 +18,7 @@ function getHandbookSheet() {
 function getDataTypeOptionsMap() {
   const sheet = getHandbookSheet();
   if (!sheet) return {};
+  /** @type {Object.<string, string[]>} */
   const map = {};
   try {
     sheet.getRange(HANDBOOK_DATA_TYPES_RANGE).getValues().forEach(row => {
@@ -41,6 +42,7 @@ function getDataTypeOptionsMap() {
 function getTableColumnsMap() {
   const sheet = getHandbookSheet();
   if (!sheet) return {};
+  /** @type {Object.<string, {name: string, type: string}[]>} */
   const map = {};
   try {
     sheet.getRange(HANDBOOK_TABLE_COLUMNS_RANGE).getValues().forEach(row => {

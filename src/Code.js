@@ -484,6 +484,7 @@ function _classifyDriveFile(file, fileId) {
  *   Map of fileId → { type:'image', dataUrl } | { type:'pdf', viewUrl } | null on error.
  */
 function getImagesDataUrls(fileIds) {
+  /** @type {Object.<string, {type: string, dataUrl?: string, viewUrl?: string}>} */
   const result = {};
   fileIds.forEach(fileId => {
     if (!fileId) return;

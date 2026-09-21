@@ -102,6 +102,7 @@ function _exportDoc(rowEntries, templateCell, docPrefix) {
 
     const rowValues = all[rowIndex - 1];
     if (!rowValues) continue;
+    /** @type {Object.<string, string>} */
     const data = {};
     const strValues = stringifyRowValues(rowValues);
     columns.forEach((col, j) => { data[col.name] = strValues[j]; });

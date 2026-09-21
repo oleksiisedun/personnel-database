@@ -50,6 +50,7 @@ function startPhotoExport() {
     for (let i = 2; i < all.length; i++) {
       const strValues = stringifyRowValues(all[i]);
       if (strValues.every(v => v === '')) continue;
+      /** @type {Object.<string, string>} */
       const data = {};
       columns.forEach((col, j) => { data[col.name] = strValues[j]; });
 
