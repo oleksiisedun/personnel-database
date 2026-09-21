@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8">
   <?!= HtmlService.createHtmlOutputFromFile('WebEditor.css').getContent(); ?>
-  <? var colMinWidths = getColumnMinWidths(); var colMaxWidths = getColumnMaxWidths(); ?>
+  <? const colMinWidths = getColumnMinWidths(); const colMaxWidths = getColumnMaxWidths(); ?>
   <style>
     :root {
       --text-min-width: <?= colMinWidths.text ?>px;
