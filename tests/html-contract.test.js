@@ -8,10 +8,12 @@ const { test, describe } = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
+const { clientScripts } = require('./load.js');
 
 const read = name => fs.readFileSync(path.join(__dirname, '..', 'src', name), 'utf8');
 const html = read('WebEditor.html');
-const clientJs = read('WebEditor.js.html');
+const fragments = clientScripts();
+const clientJs = fragments.map(f => f.text).join('\n');
 const codeJs = read('Code.js');
 
 describe('WebEditor element ids', () => {
@@ -31,6 +33,21 @@ describe('WebEditor element ids', () => {
     const all = [...html.matchAll(/\bid="([^"]+)"/g)].map(m => m[1]);
     const dupes = all.filter((id, i) => all.indexOf(id) !== i);
     assert.deepEqual(dupes, []);
+  });
+});
+
+describe('client script fragments', () => {
+  const onDisk = fs.readdirSync(path.join(__dirname, '..', 'src')).filter(f => /^WebEditor(\.\w+)?\.js\.html$/.test(f));
+
+  test('WebEditor.html includes every WebEditor*.js.html file (an unincluded fragment silently drops code)', () => {
+    assert.deepEqual(fragments.map(f => f.file).sort(), onDisk.sort());
+  });
+  test('each fragment is exactly one well-formed <script> block', () => {
+    for (const { file, text } of fragments) {
+      assert.equal((text.match(/<script>/g) || []).length, 1, `${file}: expected one <script>`);
+      assert.equal((text.match(/<\/script>/g) || []).length, 1, `${file}: expected one </script>`);
+      assert.match(text.trim(), /^<script>[\s\S]*<\/script>$/, `${file}: content outside <script>`);
+    }
   });
 });
 

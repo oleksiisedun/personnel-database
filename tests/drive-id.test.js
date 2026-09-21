@@ -1,6 +1,6 @@
 'use strict';
 
-// parseDriveId() (server, Utils.js) and extractDriveId() (client, WebEditor.js.html)
+// parseDriveId() (server, Utils.js) and extractDriveId() (client, WebEditor.images.js.html)
 // are hand-maintained copies of the same URL patterns; these tests keep them aligned.
 
 const { test, describe } = require('node:test');

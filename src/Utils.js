@@ -465,7 +465,7 @@ function _encodeSubTable(rows) {
  *   https://drive.google.com/file/d/<ID>/view
  *   https://drive.google.com/open?id=<ID>
  * Returns the input unchanged when it does not look like a URL.
- * Client-side counterpart: extractDriveId() in WebEditor.js.html — keep URL patterns aligned.
+ * Client-side counterpart: extractDriveId() in WebEditor.images.js.html — keep URL patterns aligned.
  *
  * @param {string} value
  * @returns {string}

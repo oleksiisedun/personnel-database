@@ -1,0 +1,131 @@
+<script>
+  // Move overlay: move selected personnel to another source spreadsheet.
+  // One of several WebEditor.*.js.html fragments sharing a single global scope; include order is set in WebEditor.html.
+
+  let pendingMoveEntries = null;     // rowEntries[] sent to movePersonnel(), consumed by onMoveSuccess()
+
+  /**
+   * Opens the move overlay and populates the destination dropdown.
+   * Excludes the shared source of all selected rows from the dropdown so
+   * users cannot move persons to the spreadsheet they already belong to
+   * (only when all selected rows share the same source).
+   */
+  function openMoveOverlay() {
+    const sources = schema.masterSources ?? [];
+    const selectedRows = getSelectedRows();
+
+    // Determine if all selected rows share one source (may be null for local).
+    const sourceIds = new Set(selectedRows.map(r => r.spreadsheetId ?? null));
+    const sharedSourceId = sourceIds.size === 1 ? [...sourceIds][0] : undefined;
+
+    const sel = document.getElementById('move-destination');
+    sel.innerHTML = '';
+    sources.forEach(({ id, name }) => {
+      if (sharedSourceId !== undefined && id === sharedSourceId) return;
+      const opt = document.createElement('option');
+      opt.value = id ?? '';
+      opt.textContent = name;
+      sel.appendChild(opt);
+    });
+
+    document.getElementById('move-status').style.display = 'none';
+    document.getElementById('move-status').textContent = '';
+    document.getElementById('move-log').style.display = 'none';
+    document.getElementById('move-log').innerHTML = '';
+    document.getElementById('move-error').style.display = 'none';
+    document.getElementById('move-error').textContent = '';
+    document.getElementById('btn-move-confirm').disabled = false;
+    document.getElementById('btn-move-cancel').disabled = false;
+    document.getElementById('btn-move-cancel').textContent = 'Cancel';
+    document.getElementById('move-overlay').style.display = 'flex';
+  }
+
+  /**
+   * Hides the move overlay.
+   */
+  function closeMoveOverlay() {
+    document.getElementById('move-overlay').style.display = 'none';
+  }
+
+  /**
+   * Collects selected rows, calls movePersonnel on the server, then updates
+   * the local schema and re-renders the list.
+   */
+  function runMove() {
+    const rowEntries = getSelectedRowEntries();
+    if (!rowEntries.length) return;
+    pendingMoveEntries = rowEntries;
+
+    const rawDestId = document.getElementById('move-destination').value;
+    const destinationSpreadsheetId = rawDestId === '' ? null : rawDestId;
+
+    const statusEl = document.getElementById('move-status');
+    statusEl.textContent = `Moving ${rowEntries.length} person${rowEntries.length !== 1 ? 's' : ''}…`;
+    statusEl.style.display = 'block';
+    document.getElementById('move-error').style.display = 'none';
+    document.getElementById('btn-move-confirm').disabled = true;
+    document.getElementById('btn-move-cancel').disabled = true;
+
+    google.script.run
+      .withSuccessHandler(onMoveSuccess)
+      .withFailureHandler(onMoveError)
+      .movePersonnel(rowEntries, destinationSpreadsheetId);
+  }
+
+  /**
+   * Success handler for movePersonnel. Updates local schema, clears selection,
+   * re-renders list, and shows per-person log.
+   * @param {{
+   *   log: Array<{name: string, folderNote: string}>,
+   *   movedRows: Array<{rowIndex: number, values: string[], spreadsheetId?: string}>,
+   *   skippedEntries: Array<{rowIndex: number, spreadsheetId: string|null}>
+   * }} response
+   */
+  function onMoveSuccess(response) {
+    // Entries the server actually skipped (same spreadsheet as destination, or source
+    // inaccessible) were never deleted — exclude them so they aren't dropped from the
+    // local cache and don't throw off the rowIndex shift below.
+    const skippedKeys = new Set((response.skippedEntries ?? []).map(e => rowKey(e)));
+    const movedEntries = pendingMoveEntries.filter(e => !skippedKeys.has(rowKey(e)));
+    const movedKeys = new Set(movedEntries.map(e => rowKey(e)));
+    schema.rows = schema.rows.filter(r => !movedKeys.has(rowKey(r)));
+    movedKeys.forEach(k => selectedKeys.delete(k));
+
+    // The server hard-deletes moved rows from their source sheet, shifting every
+    // subsequent row's real sheet row number up by one per deletion. Decrement the
+    // cached rowIndex of remaining same-source rows so later actions (edit/delete/
+    // move) target the correct physical row instead of a stale one.
+    adjustRowIndexesAfterDelete(schema.rows, groupRowIndexesBySource(movedEntries));
+    pendingMoveEntries = null;
+
+    (response.movedRows ?? []).forEach(r => schema.rows.push(r));
+    applyFilters();
+
+    const logEl = document.getElementById('move-log');
+    logEl.innerHTML = '';
+    (response.log ?? []).forEach(({ name, folderNote }) => {
+      const div = document.createElement('div');
+      div.textContent = `${name}: ${folderNote}`;
+      logEl.appendChild(div);
+    });
+    logEl.style.display = 'block';
+
+    const statusEl = document.getElementById('move-status');
+    statusEl.textContent = 'Move complete.';
+    document.getElementById('btn-move-confirm').disabled = true;
+    document.getElementById('btn-move-cancel').disabled = false;
+    document.getElementById('btn-move-cancel').textContent = 'Close';
+  }
+
+  /**
+   * Failure handler for movePersonnel. Shows the error and re-enables buttons.
+   * @param {Error} err
+   */
+  function onMoveError(err) {
+    pendingMoveEntries = null;
+    showError('move-error', 'Move failed', err);
+    document.getElementById('move-status').style.display = 'none';
+    document.getElementById('btn-move-confirm').disabled = false;
+    document.getElementById('btn-move-cancel').disabled = false;
+  }
+</script>

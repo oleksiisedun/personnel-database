@@ -9,8 +9,7 @@ const fs = require('node:fs');
 const path = require('node:path');
 const vm = require('node:vm');
 
-const SRC_DIR = path.join(__dirname, '..', 'src');
-const CLIENT_FILE = 'WebEditor.js.html';
+const { clientScripts, SRC_DIR } = require('./client-scripts.js');
 
 /**
  * Runs the given src/ files in one fresh context and returns the requested
@@ -28,19 +27,21 @@ function loadServer(files, names) {
 }
 
 /**
- * Returns a single function declared inside the client <script> of
- * WebEditor.js.html. The script runs DOM/`google.script` code at load time, so
- * it can't be executed whole; instead the function's source is cut out by its
- * 2-space indent (declaration line to the next line that is exactly `  }`) and
- * evaluated alone. Only works for self-contained functions.
+ * Returns a single function declared inside one of the client <script>
+ * fragments. The scripts run DOM/`google.script` code at load time, so a
+ * function can't be had by executing a whole fragment; instead its source is
+ * cut out by its 2-space indent (declaration line to the next line that is
+ * exactly `  }`) and evaluated alone. Only works for self-contained functions.
  * @param {string} name
  * @returns {Function}
  */
 function loadClientFunction(name) {
-  const text = fs.readFileSync(path.join(SRC_DIR, CLIENT_FILE), 'utf8');
-  const match = text.match(new RegExp(`^  function ${name}\\(.*?^  }$`, 'ms'));
-  if (!match) throw new Error(`Function ${name}() not found in ${CLIENT_FILE}`);
-  return vm.runInContext(`(${match[0].trim()})`, vm.createContext({}));
+  const pattern = new RegExp(`^  function ${name}\\(.*?^  }$`, 'ms');
+  for (const { text } of clientScripts()) {
+    const match = text.match(pattern);
+    if (match) return vm.runInContext(`(${match[0].trim()})`, vm.createContext({}));
+  }
+  throw new Error(`Function ${name}() not found in any client script fragment`);
 }
 
 /**
@@ -52,4 +53,4 @@ function loadClientFunction(name) {
  */
 const plain = (value) => JSON.parse(JSON.stringify(value));
 
-module.exports = { loadServer, loadClientFunction, plain };
+module.exports = { loadServer, loadClientFunction, clientScripts, plain };

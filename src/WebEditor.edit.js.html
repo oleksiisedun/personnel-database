@@ -1,0 +1,530 @@
+<script>
+  // Edit view: form fields and validation, save/add/delete, unsaved-changes guard.
+  // One of several WebEditor.*.js.html fragments sharing a single global scope; include order is set in WebEditor.html.
+
+  let editingRow = null;   // row object open in the edit view
+
+  let pendingValues = null; // newValues[] staged by saveRow(), consumed by onSaveSuccess()
+
+  let isNewRow = false;    // true when the edit view holds a freshly appended row
+
+  let originalFormValues = null; // snapshot of collectFormValues() taken right after openEditView() builds the form
+
+  let activeEditTab = 'main';    // 'main', or a *-table column's index as a string — reset to 'main' on every openEditView() call
+
+  /**
+   * Validation rules for column types that have format constraints. Defined at
+   * module scope so both real-time input handlers and saveRow() share the same regex.
+   */
+  const VALIDATORS = {
+    date:   { regex: /^\d{2}\.\d{2}\.\d{4}$/, placeholder: 'DD.MM.YYYY', hint: 'Format: DD.MM.YYYY',        msg: 'Fix date fields (expected format: DD.MM.YYYY) before saving.' },
+    tin:    { regex: /^\d{10}$/,              placeholder: '1234567890', hint: 'Must be exactly 10 digits', msg: 'TIN must be exactly 10 digits.' },
+    number: { regex: /^\d+$/,                 placeholder: '123',        hint: 'Digits only',               msg: 'Number fields must contain only digits.' },
+  };
+
+  /**
+   * Builds a text input with live validation against VALIDATORS[col.type].
+   * @param {{type: string}} col
+   * @param {string} value
+   * @param {number} colIndex
+   * @returns {{ input: HTMLInputElement, errHint: HTMLElement }}
+   */
+  function buildValidatedInput(col, value, colIndex) {
+    const v = VALIDATORS[col.type];
+    const input = document.createElement('input');
+    input.type = 'text';
+    input.value = value;
+    input.dataset.colIndex = colIndex;
+    input.placeholder = v.placeholder;
+    const errHint = document.createElement('div');
+    errHint.className = 'field-hint field-error';
+    errHint.style.display = 'none';
+    errHint.textContent = v.hint;
+    input.addEventListener('input', () => {
+      const val = input.value.trim();
+      const valid = !val || v.regex.test(val);
+      input.classList.toggle('input-error', !valid);
+      errHint.style.display = valid ? 'none' : 'block';
+    });
+    return { input, errHint };
+  }
+
+  /**
+   * Populates a <select> with an empty "—" option, each of `options`, and (if not already
+   * present) currentVal, then sets it as selected. Shared by buildDropdownField() (top-level
+   * dropdown columns) and addTableEditorRow() (*-table dropdown sub-columns).
+   * @param {HTMLSelectElement} sel
+   * @param {string[]} options
+   * @param {string} currentVal
+   */
+  function populateSelectOptions(sel, options, currentVal) {
+    const emptyOpt = document.createElement('option');
+    emptyOpt.value = '';
+    emptyOpt.textContent = '—';
+    sel.appendChild(emptyOpt);
+    options.forEach(opt => {
+      const o = document.createElement('option');
+      o.value = opt;
+      o.textContent = opt;
+      sel.appendChild(o);
+    });
+    if (currentVal && !options.includes(currentVal)) {
+      const o = document.createElement('option');
+      o.value = currentVal;
+      o.textContent = currentVal;
+      sel.appendChild(o);
+    }
+    sel.value = currentVal;
+  }
+
+  /**
+   * Builds a <select> element for a dropdown column type (any type with dropdownOptions).
+   * Appends all known options plus the current value if it is not already in the list.
+   * @param {{type: string, dropdownOptions?: string[]}} col - Column descriptor.
+   * @param {number} colIndex - Column index used as the select's data-col-index attribute.
+   * @param {string} currentVal - The row's current value for this column.
+   * @returns {HTMLSelectElement}
+   */
+  function buildDropdownField(col, colIndex, currentVal) {
+    const sel = document.createElement('select');
+    sel.dataset.colIndex = colIndex;
+    populateSelectOptions(sel, col.dropdownOptions || [], currentVal);
+    return sel;
+  }
+
+  /**
+   * Switches to the edit view for the given row. Dynamically builds a form field
+   * for each column: a dropdown for dropdown types, a table editor for *-table types,
+   * a text input with live image preview for image types, and a plain text input for text types.
+   * Image-type fields are grouped into their own "documentPhotos" tab/panel (labeled
+   * schema.documentPhotoTabName) instead of the main grid panel, built up front so it
+   * appears as the first dynamic tab, ahead of any *-table tabs.
+   * @param {{rowIndex: number|null, values: string[]}} row
+   */
+  function openEditView(row) {
+    editingRow = row;
+    const form = document.getElementById('edit-form');
+    const tabs = document.getElementById('edit-tabs');
+    form.innerHTML = '';
+    tabs.innerHTML = '';
+
+    const mainPanel = document.createElement('div');
+    mainPanel.className = 'edit-panel edit-panel--grid';
+    mainPanel.dataset.tabKey = 'main';
+    form.appendChild(mainPanel);
+
+    let photoPanel = null;
+    if (schema.columns.some(col => col.type === 'image')) {
+      photoPanel = document.createElement('div');
+      photoPanel.className = 'edit-panel edit-panel--grid';
+      photoPanel.dataset.tabKey = 'documentPhotos';
+      form.appendChild(photoPanel);
+
+      const photoTabBtn = document.createElement('div');
+      photoTabBtn.className = 'edit-tab';
+      photoTabBtn.textContent = schema.documentPhotoTabName;
+      photoTabBtn.dataset.tabKey = 'documentPhotos';
+      photoTabBtn.addEventListener('click', () => switchEditTab('documentPhotos'));
+      tabs.appendChild(photoTabBtn);
+    }
+
+    schema.columns.forEach((col, i) => {
+      if (isTableType(col)) {
+        const panel = document.createElement('div');
+        panel.className = 'edit-panel edit-panel--table';
+        panel.dataset.tabKey = String(i);
+        panel.appendChild(buildTableEditor(i, parseData(row.values[i] || '', tableHeaderNames(col)), col.tableHeaders || []));
+        form.appendChild(panel);
+
+        const tabBtn = document.createElement('div');
+        tabBtn.className = 'edit-tab';
+        tabBtn.textContent = col.name;
+        tabBtn.dataset.tabKey = String(i);
+        tabBtn.addEventListener('click', () => switchEditTab(String(i)));
+        tabs.appendChild(tabBtn);
+        return;
+      }
+
+      const block = document.createElement('div');
+      block.className = 'field-block';
+
+      const label = document.createElement('label');
+      label.textContent = col.name;
+      block.appendChild(label);
+
+      if (col.dropdownOptions) {
+        block.appendChild(buildDropdownField(col, i, row.values[i] || ''));
+      } else if (VALIDATORS[col.type]) {
+        const { input, errHint } = buildValidatedInput(col, row.values[i] || '', i);
+        block.appendChild(input);
+        block.appendChild(errHint);
+      } else {
+        const input = document.createElement('input');
+        input.type = 'text';
+        input.value = row.values[i] || '';
+        input.dataset.colIndex = i;
+        block.appendChild(input);
+
+        if (col.type === 'image') {
+          const hint = document.createElement('div');
+          hint.className = 'field-hint';
+          hint.textContent = 'Paste a Google Drive sharing link';
+          block.appendChild(hint);
+
+          const preview = document.createElement('img');
+          preview.className = 'edit-preview';
+          preview.alt = '';
+
+          const pdfPreview = document.createElement('div');
+          pdfPreview.className = 'edit-preview-pdf';
+          pdfPreview.style.display = 'none';
+          const pdfA = document.createElement('a');
+          pdfA.target = '_blank';
+          pdfA.rel = 'noopener noreferrer';
+          pdfA.textContent = 'Open PDF in Drive';
+          pdfPreview.appendChild(pdfA);
+
+          block.appendChild(preview);
+          block.appendChild(pdfPreview);
+          updatePreview(preview, pdfPreview, input.value);
+
+          input.addEventListener('input', () => updatePreview(preview, pdfPreview, input.value));
+          preview.addEventListener('click', () => {
+            const id = extractDriveId(input.value);
+            if (id) openLightbox(id);
+          });
+        }
+      }
+
+      (col.type === 'image' && photoPanel ? photoPanel : mainPanel).appendChild(block);
+    });
+
+    document.getElementById('edit-title').textContent = isNewRow ? 'Person' : (row.values[0] || 'Edit record');
+    document.getElementById('save-status').textContent = '';
+    document.getElementById('btn-save').disabled = false;
+    const deleteBtn = document.getElementById('btn-delete');
+    deleteBtn.style.display = isNewRow ? 'none' : 'inline-block';
+    deleteBtn.disabled = false;
+    const ssSelect = document.getElementById('add-spreadsheet-select');
+    if (isNewRow && schema.masterMode && showAllUnits) {
+      ssSelect.innerHTML = '';
+      (schema.masterSources ?? []).forEach(({ id, name }) => {
+        const opt = document.createElement('option');
+        opt.value = id ?? '';
+        opt.textContent = name;
+        ssSelect.appendChild(opt);
+      });
+      ssSelect.style.display = 'inline-block';
+    } else {
+      ssSelect.style.display = 'none';
+    }
+    originalFormValues = collectFormValues();
+    switchEditTab('main');
+    showView('edit');
+  }
+
+  /**
+   * Switches the active tab within the edit view (main-info panel, the
+   * "documentPhotos" image-fields panel, or one *-table column panel) by
+   * toggling `.active` on the matching panel and tab button, including
+   * #edit-title when switching to 'main'. All panels stay mounted in the DOM
+   * for the life of the edit session — this only toggles CSS display, never
+   * rebuilds anything — so typed input and table-editor row edits on inactive
+   * tabs are never lost.
+   * @param {string} tabKey - 'main', 'documentPhotos', or a *-table column's index as a string.
+   */
+  function switchEditTab(tabKey) {
+    activeEditTab = tabKey;
+    document.querySelectorAll('#edit-form .edit-panel').forEach(panel => {
+      panel.classList.toggle('active', panel.dataset.tabKey === tabKey);
+    });
+    document.querySelectorAll('#edit-tabs .edit-tab').forEach(btn => {
+      btn.classList.toggle('active', btn.dataset.tabKey === tabKey);
+    });
+    document.getElementById('edit-title').classList.toggle('active', tabKey === 'main');
+  }
+
+  /**
+   * Leaves the edit view and returns to the list, discarding any in-progress edit state.
+   */
+  function leaveEditView() {
+    isNewRow = false;
+    showView('list');
+  }
+
+  /**
+   * Shows the confirmation overlay warning that unsaved edit-form changes will be discarded.
+   */
+  function openUnsavedChangesOverlay() {
+    document.getElementById('unsaved-changes-overlay').style.display = 'flex';
+  }
+
+  /**
+   * Hides the unsaved-changes confirmation overlay without taking any action.
+   */
+  function closeUnsavedChangesOverlay() {
+    document.getElementById('unsaved-changes-overlay').style.display = 'none';
+  }
+
+  /**
+   * Updates the image preview element in the edit form for an image-type field.
+   * Extracts the file ID from the URL, shows a cached data URL immediately if
+   * available, or fetches it from the server asynchronously.
+   * @param {HTMLImageElement} imgEl - The preview img element to update.
+   * @param {HTMLDivElement} pdfEl - The PDF/no-access fallback container.
+   * @param {string} url - The Google Drive URL or file ID entered by the user.
+   */
+  function updatePreview(imgEl, pdfEl, url) {
+    const id = extractDriveId(url);
+    if (!id) {
+      imgEl.src = ''; imgEl.style.display = 'none';
+      pdfEl.style.display = 'none';
+      return;
+    }
+    const cached = imageCache[id];
+    if (cached) {
+      applyFileResult(imgEl, pdfEl, cached);
+      return;
+    }
+    imgEl.src = ''; imgEl.style.display = 'block';
+    pdfEl.style.display = 'none';
+    google.script.run
+      .withSuccessHandler(results => {
+        const result = results[id] ?? null;
+        imageCache[id] = result;
+        saveToIndexedDB(id, result);
+        applyFileResult(imgEl, pdfEl, result);
+      })
+      .withFailureHandler(() => { imgEl.style.display = 'none'; })
+      .getImagesDataUrls([id]);
+  }
+
+  /**
+   * Reads the current state of every field in #edit-form into a values array
+   * aligned with schema.columns (plain inputs, selects, and table editors via
+   * encodeTableEditor). Used both to build the save payload and to detect
+   * unsaved changes against the snapshot taken when the edit view was opened.
+   * @returns {string[]}
+   */
+  function collectFormValues() {
+    const values = new Array(schema.columns.length).fill('');
+    document.querySelectorAll('#edit-form input[data-col-index]').forEach(inp => {
+      values[parseInt(inp.dataset.colIndex)] = inp.value;
+    });
+    document.querySelectorAll('#edit-form select[data-col-index]').forEach(sel => {
+      values[parseInt(sel.dataset.colIndex)] = sel.value;
+    });
+    schema.columns.forEach((col, i) => {
+      if (isTableType(col)) values[i] = encodeTableEditor(i, col);
+    });
+    return values;
+  }
+
+  /**
+   * True if any field in #edit-form differs from the snapshot captured when
+   * the edit view was opened (originalFormValues).
+   * @returns {boolean}
+   */
+  function formValuesChanged() {
+    if (!originalFormValues) return false;
+    return JSON.stringify(collectFormValues()) !== JSON.stringify(originalFormValues);
+  }
+
+  /**
+   * Human-readable label for one of the edit view's tabs, used only to point the user
+   * at the right place in a validation-error alert — not the UI tab text itself (the
+   * 'main' tab has no visible label of its own; #edit-title shows the person's name).
+   * @param {string} tabKey - 'main', 'documentPhotos', or a *-table column's index as a string.
+   * @returns {string}
+   */
+  function getEditTabLabel(tabKey) {
+    if (tabKey === 'main') return 'the main info tab';
+    if (tabKey === 'documentPhotos') return `the "${schema.documentPhotoTabName}" tab`;
+    return `the "${schema.columns[parseInt(tabKey)].name}" tab`;
+  }
+
+  /**
+   * Validates every VALIDATORS-typed field — plain inputs and *-table sub-columns alike —
+   * then collects new values for all columns from the edit form (plain inputs and table
+   * editors), stores them in pendingValues, and calls updateRow() on the server.
+   * Disables the Save button for the duration of the async call.
+   */
+  function saveRow() {
+    const invalidFields = []; // { tabKey, fieldName, message }
+    schema.columns.forEach((col, i) => {
+      if (isTableType(col)) {
+        const wrapper = document.querySelector(`#edit-form .table-editor[data-col-index="${i}"]`);
+        if (!wrapper) return;
+        wrapper.querySelectorAll('input[data-field]').forEach(inp => {
+          const h = (col.tableHeaders || []).find(hh => hh.name === inp.dataset.field);
+          const validator = h && VALIDATORS[h.type];
+          if (!validator) return;
+          const val = inp.value.trim();
+          const valid = !val || validator.regex.test(val);
+          inp.classList.toggle('input-error', !valid);
+          if (!valid) invalidFields.push({ tabKey: String(i), fieldName: h.name, message: validator.msg });
+        });
+        return;
+      }
+      const validator = VALIDATORS[col.type];
+      if (!validator) return;
+      const inp = document.querySelector(`#edit-form input[data-col-index="${i}"]`);
+      if (!inp) return;
+      const val = inp.value.trim();
+      const valid = !val || validator.regex.test(val);
+      inp.classList.toggle('input-error', !valid);
+      if (!valid) {
+        const panel = inp.closest('.edit-panel');
+        invalidFields.push({ tabKey: panel ? panel.dataset.tabKey : 'main', fieldName: col.name, message: validator.msg });
+      }
+    });
+    if (invalidFields.length) {
+      switchEditTab(invalidFields[0].tabKey);
+      const lines = invalidFields.map(f => `- "${f.fieldName}" on ${getEditTabLabel(f.tabKey)}: ${f.message}`);
+      alert(`Cannot save — fix the following field(s) before saving:\n\n${lines.join('\n')}`);
+      return;
+    }
+
+    const newValues = collectFormValues();
+    pendingValues = newValues;
+
+    document.getElementById('btn-save').disabled = true;
+    document.getElementById('save-status').textContent = 'Saving…';
+
+    if (isNewRow) {
+      const ssSelect = document.getElementById('add-spreadsheet-select');
+      const targetId = (schema.masterMode && showAllUnits && ssSelect.style.display !== 'none')
+        ? ssSelect.value || null
+        : null;
+      google.script.run
+        .withSuccessHandler(newRowIndex => {
+          editingRow.rowIndex = newRowIndex;
+          if (targetId) editingRow.spreadsheetId = targetId;
+          onSaveSuccess();
+        })
+        .withFailureHandler(onSaveError)
+        .addRowWithData(newValues, targetId);
+    } else {
+      google.script.run
+        .withSuccessHandler(onSaveSuccess)
+        .withFailureHandler(onSaveError)
+        .updateRow(editingRow.rowIndex, newValues, editingRow.spreadsheetId ?? null);
+    }
+  }
+
+  /**
+   * Success handler for saveRow(). Updates the in-memory row values from
+   * pendingValues so the list view reflects the change without a full reload,
+   * then returns to the list view. For new rows, adds the row to schema.rows.
+   */
+  function onSaveSuccess() {
+    if (pendingValues) {
+      pendingValues.forEach((val, i) => { editingRow.values[i] = val; });
+      pendingValues = null;
+    }
+    if (isNewRow) {
+      schema.rows.push(editingRow);
+      isNewRow = false;
+    }
+    applyFilters();
+    showView('list');
+  }
+
+  /**
+   * Creates a local empty row and opens the edit view for it.
+   * The row is written to the sheet only when the user saves.
+   */
+  function addPerson() {
+    const emptyValues = new Array(schema.columns.length).fill('');
+    const newRow = { rowIndex: null, values: emptyValues };
+    isNewRow = true;
+    openEditView(newRow);
+  }
+
+  /**
+   * Failure handler for saveRow(). Re-enables the Save button and alerts the error.
+   * @param {Error} err
+   */
+  function onSaveError(err) {
+    document.getElementById('btn-save').disabled = false;
+    document.getElementById('save-status').textContent = '';
+    alert(`Save failed: ${err.message || err}`);
+  }
+
+  /**
+   * Asks for confirmation then moves the current row to the Trash sheet via the server.
+   */
+  function deletePerson() {
+    if (!confirm('Move this person to Trash?')) return;
+    document.getElementById('btn-delete').disabled = true;
+    document.getElementById('btn-save').disabled = true;
+    google.script.run
+      .withSuccessHandler(onDeleteSuccess)
+      .withFailureHandler(onDeleteError)
+      .deleteRow(editingRow.rowIndex, editingRow.spreadsheetId ?? null);
+  }
+
+  /**
+   * Success handler for deletePerson(). Removes the row from the in-memory schema,
+   * adjusts rowIndexes for all subsequent rows (the sheet row numbers shifted up by 1),
+   * and returns to the list view.
+   */
+  function onDeleteSuccess() {
+    const deletedIndex = editingRow.rowIndex;
+    const deletedSpreadsheetId = editingRow.spreadsheetId ?? null;
+    schema.rows = schema.rows.filter(r => r !== editingRow);
+    adjustRowIndexesAfterDelete(schema.rows, new Map([[deletedSpreadsheetId, [deletedIndex]]]));
+    editingRow = null;
+    applyFilters();
+    showView('list');
+  }
+
+  /**
+   * Failure handler for deletePerson(). Re-enables buttons and alerts the error.
+   * @param {Error} err
+   */
+  function onDeleteError(err) {
+    document.getElementById('btn-delete').disabled = false;
+    document.getElementById('btn-save').disabled = false;
+    alert(`Delete failed: ${err.message || err}`);
+  }
+
+  /**
+   * Asks for confirmation then moves all selected rows to Trash via the server.
+   */
+  function deletePersonnelBulk() {
+    const rowEntries = getSelectedRowEntries();
+    if (!rowEntries.length) return;
+    const count = rowEntries.length;
+    if (!confirm(`Move ${count} person${count !== 1 ? 's' : ''} to Trash?`)) return;
+    document.getElementById('btn-delete-bulk').disabled = true;
+    google.script.run
+      .withSuccessHandler(onBulkDeleteSuccess.bind(null, rowEntries))
+      .withFailureHandler(onBulkDeleteError)
+      .deleteRows(rowEntries);
+  }
+
+  /**
+   * Success handler for deletePersonnelBulk(). Removes deleted rows from schema,
+   * adjusts rowIndexes for remaining rows in the same spreadsheet, and re-renders.
+   * @param {Array<{rowIndex: number, spreadsheetId: string|null}>} deletedEntries
+   */
+  function onBulkDeleteSuccess(deletedEntries) {
+    const deletedKeys = new Set(deletedEntries.map(e => rowKey(e)));
+    schema.rows = schema.rows.filter(r => !deletedKeys.has(rowKey(r)));
+    deletedKeys.forEach(k => selectedKeys.delete(k));
+
+    adjustRowIndexesAfterDelete(schema.rows, groupRowIndexesBySource(deletedEntries));
+
+    applyFilters();
+  }
+
+  /**
+   * Failure handler for deletePersonnelBulk(). Re-enables the button and logs the error.
+   * @param {Error} err
+   */
+  function onBulkDeleteError(err) {
+    document.getElementById('btn-delete-bulk').disabled = false;
+    console.error('Bulk delete failed:', err.message || err);
+  }
+</script>

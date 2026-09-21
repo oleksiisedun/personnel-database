@@ -1,0 +1,250 @@
+<script>
+  // *-table cells: sub-table codec, read-only mini table (list view), table editor (edit view).
+  // One of several WebEditor.*.js.html fragments sharing a single global scope; include order is set in WebEditor.html.
+
+  const FIELD_SEP = ' | ';
+
+  const ROW_SEP = '\n';
+
+  const MINI_TABLE_HEADER_MIN_FONT_SIZE_PX = 8;
+
+  /**
+   * Decodes a pipe-delimited cell string into an array of row objects.
+   * Empty cell returns []. Each row object maps field names to string values.
+   * @param {string} cell - Raw encoded cell value from the sheet.
+   * @param {string[]} fields - Ordered list of field names (sub-column headers).
+   * @returns {Object[]}
+   */
+  const parseData = (cell, fields) => {
+    if (!cell) return [];
+    return cell.split(ROW_SEP).map(row => {
+      const values = row.split(FIELD_SEP);
+      return Object.fromEntries(fields.map((key, i) => [key, values[i] ?? '']));
+    });
+  };
+
+  /**
+   * Encodes an array of row objects back into the pipe-delimited cell string.
+   * Rows where every field is empty are excluded (treated as blank/deleted) — a row counts
+   * as filled in if the user entered a value in *any* column, not just the first one.
+   * @param {Object[]} data - Array of row objects.
+   * @param {string[]} fields - Ordered list of field names.
+   * @returns {string}
+   */
+  const mergeData = (data, fields) => data
+    .filter(r => fields.some(f => r[f]))
+    .map(r => fields.map(f => r[f] ?? '').join(FIELD_SEP))
+    .join(ROW_SEP);
+
+  /**
+   * Returns true if the column type is a *-table type (e.g. relatives-table).
+   * @param {{type: string}} col
+   * @returns {boolean}
+   */
+  function isTableType(col) { return col.type.endsWith('-table'); }
+
+  /**
+   * Extracts the bare sub-column name array from a *-table column's tableHeaders (now
+   * {name, type, dropdownOptions?} objects), for use with parseData()/mergeData() which key
+   * sub-table rows by field name only.
+   * @param {{tableHeaders?: Array<{name: string}>}} col
+   * @returns {string[]}
+   */
+  function tableHeaderNames(col) { return (col.tableHeaders || []).map(h => h.name); }
+
+  /**
+   * Builds a <colgroup> element with proportional widths for a *-table column.
+   * Column widths are proportional to the square root of the max content length
+   * (header or any data value, minimum 8 chars). Returns null when headers is empty.
+   * @param {Object[]} rows - Decoded table row objects.
+   * @param {string[]} headers - Sub-column header names.
+   * @param {boolean} [extraCol=false] - When true, appends an unsized <col> for the delete button column.
+   * @returns {HTMLTableColElement|null}
+   */
+  function buildTableColgroup(rows, headers, extraCol = false) {
+    if (!(headers || []).length) return null;
+    const scaledLens = headers.map(h => {
+      const dataMax = (rows || []).reduce((m, r) => Math.max(m, (r[h] || '').length), 0);
+      return Math.sqrt(Math.max(h.length, dataMax, 8));
+    });
+    const total = scaledLens.reduce((a, b) => a + b, 0);
+    const colgroup = document.createElement('colgroup');
+    scaledLens.forEach(len => {
+      const col = document.createElement('col');
+      col.style.width = `${(len / total * 100).toFixed(1)}%`;
+      colgroup.appendChild(col);
+    });
+    if (extraCol) colgroup.appendChild(document.createElement('col'));
+    return colgroup;
+  }
+
+  /**
+   * Builds a <thead> element with a single header row populated from the given headers.
+   * @param {string[]} headers - Sub-column header names.
+   * @param {boolean} [extraTh=false] - When true, appends an empty <th> for the delete button column.
+   * @returns {HTMLTableSectionElement}
+   */
+  function buildTableHeaderRow(headers, extraTh = false) {
+    const thead = document.createElement('thead');
+    const trHead = document.createElement('tr');
+    (headers || []).forEach(h => {
+      const th = document.createElement('th');
+      th.textContent = h;
+      trHead.appendChild(th);
+    });
+    if (extraTh) trHead.appendChild(document.createElement('th'));
+    thead.appendChild(trHead);
+    return thead;
+  }
+
+  /**
+   * Builds a read-only HTML table element from decoded *-table row data.
+   * Used to display *-table column values in the list view.
+   * @param {Object[]} rows - Array of row objects (field name → value).
+   * @param {Array<{name: string}>} headers - Ordered sub-column descriptors.
+   * @returns {HTMLTableElement}
+   */
+  function buildMiniTable(rows, headers) {
+    const table = document.createElement('table');
+    table.className = 'mini-table';
+    const headerNames = (headers || []).map(h => h.name);
+    const colgroup = buildTableColgroup(rows, headerNames);
+    if (colgroup) table.appendChild(colgroup);
+    table.appendChild(buildTableHeaderRow(headerNames));
+    const tbody = document.createElement('tbody');
+    (rows || []).forEach(rowObj => {
+      const tr = document.createElement('tr');
+      headerNames.forEach(h => {
+        const td = document.createElement('td');
+        td.textContent = rowObj[h] || '';
+        tr.appendChild(td);
+      });
+      tbody.appendChild(tr);
+    });
+    table.appendChild(tbody);
+    return table;
+  }
+
+  /**
+   * Shrinks the font-size of any mini-table header cell whose text is a single
+   * word (no space to wrap at) and wider than its column, proportionally to the
+   * exact ratio needed to fit it on one line — never wrapping mid-word or
+   * truncating. Multi-word headers are left untouched; they wrap normally at
+   * spaces. Must be called after `table` is attached to the live DOM, since it
+   * measures actual rendered width (clientWidth/scrollWidth).
+   * @param {HTMLTableElement} table
+   */
+  function shrinkOverflowingSingleWordHeaders(table) {
+    table.querySelectorAll('thead th').forEach(th => {
+      const text = th.textContent;
+      if (!text || /\s/.test(text) || th.scrollWidth <= th.clientWidth) return;
+      const scale = th.clientWidth / th.scrollWidth;
+      const baseSize = parseFloat(getComputedStyle(th).fontSize);
+      th.style.fontSize = `${Math.max(baseSize * scale, MINI_TABLE_HEADER_MIN_FONT_SIZE_PX)}px`;
+    });
+  }
+
+  /**
+   * Builds an interactive table editor widget for a *-table column in the edit
+   * view. Pre-populates rows from decoded data. Includes an "Add row" button and
+   * a delete button per row. The wrapper div carries data-col-index so
+   * encodeTableEditor() can locate it during save.
+   * @param {number} colIndex - Index of the column in schema.columns.
+   * @param {Object[]} rows - Pre-decoded row objects.
+   * @param {Array<{name: string, type: string, dropdownOptions?: string[]}>} headers - Sub-column descriptors.
+   * @returns {HTMLDivElement}
+   */
+  function buildTableEditor(colIndex, rows, headers) {
+    const wrapper = document.createElement('div');
+    wrapper.className = 'table-editor';
+    wrapper.dataset.colIndex = colIndex;
+    const table = document.createElement('table');
+
+    const headerNames = (headers || []).map(h => h.name);
+    const colgroup = buildTableColgroup(rows, headerNames, true);
+    if (colgroup) table.appendChild(colgroup);
+    table.appendChild(buildTableHeaderRow(headerNames, true));
+    const tbody = document.createElement('tbody');
+    (rows || []).forEach(rowObj => addTableEditorRow(tbody, headers, rowObj));
+    table.appendChild(tbody);
+    wrapper.appendChild(table);
+    const btnAdd = document.createElement('button');
+    btnAdd.type = 'button';
+    btnAdd.className = 'btn-add-row';
+    btnAdd.textContent = '+ Add row';
+    btnAdd.addEventListener('click', () => addTableEditorRow(tbody, headers, null));
+    wrapper.appendChild(btnAdd);
+    return wrapper;
+  }
+
+  /**
+   * Appends a new editable row to a table editor tbody. Each cell contains a text input
+   * (or, when the sub-column has dropdownOptions, a <select>) tagged with data-field (the
+   * header name). A sub-column whose type has a VALIDATORS entry (date/tin/number) gets the
+   * same live format validation as a top-level field of that type — placeholder, hint tooltip,
+   * and a red border while the value doesn't match. The last cell contains a delete button
+   * that removes the row from the DOM.
+   * @param {HTMLTableSectionElement} tbody
+   * @param {Array<{name: string, type: string, dropdownOptions?: string[]}>} headers - Sub-column descriptors.
+   * @param {Object|null} rowObj - Existing row data to pre-fill, or null for an empty row.
+   */
+  function addTableEditorRow(tbody, headers, rowObj) {
+    const tr = document.createElement('tr');
+    (headers || []).forEach(h => {
+      const td = document.createElement('td');
+      const currentVal = rowObj?.[h.name] ?? '';
+      let inp;
+      if (h.dropdownOptions) {
+        inp = document.createElement('select');
+        populateSelectOptions(inp, h.dropdownOptions, currentVal);
+      } else {
+        inp = document.createElement('input');
+        inp.type = 'text';
+        inp.value = currentVal;
+        const validator = VALIDATORS[h.type];
+        if (validator) {
+          inp.placeholder = validator.placeholder;
+          inp.title = validator.hint;
+          inp.addEventListener('input', () => {
+            const val = inp.value.trim();
+            inp.classList.toggle('input-error', !!val && !validator.regex.test(val));
+          });
+        }
+      }
+      inp.dataset.field = h.name;
+      td.appendChild(inp);
+      tr.appendChild(td);
+    });
+    const tdDel = document.createElement('td');
+    const btnDel = document.createElement('button');
+    btnDel.type = 'button';
+    btnDel.className = 'btn-delete-row';
+    btnDel.textContent = '×';
+    btnDel.addEventListener('click', () => tr.remove());
+    tdDel.appendChild(btnDel);
+    tr.appendChild(tdDel);
+    tbody.appendChild(tr);
+  }
+
+  /**
+   * Reads all input/select values from a table editor widget and encodes them back into
+   * the pipe-delimited cell string using mergeData(). Rows where every field is empty are
+   * excluded (treated as blank/deleted).
+   * @param {number} colIndex - Index of the column whose editor to read.
+   * @param {{tableHeaders?: Array<{name: string}>}} col - Column descriptor from schema.
+   * @returns {string} Encoded cell value ready to write to the sheet.
+   */
+  function encodeTableEditor(colIndex, col) {
+    const wrapper = document.querySelector(`.table-editor[data-col-index="${colIndex}"]`);
+    if (!wrapper) return '';
+    const rows = [];
+    wrapper.querySelectorAll('tbody tr').forEach(tr => {
+      const obj = {};
+      tr.querySelectorAll('[data-field]').forEach(inp => {
+        obj[inp.dataset.field] = inp.value;
+      });
+      rows.push(obj);
+    });
+    return mergeData(rows, tableHeaderNames(col));
+  }
+</script>

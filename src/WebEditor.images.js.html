@@ -1,0 +1,243 @@
+<script>
+  // Images and files: IndexedDB image cache, fetch queue, file badges, Drive-ID parsing, lightbox.
+  // One of several WebEditor.*.js.html fragments sharing a single global scope; include order is set in WebEditor.html.
+
+  const imageCache = {};     // fileId → { type:'image', dataUrl } | { type:'pdf', viewUrl } | null
+
+  const pendingImages = new Set(); // fileIds currently being fetched to avoid duplicate requests
+
+  let dbPromise = null;              // Promise<IDBDatabase> — opened once in init(), reused thereafter
+
+  /**
+   * Opens (or reuses) the IndexedDB database for the persistent image cache.
+   * Called eagerly in init() so the DB is ready before onDataLoaded fires.
+   * @returns {Promise<IDBDatabase>}
+   */
+  function openImageDB() {
+    if (dbPromise) return dbPromise;
+    dbPromise = new Promise((resolve, reject) => {
+      try {
+        const req = indexedDB.open('pdb_images', 1);
+        req.onupgradeneeded = e => { e.target.result.createObjectStore('images'); };
+        req.onsuccess = e => resolve(e.target.result);
+        req.onerror = () => reject(req.error);
+      } catch (e) {
+        reject(e);
+      }
+    });
+    return dbPromise;
+  }
+
+  /**
+   * Reads all entries from IndexedDB, validates TTL, and pre-populates imageCache
+   * so renderList() can display cached images without queuing network requests.
+   * Expired or invalid entries are deleted in the same pass. Always resolves.
+   * @returns {Promise<void>}
+   */
+  async function loadCacheFromIndexedDB() {
+    try {
+      const db = await openImageDB();
+      const ttlMs = schema.imageCacheTtlDays * 24 * 60 * 60 * 1000;
+      const now = Date.now();
+      await new Promise(resolve => {
+        const req = db.transaction('images', 'readwrite').objectStore('images').openCursor();
+        req.onsuccess = e => {
+          const cursor = e.target.result;
+          if (!cursor) { resolve(); return; }
+          const entry = cursor.value;
+          if (!entry?.data || now - entry.savedAt > ttlMs) {
+            cursor.delete();
+          } else {
+            imageCache[cursor.key] = entry.data;
+          }
+          cursor.continue();
+        };
+        req.onerror = () => resolve();
+      });
+    } catch (e) {
+      // IndexedDB unavailable — silent fallback, images fetched from server
+    }
+  }
+
+  /**
+   * Persists a single fetched image result to IndexedDB. Fire-and-forget.
+   * @param {string} fileId - Google Drive file ID used as the record key.
+   * @param {Object} result - Value returned by getImagesDataUrls for this file ID.
+   * @returns {void}
+   */
+  function saveToIndexedDB(fileId, result) {
+    openImageDB().then(db => {
+      db.transaction('images', 'readwrite').objectStore('images')
+        .put({ savedAt: Date.now(), data: result }, fileId);
+    }).catch(() => {});
+  }
+
+  /**
+   * Creates a badge element for non-image Drive files (PDF, folder, no-access).
+   * @param {string} type - 'pdf' | 'folder' | 'no-access'
+   * @param {string} [viewUrl]
+   * @returns {HTMLElement}
+   */
+  function buildFileBadge(type, viewUrl) {
+    if (type === 'no-access') {
+      const span = document.createElement('span');
+      span.className = 'pdf-link pdf-link--no-access';
+      span.textContent = 'No access';
+      return span;
+    }
+    const a = document.createElement('a');
+    a.href = viewUrl;
+    a.target = '_blank';
+    a.rel = 'noopener noreferrer';
+    a.className = 'pdf-link' + (type === 'folder' ? ' pdf-link--folder' : '');
+    a.textContent = type === 'folder' ? 'Folder' : 'PDF';
+    return a;
+  }
+
+  /**
+   * Finds all img elements tagged with data-file-id (not yet loaded) and fires
+   * one google.script.run call per unique file ID. Results are stored in imageCache
+   * and the img src is updated when the response arrives. Uses pendingImages to
+   * prevent duplicate in-flight requests for the same file.
+   */
+  function queueImageFetch() {
+    const ids = [];
+    document.querySelectorAll('img[data-file-id]').forEach(img => {
+      const id = img.dataset.fileId;
+      if (!id || pendingImages.has(id)) return;
+      pendingImages.add(id);
+      ids.push(id);
+    });
+    if (!ids.length) return;
+    const batchSize = schema.imageFetchBatchSize;
+    const concurrency = schema.imageFetchConcurrency;
+    let offset = 0;
+    const fetchNext = () => {
+      if (offset >= ids.length) return;
+      const batch = ids.slice(offset, offset + batchSize);
+      offset += batchSize;
+      google.script.run
+        .withSuccessHandler(results => {
+          batch.forEach(fileId => {
+            pendingImages.delete(fileId);
+            const result = results[fileId] ?? null;
+            imageCache[fileId] = result;
+            saveToIndexedDB(fileId, result);
+            document.querySelectorAll(`img[data-file-id="${fileId}"]`).forEach(el => {
+              el.removeAttribute('data-file-id');
+              if (result?.type === 'image') {
+                el.src = result.dataUrl;
+              } else if (result) {
+                el.parentNode.replaceChild(buildFileBadge(result.type, result.viewUrl), el);
+              }
+            });
+          });
+          fetchNext();
+        })
+        .withFailureHandler(() => {
+          batch.forEach(fileId => pendingImages.delete(fileId));
+          fetchNext();
+        })
+        .getImagesDataUrls(batch);
+    };
+    const workers = Math.min(concurrency, Math.ceil(ids.length / batchSize));
+    for (let i = 0; i < workers; i++) fetchNext();
+  }
+
+  /**
+   * Extracts the Google Drive file ID from a sharing URL or returns the input
+   * unchanged if it looks like a bare file ID already.
+   * Supported formats:
+   *   https://drive.google.com/file/d/FILE_ID/view
+   *   https://drive.google.com/drive/u/0/folders/FOLDER_ID (or without the /u/0/ account segment)
+   *   https://drive.google.com/open?id=FILE_ID
+   *   FILE_ID (bare alphanumeric string ≥ 10 chars)
+   * Server-side counterpart: parseDriveId() in Utils.js — keep URL patterns aligned.
+   * @param {string} url
+   * @returns {string|null} File ID, or null if not parseable.
+   */
+  function extractDriveId(url) {
+    if (!url) return null;
+    const patterns = [
+      /\/folders\/([a-zA-Z0-9_-]+)/,
+      /\/d\/([a-zA-Z0-9_-]+)/,
+      /[?&]id=([a-zA-Z0-9_-]+)/,
+    ];
+    for (const pattern of patterns) {
+      const m = url.match(pattern);
+      if (m) return m[1];
+    }
+    if (/^[a-zA-Z0-9_-]{10,}$/.test(url.trim())) return url.trim();
+    return null;
+  }
+
+  /**
+   * Applies a server file-fetch result to an image/PDF preview pair.
+   * @param {HTMLImageElement} imgEl
+   * @param {HTMLElement} pdfEl - Container with an <a> child for non-image files.
+   * @param {{type: string, dataUrl?: string, viewUrl?: string}|null} result
+   */
+  function applyFileResult(imgEl, pdfEl, result) {
+    if (!result) { imgEl.style.display = 'none'; return; }
+    if (result.type === 'image') {
+      imgEl.src = result.dataUrl;
+      imgEl.style.display = 'block';
+      pdfEl.style.display = 'none';
+    } else {
+      imgEl.src = '';
+      imgEl.style.display = 'none';
+      const link = pdfEl.querySelector('a');
+      if (result.type === 'no-access') {
+        link.removeAttribute('href');
+        link.textContent = 'No access to this file';
+      } else {
+        link.href = result.viewUrl;
+        link.textContent = result.type === 'folder' ? 'Open Folder in Drive' : 'Open PDF in Drive';
+      }
+      pdfEl.style.display = 'block';
+    }
+  }
+
+  /**
+   * Opens the lightbox overlay for a given Drive file ID. Uses the cached data
+   * URL if available; otherwise fetches it from the server and updates the
+   * lightbox image once the response arrives.
+   * @param {string} fileId - Google Drive file ID.
+   */
+  function openLightbox(fileId) {
+    const cached = imageCache[fileId];
+    if (cached?.type === 'no-access') return;
+    if (cached && cached.type !== 'image') {
+      window.open(cached.viewUrl, '_blank', 'noopener,noreferrer');
+      return;
+    }
+    const lightbox = document.getElementById('lightbox');
+    const imgEl = document.getElementById('lightbox-img');
+    const pdfMsg = lightbox.querySelector('.lightbox-pdf-msg');
+    lightbox.style.display = 'flex';
+    pdfMsg.style.display = 'none';
+    imgEl.style.display = '';
+    if (cached?.type === 'image') {
+      imgEl.src = cached.dataUrl;
+    } else {
+      imgEl.src = '';
+      google.script.run
+        .withSuccessHandler(results => {
+          const result = results[fileId] ?? null;
+          imageCache[fileId] = result;
+          saveToIndexedDB(fileId, result);
+          if (result?.type === 'image') {
+            imgEl.src = result.dataUrl;
+          } else if (result?.type === 'no-access') {
+            lightbox.style.display = 'none';
+          } else if (result) {
+            imgEl.style.display = 'none';
+            pdfMsg.querySelector('a').href = result.viewUrl;
+            pdfMsg.style.display = 'flex';
+          }
+        })
+        .withFailureHandler(() => {})
+        .getImagesDataUrls([fileId]);
+    }
+  }
+</script>

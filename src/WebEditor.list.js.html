@@ -1,0 +1,416 @@
+<script>
+  // List view: table rendering, filters, sorting, selection, column panel, schema-mismatch warning.
+  // One of several WebEditor.*.js.html fragments sharing a single global scope; include order is set in WebEditor.html.
+
+  let filteredRows = [];   // subset of schema.rows currently shown after filters
+
+  const hiddenColumns = new Set(); // column indices hidden by the user
+
+  let useRegex = false;              // true when filter inputs are treated as regular expressions
+
+  let filterActualPersonnel = false; // true when only names in the actual personnel list are shown
+
+  let showAllUnits = true;           // true when master-mode remote rows are included alongside local ones
+
+  /**
+   * Builds the static parts of the list view that depend on schema but not on data:
+   * the column header row and the filter input row. Also rebuilds the column
+   * visibility panel. Called once after schema is loaded.
+   */
+  function buildListView() {
+    const filterRow = document.getElementById('filter-row');
+    const headerRow = document.getElementById('header-row');
+    const dataTable = document.getElementById('data-table');
+    const debouncedFilter = debounce(() => {
+      applyFilters();
+      dataTable.classList.remove('filtering');
+    }, schema.filterDebounceMs);
+    filterRow.innerHTML = '';
+    headerRow.innerHTML = '';
+
+    // Checkbox column — filter row: master select-all checkbox
+    const fthCb = document.createElement('th');
+    fthCb.className = 'col-checkbox';
+    const chkAll = document.createElement('input');
+    chkAll.type = 'checkbox';
+    chkAll.id = 'chk-select-all';
+    chkAll.title = 'Select / deselect all visible';
+    chkAll.addEventListener('change', () => {
+      filteredRows.forEach(row => {
+        if (chkAll.checked) selectedKeys.add(rowKey(row));
+        else selectedKeys.delete(rowKey(row));
+      });
+      document.querySelectorAll('#table-body input[type=checkbox]').forEach(cb => {
+        cb.checked = chkAll.checked;
+      });
+      updateSelectionUI();
+    });
+    fthCb.appendChild(chkAll);
+    filterRow.appendChild(fthCb);
+
+    // Checkbox column — header row: empty label cell
+    const thCb = document.createElement('th');
+    thCb.className = 'col-checkbox';
+    headerRow.appendChild(thCb);
+
+    schema.columns.forEach((col, i) => {
+      const th = document.createElement('th');
+      th.dataset.colIndex = i;
+      const hDiv = document.createElement('div');
+      hDiv.className = 'cell-content';
+      if (col.type === 'image') hDiv.classList.add('cell-content--image');
+      if (isTableType(col)) hDiv.classList.add('cell-content--table');
+      hDiv.textContent = col.name;
+      th.appendChild(hDiv);
+      headerRow.appendChild(th);
+
+      const fth = document.createElement('th');
+      fth.dataset.colIndex = i;
+      const fDiv = document.createElement('div');
+      fDiv.className = 'cell-content';
+      const input = document.createElement('input');
+      input.type = 'text';
+      input.placeholder = 'Filter';
+      input.dataset.colIndex = i;
+      input.addEventListener('input', () => dataTable.classList.add('filtering'));
+      input.addEventListener('input', debouncedFilter);
+      fDiv.appendChild(input);
+      fth.appendChild(fDiv);
+      filterRow.appendChild(fth);
+    });
+    buildColumnPanel();
+  }
+
+  /**
+   * Reads all active filter inputs, filters schema.rows into filteredRows,
+   * and re-renders the table body. Called on every filter input change.
+   */
+  function applyFilters() {
+    const filters = {};
+    document.querySelectorAll('#filter-row input[type=text]').forEach(inp => {
+      const val = inp.value.trim();
+      if (!val) return;
+      if (val === '""' || val === "''") {
+        filters[inp.dataset.colIndex] = { empty: true };
+      } else if (useRegex) {
+        try { filters[inp.dataset.colIndex] = new RegExp(val, 'i'); } catch (e) { /* invalid regex — skip */ }
+      } else {
+        filters[inp.dataset.colIndex] = val.toLowerCase();
+      }
+    });
+    filteredRows = schema.rows.filter(row => {
+      if (!Object.keys(filters).every(colIdx => {
+        const cell = row.values[colIdx] || '';
+        const f = filters[colIdx];
+        if (f?.empty) return !cell.trim();
+        if (f?.notEmpty) return !!cell.trim();
+        return useRegex ? f.test(cell) : cell.toLowerCase().includes(f);
+      })) return false;
+      if (!showAllUnits && row.spreadsheetId) return false;
+      if (filterActualPersonnel) {
+        return isActualPersonnelRow(row);
+      }
+      return true;
+    });
+
+    filteredRows = sortRowsBySourceOrder(filteredRows);
+
+    renderList();
+  }
+
+  /**
+   * Sorts rows by Master Mode source declaration order (schema.masterSourceIds,
+   * local rows first), then by rowIndex within each source. Used both for list
+   * display (applyFilters()) and to order rows sent to exportXLSX(), so a
+   * multi-source XLSX export lands in the same order the user sees on screen.
+   * Returns the input unchanged (not sorted, not copied) when there are no
+   * master sources. Does not mutate its input.
+   * @param {Array<{rowIndex: number, spreadsheetId?: string}>} rows
+   * @returns {Array<{rowIndex: number, spreadsheetId?: string}>}
+   */
+  function sortRowsBySourceOrder(rows) {
+    if (!schema.masterSourceIds?.length) return rows;
+    const srcOrder = new Map([[undefined, 0], [null, 0]]);
+    schema.masterSourceIds.forEach((id, i) => srcOrder.set(id, i + 1));
+    return [...rows].sort((a, b) => {
+      const ao = srcOrder.get(a.spreadsheetId) ?? srcOrder.size;
+      const bo = srcOrder.get(b.spreadsheetId) ?? srcOrder.size;
+      return ao !== bo ? ao - bo : a.rowIndex - b.rowIndex;
+    });
+  }
+
+  /**
+   * Rebuilds the table body from filteredRows. Each cell is rendered according
+   * to its column type: *-table → mini-table, image → thumbnail, col 0 → edit
+   * link, otherwise plain text. Applies column visibility and queues image fetches
+   * after the DOM is updated.
+   */
+  function renderList() {
+    const tbody = document.getElementById('table-body');
+    tbody.innerHTML = '';
+
+    filteredRows.forEach(row => {
+      const tr = document.createElement('tr');
+
+      const tdCb = document.createElement('td');
+      tdCb.className = 'col-checkbox';
+      const chk = document.createElement('input');
+      chk.type = 'checkbox';
+      chk.checked = selectedKeys.has(rowKey(row));
+      chk.addEventListener('change', () => {
+        if (chk.checked) selectedKeys.add(rowKey(row));
+        else selectedKeys.delete(rowKey(row));
+        updateSelectionUI();
+      });
+      tdCb.appendChild(chk);
+      tr.appendChild(tdCb);
+
+      row.values.forEach((val, i) => {
+        const td = document.createElement('td');
+        td.dataset.colIndex = i;
+        const col = schema.columns[i];
+
+        const cell = document.createElement('div');
+        cell.className = 'cell-content';
+
+        if (col.type === 'image') cell.classList.add('cell-content--image');
+        if (isTableType(col)) {
+          cell.classList.add('cell-content--table');
+          cell.appendChild(buildMiniTable(parseData(val, tableHeaderNames(col)), col.tableHeaders || []));
+        } else if (col.type === 'image') {
+          const id = extractDriveId(val);
+          if (id) {
+            const cached = imageCache[id];
+            if (cached && cached.type !== 'image') {
+              cell.appendChild(buildFileBadge(cached.type, cached.viewUrl));
+            } else {
+              const img = document.createElement('img');
+              img.className = 'thumb';
+              img.alt = '';
+              if (cached?.type === 'image') {
+                img.src = cached.dataUrl;
+              } else {
+                img.dataset.fileId = id; // picked up by queueImageFetch()
+              }
+              img.addEventListener('click', () => openLightbox(id));
+              cell.appendChild(img);
+            }
+          } else {
+            const span = document.createElement('span');
+            span.className = 'no-image';
+            span.textContent = '—';
+            cell.appendChild(span);
+          }
+        } else if (i === 0) {
+          const a = document.createElement('a');
+          a.className = 'name-link';
+          a.href = '#';
+          a.textContent = val;
+          a.addEventListener('click', e => {
+            e.preventDefault();
+            openEditView(row);
+          });
+          cell.appendChild(a);
+        } else {
+          cell.textContent = val;
+        }
+
+        td.appendChild(cell);
+        tr.appendChild(td);
+      });
+      tbody.appendChild(tr);
+    });
+    tbody.querySelectorAll('.mini-table').forEach(shrinkOverflowingSingleWordHeaders);
+    applyColumnVisibility();
+    queueImageFetch();
+    updateSelectionUI();
+  }
+
+  /**
+   * Updates export button disabled state (based on total selection across all
+   * rows) and the master checkbox (checked / indeterminate / unchecked, based
+   * on selection among the currently visible/filtered rows only).
+   */
+  function updateSelectionUI() {
+    document.getElementById('btn-export-f1').disabled = selectedKeys.size === 0;
+    document.getElementById('btn-export-wc').disabled = selectedKeys.size === 0;
+    document.getElementById('btn-export-xlsx').disabled = selectedKeys.size === 0;
+    document.getElementById('btn-move').disabled = selectedKeys.size === 0;
+    document.getElementById('btn-delete-bulk').disabled = selectedKeys.size === 0;
+
+    const chkAll = document.getElementById('chk-select-all');
+    if (!chkAll) return;
+    const total = filteredRows.length;
+    const selectedVisible = filteredRows.filter(row => selectedKeys.has(rowKey(row))).length;
+    if (total === 0 || selectedVisible === 0) {
+      chkAll.checked = false;
+      chkAll.indeterminate = false;
+    } else if (selectedVisible === total) {
+      chkAll.checked = true;
+      chkAll.indeterminate = false;
+    } else {
+      chkAll.checked = false;
+      chkAll.indeterminate = true;
+    }
+  }
+
+  /**
+   * Converts a 0-based column index to a spreadsheet letter (A, B, …, Z, AA, …).
+   * @param {number} index
+   * @returns {string}
+   */
+  function colIndexToLetter(index) {
+    let letter = '';
+    let n = index + 1;
+    while (n > 0) {
+      const rem = (n - 1) % 26;
+      letter = String.fromCharCode(65 + rem) + letter;
+      n = Math.floor((n - 1) / 26);
+    }
+    return letter;
+  }
+
+  /**
+   * Shows or hides the schema-warning button based on recorded column mismatches.
+   */
+  function updateSchemaWarningIcon() {
+    const btn = document.getElementById('btn-schema-warning');
+    if (!btn) return;
+    btn.style.display = Object.keys(schema.sourceColumnMismatches).length ? '' : 'none';
+  }
+
+  /**
+   * Populates and opens the schema-warning overlay. Rebuilds content each time
+   * so freshly-arrived mismatches are always reflected.
+   */
+  function openSchemaWarningOverlay() {
+    const sourceMap = new Map(schema.masterSources.map(s => [s.id, s.name]));
+    const content = document.getElementById('schema-warning-content');
+    content.textContent = '';
+    for (const [id, mismatches] of Object.entries(schema.sourceColumnMismatches)) {
+      const heading = document.createElement('h3');
+      heading.textContent = sourceMap.get(id) ?? id;
+      content.appendChild(heading);
+      const table = document.createElement('table');
+      const hRow = table.createTHead().insertRow();
+      ['Column', 'Local', 'Remote'].forEach(text => {
+        const th = document.createElement('th');
+        th.textContent = text;
+        hRow.appendChild(th);
+      });
+      const tbody = table.createTBody();
+      mismatches.forEach(({ colIndex, localName, remoteName }) => {
+        const tr = tbody.insertRow();
+        [colIndexToLetter(colIndex), localName, remoteName].forEach(text => {
+          tr.insertCell().textContent = text;
+        });
+      });
+      content.appendChild(table);
+    }
+    document.getElementById('schema-warning-overlay').style.display = 'flex';
+  }
+
+  /**
+   * Closes the schema-warning overlay.
+   */
+  function closeSchemaWarningOverlay() {
+    document.getElementById('schema-warning-overlay').style.display = 'none';
+  }
+
+  /**
+   * Populates the column visibility dropdown panel with a "Select all" checkbox
+   * and one checkbox per column. The first column's checkbox is always disabled.
+   * Rebuilds the panel from scratch each time schema changes.
+   */
+  function buildColumnPanel() {
+    const panel = document.getElementById('col-panel');
+    panel.innerHTML = '';
+
+    const allLabel = document.createElement('label');
+    allLabel.className = 'col-panel-select-all';
+    const allCb = document.createElement('input');
+    allCb.type = 'checkbox';
+    allCb.id = 'col-select-all';
+    allCb.addEventListener('change', () => {
+      schema.columns.forEach((col, i) => {
+        if (i === 0) return;
+        if (allCb.checked) hiddenColumns.delete(i);
+        else hiddenColumns.add(i);
+      });
+      panel.querySelectorAll('input[data-cb-col]').forEach(cb => {
+        if (parseInt(cb.dataset.cbCol) !== 0) cb.checked = allCb.checked;
+      });
+      applyColumnVisibility();
+    });
+    allLabel.appendChild(allCb);
+    allLabel.appendChild(document.createTextNode(' Select all'));
+    panel.appendChild(allLabel);
+
+    schema.columns.forEach((col, i) => {
+      const label = document.createElement('label');
+      const cb = document.createElement('input');
+      cb.type = 'checkbox';
+      cb.checked = !hiddenColumns.has(i);
+      cb.dataset.cbCol = i;
+      if (i === 0) {
+        cb.disabled = true;
+      } else {
+        cb.addEventListener('change', () => {
+          if (cb.checked) hiddenColumns.delete(i);
+          else hiddenColumns.add(i);
+          updateSelectAll();
+          applyColumnVisibility();
+        });
+      }
+      label.appendChild(cb);
+      label.appendChild(document.createTextNode(` ${col.name}`));
+      panel.appendChild(label);
+    });
+
+    updateSelectAll();
+  }
+
+  /**
+   * Syncs the "Select all" checkbox state (checked / unchecked / indeterminate)
+   * to reflect how many non-first columns are currently visible.
+   */
+  function updateSelectAll() {
+    const allCb = document.getElementById('col-select-all');
+    if (!allCb || schema.columns.length <= 1) return;
+    let hiddenCount = 0;
+    schema.columns.forEach((col, i) => {
+      if (i !== 0 && hiddenColumns.has(i)) hiddenCount++;
+    });
+    const total = schema.columns.length - 1;
+    if (hiddenCount === 0) {
+      allCb.checked = true; allCb.indeterminate = false;
+    } else if (hiddenCount === total) {
+      allCb.checked = false; allCb.indeterminate = false;
+    } else {
+      allCb.indeterminate = true;
+    }
+  }
+
+  /**
+   * Shows or hides every th/td in the data table based on the hiddenColumns set.
+   * Targets cells by their data-col-index attribute so both header and body stay
+   * in sync.
+   */
+  function applyColumnVisibility() {
+    document.querySelectorAll('#data-table th[data-col-index], #data-table td[data-col-index]').forEach(el => {
+      el.style.display = hiddenColumns.has(parseInt(el.dataset.colIndex)) ? 'none' : '';
+    });
+  }
+
+  /**
+   * Measures the rendered height of the filter row and sets the CSS top offset
+   * of each header-row th so both sticky rows stack correctly without overlapping.
+   * Must be called after the table is visible (offsetHeight requires layout).
+   */
+  function updateStickyOffsets() {
+    const filterHeight = document.getElementById('filter-row').getBoundingClientRect().height;
+    document.querySelectorAll('#header-row th').forEach(th => {
+      th.style.top = `${filterHeight}px`;
+    });
+  }
+</script>

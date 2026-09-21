@@ -115,7 +115,7 @@ const AWARDS_IMPORT_NOT_FOUND_DISPLAY_LIMIT = 20;
 
 // *-table cell encoding, shared by _parseSubTable()/_encodeSubTable() in
 // Utils.js (used by the export code and the award importer, Import.js). The client
-// (WebEditor.js.html) independently declares the same two literals since it
+// (WebEditor.tables.js.html) independently declares the same two literals since it
 // runs in a separate HTML-embedded script, not this server runtime.
 const TABLE_FIELD_SEP = ' | ';
 const TABLE_ROW_SEP = '\n';

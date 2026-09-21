@@ -141,6 +141,13 @@
   <script>
     const INITIAL_MODE = <?!= JSON.stringify(mode); ?>;
   </script>
+  <!-- Client script fragments share one global scope; this order is the load order and the lint order. -->
   <?!= HtmlService.createHtmlOutputFromFile('WebEditor.js').getContent(); ?>
+  <?!= HtmlService.createHtmlOutputFromFile('WebEditor.list.js').getContent(); ?>
+  <?!= HtmlService.createHtmlOutputFromFile('WebEditor.images.js').getContent(); ?>
+  <?!= HtmlService.createHtmlOutputFromFile('WebEditor.tables.js').getContent(); ?>
+  <?!= HtmlService.createHtmlOutputFromFile('WebEditor.edit.js').getContent(); ?>
+  <?!= HtmlService.createHtmlOutputFromFile('WebEditor.export.js').getContent(); ?>
+  <?!= HtmlService.createHtmlOutputFromFile('WebEditor.move.js').getContent(); ?>
 </body>
 </html>

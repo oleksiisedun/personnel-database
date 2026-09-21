@@ -1,21 +1,46 @@
 import js from '@eslint/js';
 import globals from 'globals';
+import path from 'node:path';
+import { createRequire } from 'node:module';
 
-// Extracts the <script> body from an .html file, padded with blank lines so
-// reported line numbers match the real file. (eslint-plugin-html does not
-// support ESLint 10, and this file has no scriptlets inside its <script>.)
+const { clientScripts } = createRequire(import.meta.url)('./tests/client-scripts.js');
+
+// The client script is split across several WebEditor.*.js.html fragments that
+// share one global scope in the browser (see WebEditor.html). To keep `no-undef`
+// meaningful they are linted as ONE unit: this processor runs on the entry file
+// (src/WebEditor.js.html), concatenates every fragment's <script> body in include
+// order, and maps each message back to its real file and line. Bodies are taken
+// from the character after `<script>`, so body line N is file line N.
+// (eslint-plugin-html does not support ESLint 10, and the scripts contain no scriptlets.)
+const srcDir = path.join(import.meta.dirname, 'src');
+const layouts = new Map(); // entry file name -> [{ file, startLine }] for postprocess()
+
+const scriptBody = (html) => html.slice(html.indexOf('<script>') + '<script>'.length, html.lastIndexOf('</script>'));
+
 const htmlScript = {
   processors: {
     script: {
-      preprocess: (text) => {
-        const start = text.indexOf('<script>');
-        const end = text.lastIndexOf('</script>');
-        if (start === -1 || end === -1) return [];
-        const before = text.slice(0, start + '<script>'.length);
-        const padding = '\n'.repeat(before.split('\n').length - 1);
-        return [padding + text.slice(start + '<script>'.length, end)];
+      preprocess: (text, filename) => {
+        const entry = path.basename(filename);
+        const fragments = clientScripts(srcDir).map((f) => (f.file === entry ? { ...f, text } : f));
+        let line = 0;
+        const layout = [];
+        const code = fragments.map(({ file, text: html }) => {
+          const body = scriptBody(html);
+          layout.push({ file, startLine: line });
+          line += body.split('\n').length;
+          return body;
+        });
+        layouts.set(filename, layout);
+        return [code.join('\n')];
       },
-      postprocess: (messages) => messages.flat(),
+      postprocess: (messages, filename) => {
+        const layout = layouts.get(filename);
+        return messages.flat().map((msg) => {
+          const at = [...layout].reverse().find((l) => l.startLine < msg.line);
+          return { ...msg, line: msg.line - at.startLine, endLine: msg.endLine && msg.endLine - at.startLine, message: `[${at.file}] ${msg.message}` };
+        });
+      },
       supportsAutofix: false,
     },
   },
@@ -23,7 +48,7 @@ const htmlScript = {
 
 // Correctness-only rules. Types are already covered by `npm run typecheck`
 // (src/*.js files); the main gap this fills is the JS embedded in
-// WebEditor.js.html, which tsc cannot see.
+// the WebEditor.*.js.html fragments, which tsc cannot see.
 const rules = {
   ...js.configs.recommended.rules,
   'no-var': 'error',
@@ -62,7 +87,8 @@ export default [
     },
   },
 
-  // Client-side script inside the HtmlService dialog. Not a module: every
+  // Client-side script inside the HtmlService dialog (all WebEditor.*.js.html
+  // fragments, linted as one unit via the entry file). Not a module: every
   // top-level function is a global, so no-undef is the check tsc can't do.
   {
     files: ['src/WebEditor.js.html'],

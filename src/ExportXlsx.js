@@ -42,7 +42,7 @@
  *
  * @param {Array<{rowIndex: number, spreadsheetId: string|null}>} rowEntries - Rows to export, in the
  *   exact order they should appear in the sheet (caller orders them — see
- *   sortRowsBySourceOrder() in WebEditor.js.html).
+ *   sortRowsBySourceOrder() in WebEditor.list.js.html).
  * @param {number[]} visibleColumnIndices - Indices into the local Database sheet's column
  *   schema to include, in order (columns the user has not hidden).
  * @returns {{name: string, url: string}} The saved .xlsx file's name and Drive URL.

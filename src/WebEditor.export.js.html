@@ -1,0 +1,316 @@
+<script>
+  // Export overlay: F-1/Wanted Card, XLSX and S-КАДР photo export flows.
+  // One of several WebEditor.*.js.html fragments sharing a single global scope; include order is set in WebEditor.html.
+
+  let pendingExportState = null;     // { mode: 'batch'|'xlsx', btnId, entries, total, serverFnName? } staged when confirm dialog is shown
+
+  /**
+   * Shows the export overlay in its confirm state (before a large export),
+   * with an estimated duration derived from the per-item server time.
+   * @param {string} message - Confirmation text, e.g. "You are about to export 30 documents…".
+   * @param {number} estimatedSeconds - Expected total server time.
+   */
+  function showExportConfirm(message, estimatedSeconds) {
+    const estimate = estimatedSeconds < 90
+      ? `about ${Math.round(estimatedSeconds / 10) * 10} seconds`
+      : `about ${Math.round(estimatedSeconds / 60)} minutes`;
+    document.getElementById('export-confirm-msg').textContent = message;
+    document.getElementById('export-confirm-estimate').textContent = `Estimated time: ${estimate}.`;
+    document.getElementById('export-confirm-wrap').style.display = 'block';
+    document.getElementById('export-progress-wrap').style.display = 'none';
+    document.getElementById('export-msg').textContent = '';
+    document.getElementById('export-links').style.display = 'none';
+    document.getElementById('export-error').style.display = 'none';
+    document.getElementById('btn-export-close').style.display = 'none';
+    document.getElementById('export-overlay').style.display = 'flex';
+  }
+
+  /**
+   * Shows the export overlay in its progress state: hides the confirm/error/close
+   * parts, clears the result list, and sets the status line.
+   * @param {string} message - Initial status text.
+   */
+  function showExportProgress(message) {
+    const ul = document.getElementById('export-links');
+    document.getElementById('export-confirm-wrap').style.display = 'none';
+    document.getElementById('export-msg').textContent = message;
+    ul.style.display = 'none';
+    ul.innerHTML = '';
+    document.getElementById('export-error').style.display = 'none';
+    document.getElementById('btn-export-close').style.display = 'none';
+    document.getElementById('export-progress-wrap').style.display = 'block';
+    document.getElementById('export-overlay').style.display = 'flex';
+  }
+
+  /**
+   * Appends a result link (opens in a new tab) to the export overlay's list.
+   * @param {HTMLElement} ul - The #export-links list.
+   * @param {{name: string, url: string}} file
+   */
+  function appendExportLink(ul, { name, url }) {
+    const li = document.createElement('li');
+    const a = document.createElement('a');
+    a.href = url;
+    a.target = '_blank';
+    a.textContent = name;
+    li.appendChild(a);
+    ul.appendChild(li);
+  }
+
+  /**
+   * Exports documents for every currently visible (filtered) row using the
+   * given server-side function. Automatically continues in subsequent batches
+   * if the server hits its time limit before finishing all rows.
+   * @param {string} btnId - ID of the button that triggered the export (disabled for the full run).
+   * @param {string} serverFnName - Name of the Apps Script function to call ('exportF1' or 'exportWC').
+   */
+  function runExport(btnId, serverFnName) {
+    const entries = getSelectedRowEntries();
+    if (!entries.length) return; // safety guard — buttons should already be disabled
+
+    const total = entries.length;
+    const btn = document.getElementById(btnId);
+    btn.disabled = true;
+
+    if (total > schema.exportConfirmThreshold) {
+      pendingExportState = { mode: 'batch', btnId, serverFnName, entries, total };
+      showExportConfirm(
+        `You are about to export ${total} documents. Export cannot be cancelled once started.`,
+        total * schema.exportSecondsPerDoc);
+      return;
+    }
+
+    startExportProgress(btnId, serverFnName, entries, total);
+  }
+
+  /**
+   * Resets the export overlay to its progress state and begins the export.
+   * @param {string} btnId
+   * @param {string} serverFnName
+   * @param {Array<{rowIndex: number, spreadsheetId: string|null}>} entries
+   * @param {number} total
+   */
+  function startExportProgress(btnId, serverFnName, entries, total) {
+    const btn = document.getElementById(btnId);
+    const ul = document.getElementById('export-links');
+
+    showExportProgress(`Exporting ${total} document${total !== 1 ? 's' : ''}…`);
+
+    let doneCount = 0;
+    const progressBar = document.getElementById('export-progress-bar');
+
+    const setProgress = pct => {
+      progressBar.classList.remove('indeterminate');
+      progressBar.style.width = `${pct}%`;
+    };
+
+    const fire = batch => {
+      progressBar.classList.add('indeterminate');
+      const runner = google.script.run
+        .withSuccessHandler(response => {
+          response.results.forEach(r => appendExportLink(ul, r));
+          ul.style.display = 'block';
+          doneCount += response.results.length;
+          setProgress(Math.round(doneCount / total * 100));
+
+          if (response.remaining.length > 0) {
+            document.getElementById('export-msg').textContent =
+              `Exported ${doneCount} of ${total}, continuing…`;
+            fire(response.remaining);
+          } else {
+            btn.disabled = false;
+            document.getElementById('export-msg').textContent =
+              `Exported ${doneCount} document${doneCount !== 1 ? 's' : ''}:`;
+            document.getElementById('btn-export-close').style.display = 'inline-block';
+          }
+        })
+        .withFailureHandler(err => {
+          btn.disabled = false;
+          progressBar.classList.remove('indeterminate');
+          document.getElementById('export-msg').textContent =
+            doneCount > 0 ? `Exported ${doneCount} before error:` : '';
+          showError('export-error', 'Export failed', err);
+          document.getElementById('btn-export-close').style.display = 'inline-block';
+        });
+      runner[serverFnName](batch);
+    };
+
+    fire(entries);
+  }
+
+  let photoExportSkipEntries = []; // accumulated across discovery + copy phases, in 'photoExport' mode
+
+  /**
+   * Kicks off the "Export Photos for S-КАДР" flow immediately on dialog open,
+   * in 'photoExport' mode (see init()). Shows the shared export overlay in its
+   * progress state and starts the server-side discovery phase.
+   */
+  function startPhotoExportFlow() {
+    const skipLog = document.getElementById('export-skip-log');
+
+    showExportProgress('Finding personnel with photos…');
+    skipLog.style.display = 'none';
+    skipLog.innerHTML = '';
+    document.getElementById('export-progress-bar').classList.add('indeterminate');
+
+    google.script.run
+      .withSuccessHandler(onPhotoDiscoverySuccess)
+      .withFailureHandler(onPhotoExportError)
+      .startPhotoExport();
+  }
+
+  /**
+   * Success handler for startPhotoExport(). Stashes the discovery skip list
+   * and starts the batched copy/convert phase, or finishes immediately if no
+   * one is eligible.
+   * @param {{folderId: string, folderUrl: string, eligible: Array<Object>, skipped: Array<{name: string, reason: string}>}} response
+   */
+  function onPhotoDiscoverySuccess(response) {
+    photoExportSkipEntries = response.skipped.slice();
+    if (!response.eligible.length) {
+      finishPhotoExport(0, response.folderUrl);
+      return;
+    }
+    runPhotoCopyBatch(response.folderId, response.folderUrl, response.eligible, response.eligible.length, 0);
+  }
+
+  /**
+   * Drives one batch of copyPhotosBatch(), recursing on response.remaining
+   * until the whole eligible list has been processed (mirrors the fire()
+   * loop in startExportProgress()).
+   * @param {string} folderId
+   * @param {string} folderUrl
+   * @param {Array<Object>} entries - Remaining eligible entries to process.
+   * @param {number} total
+   * @param {number} doneCount
+   */
+  function runPhotoCopyBatch(folderId, folderUrl, entries, total, doneCount) {
+    const progressBar = document.getElementById('export-progress-bar');
+    progressBar.classList.remove('indeterminate');
+    progressBar.style.width = Math.round(doneCount / total * 100) + '%';
+    document.getElementById('export-msg').textContent = `Copying photo ${doneCount} of ${total}…`;
+
+    google.script.run
+      .withSuccessHandler(response => {
+        const ul = document.getElementById('export-links');
+        response.results.forEach(r => appendExportLink(ul, r));
+        if (response.results.length) ul.style.display = 'block';
+        photoExportSkipEntries.push(...response.skipped);
+        const newDone = doneCount + response.results.length + response.skipped.length;
+
+        if (response.remaining.length > 0) {
+          runPhotoCopyBatch(folderId, folderUrl, response.remaining, total, newDone);
+        } else {
+          finishPhotoExport(newDone, folderUrl);
+        }
+      })
+      .withFailureHandler(onPhotoExportError)
+      .copyPhotosBatch(folderId, entries);
+  }
+
+  /**
+   * Renders the final progress-overlay state once the copy phase completes:
+   * a summary message with a link to the destination folder, the skip log,
+   * and the Close button.
+   * @param {number} doneCount
+   * @param {string} folderUrl
+   */
+  function finishPhotoExport(doneCount, folderUrl) {
+    document.getElementById('export-progress-bar').classList.remove('indeterminate');
+    document.getElementById('export-progress-bar').style.width = '100%';
+    document.getElementById('export-msg').innerHTML =
+      `Done — ${doneCount} photo${doneCount !== 1 ? 's' : ''} processed. <a href="${folderUrl}" target="_blank">Open folder</a>`;
+    renderPhotoSkipLog();
+    document.getElementById('btn-export-close').style.display = 'inline-block';
+  }
+
+  /**
+   * Populates #export-skip-log from the accumulated photoExportSkipEntries
+   * (missing photo/ID and duplicate-ID entries from discovery, plus any
+   * per-item failures from the copy phase), or hides it if empty.
+   */
+  function renderPhotoSkipLog() {
+    const el = document.getElementById('export-skip-log');
+    el.innerHTML = '';
+    if (!photoExportSkipEntries.length) { el.style.display = 'none'; return; }
+    photoExportSkipEntries.forEach(({ name, reason }) => {
+      const div = document.createElement('div');
+      div.textContent = `${name}: ${reason}`;
+      el.appendChild(div);
+    });
+    el.style.display = 'block';
+  }
+
+  /**
+   * Failure handler shared by both the discovery and copy phases of the photo
+   * export flow.
+   * @param {Error|string} err
+   */
+  function onPhotoExportError(err) {
+    document.getElementById('export-progress-bar').classList.remove('indeterminate');
+    showError('export-error', 'Photo export failed', err);
+    renderPhotoSkipLog();
+    document.getElementById('btn-export-close').style.display = 'inline-block';
+  }
+
+  /**
+   * Starts (or stages a confirmation for) an XLSX export of all checked rows,
+   * restricted to currently visible columns. Reuses the #export-overlay
+   * confirm/progress/result UI shared with runExport(), but always issues
+   * exactly one google.script.run call — exportXLSX() produces one file for
+   * all rows, unlike exportF1/exportWC's one-file-per-row + continuation model.
+   */
+  function runExportXlsx() {
+    const entries = sortRowsBySourceOrder(getSelectedRowEntries());
+    if (!entries.length) return; // safety guard — button should already be disabled
+
+    const total = entries.length;
+    const btn = document.getElementById('btn-export-xlsx');
+    btn.disabled = true;
+
+    if (total > schema.exportConfirmThreshold) {
+      pendingExportState = { mode: 'xlsx', btnId: 'btn-export-xlsx', entries, total };
+      showExportConfirm(
+        `You are about to export ${total} rows into a single XLSX file. Export cannot be cancelled once started.`,
+        total * schema.xlsxExportSecondsPerRow);
+      return;
+    }
+
+    startXlsxExportProgress(entries, total);
+  }
+
+  /**
+   * Resets the export overlay to its progress state and issues the single
+   * exportXLSX() call for all entries, then renders the one resulting file link.
+   * @param {Array<{rowIndex: number, spreadsheetId: string|null}>} entries
+   * @param {number} total - Row count, used only for the status message.
+   */
+  function startXlsxExportProgress(entries, total) {
+    const btn = document.getElementById('btn-export-xlsx');
+    const ul = document.getElementById('export-links');
+
+    showExportProgress(`Building XLSX export of ${total} row${total !== 1 ? 's' : ''}…`);
+
+    const progressBar = document.getElementById('export-progress-bar');
+    progressBar.classList.add('indeterminate');
+
+    google.script.run
+      .withSuccessHandler(result => {
+        progressBar.classList.remove('indeterminate');
+        progressBar.style.width = '100%';
+        appendExportLink(ul, result);
+        ul.style.display = 'block';
+        document.getElementById('export-msg').textContent = 'Exported:';
+        btn.disabled = false;
+        document.getElementById('btn-export-close').style.display = 'inline-block';
+      })
+      .withFailureHandler(err => {
+        progressBar.classList.remove('indeterminate');
+        btn.disabled = false;
+        document.getElementById('export-msg').textContent = '';
+        showError('export-error', 'Export failed', err);
+        document.getElementById('btn-export-close').style.display = 'inline-block';
+      })
+      .exportXLSX(entries, getVisibleColumnIndices());
+  }
+</script>
