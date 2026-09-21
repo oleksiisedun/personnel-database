@@ -10,11 +10,12 @@ clasp push
 
 All deployable code (`*.js`, `WebEditor.*.html`, `appsscript.json`) lives in `src/`; `.clasp.json` (git-ignored) sets `"rootDir": "src"` so clasp pushes only that directory, and tooling/docs stay at the repo root. Paths below are relative to `src/` unless they name a root file. If `.clasp.json` is ever recreated (`clasp clone`/`create`), re-add `rootDir`.
 
-There is no build step. Machine-checkable guardrails — run `npm run check` (all three, in sequence) after editing code:
+There is no build step. Machine-checkable guardrails — run `npm run check` (all four, in sequence) after editing code. CI (`.github/workflows/check.yml`) runs the same command on every push to `main` and every pull request:
 
-- `npm run typecheck` (`tsc -p jsconfig.json`, `checkJs` over `src/*.js` against `@types/google-apps-script`, non-strict). It can't see the JS embedded in `WebEditor.js.html`. Since JSDoc is the only source of type info, a failure often means a stale `@param`/`@returns`.
-- `npm run lint` (ESLint, `eslint.config.mjs`) — correctness-only rules over `src/*.js` and the `<script>` body of `WebEditor.js.html` (extracted by a small inline processor in the config, since `eslint-plugin-html` doesn't support ESLint 10). Its main value is `no-undef` on `WebEditor.js.html`, the one place `tsc` can't reach: everything there is a global, so a typo'd function name otherwise only fails at runtime. `no-undef`/`no-unused-vars` are off for the server `.js` files (Apps Script shares one global scope across files; `tsc` covers undefined names there). Globals declared outside that `<script>` (e.g. `INITIAL_MODE`, set by a scriptlet in `WebEditor.html`) must be added to the config's `globals`. `preserve-caught-error` is off because `Error` `cause` needs ES2022 typings.
-- `npm test` (`node --test 'tests/*.test.js'`, no dependencies) — unit tests for the pure helpers in `Utils.js`/`Config.js` and a parity test keeping server `parseDriveId()` and client `extractDriveId()` aligned. `tests/load.js` runs the Apps Script sources in a Node `vm` context (unmodified, no exports needed) and can lift one self-contained function out of `WebEditor.js.html` by its 2-space indent. **Keep new logic in pure functions that take plain values** (as `normalizePhoneNumber()` does) so it stays testable without mocking `SpreadsheetApp`/`DriveApp`; add a test when you change one.
+- `npm run typecheck` (`tsc -p jsconfig.json`, `checkJs` over `src/*.js` against `@types/google-apps-script`, non-strict). It can't see the JS embedded in the `WebEditor.*.js.html` client fragments. Since JSDoc is the only source of type info, a failure often means a stale `@param`/`@returns`.
+- `npm run lint` (ESLint, `eslint.config.mjs`) — correctness-only rules over `src/*.js` and the `<script>` bodies of the `WebEditor.*.js.html` client fragments. A small inline processor in the config (`eslint-plugin-html` doesn't support ESLint 10) runs on the entry file `WebEditor.js.html` and concatenates every fragment in `WebEditor.html` include order into **one** lint unit, tagging each message with the real fragment file and line. Its main value is `no-undef` (plus `no-redeclare` for a function declared in two fragments) on the client code, the one place `tsc` can't reach: everything there is a global, so a typo'd function name otherwise only fails at runtime. `no-undef`/`no-unused-vars` are off for the server `.js` files (Apps Script shares one global scope across files; `tsc` covers undefined names there). Globals declared outside that `<script>` (e.g. `INITIAL_MODE`, set by a scriptlet in `WebEditor.html`) must be added to the config's `globals`. `preserve-caught-error` is off because `Error` `cause` needs ES2022 typings. `no-restricted-properties` bans `SpreadsheetApp.openById`/`openByUrl` in `src/*.js`; `openSpreadsheetSafely()` is the only exception (see below).
+- `npm run lint:sh` (`shellcheck` + `shfmt -d` on `clasp-push.sh`; `.editorconfig` supplies shfmt's 2-space/`space_redirects` style). Needs `shellcheck` and `shfmt` installed locally; run `shfmt -w clasp-push.sh` to fix formatting.
+- `npm test` (`node --test 'tests/*.test.js'`, no dependencies) — unit tests for the pure helpers in `Utils.js`/`Config.js`/`ExportValues.js`, a parity test keeping server `parseDriveId()` and client `extractDriveId()` aligned, and `tests/html-contract.test.js`, static checks for what only fails at runtime in the dialog: every literal `getElementById()` id exists in `WebEditor.html` (or is assigned in script), every `#toolbar` button has `btn-toolbar`, and every server function serving `WebEditor` sets `template.mode`, and every `WebEditor*.js.html` file is included by `WebEditor.html`. `tests/load.js` runs the Apps Script sources in a Node `vm` context (unmodified, no exports needed) and can lift one self-contained function out of any client fragment by its 2-space indent. `tests/client-load.test.js` runs the client fragments in include order in a `vm` with browser stubs, catching a parse error or a load-time reference to a later fragment (a `ReferenceError`). **Keep new logic in pure functions that take plain values** (as `normalizePhoneNumber()` does) so it stays testable without mocking `SpreadsheetApp`/`DriveApp`; add a test when you change one.
 
 **Never run `clasp push`/`clasp-push.sh` or otherwise deploy/test changes yourself.** These scripts push live to real bound spreadsheets (including production personnel data across all targets in `clasp-targets.json`). Leave deployment and live testing to the user.
 
@@ -23,12 +24,17 @@ There is no build step. Machine-checkable guardrails — run `npm run check` (al
 Google Apps Script project (V8 runtime) bound to a Google Spreadsheet; the web editor runs in an `HtmlService` modal opened from the Sheets menu.
 
 - `Code.js` — menu (`onOpen`), modal openers (`openWebEditor`, `openPhotoExport`), `getSchemaAndData()`, row CRUD, image proxy, `fixPhoneNumbers`/`fixFullNames`
-- `Utils.js` — shared helpers: spreadsheet/Handbook resolution, schema comparison, column lookups
-- `Export.js` — F-1/Wanted Card Docs export, XLSX export, S-КАДР photo export
+- `Utils.js` — shared helpers: spreadsheet/Handbook resolution, schema comparison, column lookups, Drive-ID parsing (`parseDriveId`), `*-table` cell codec (`_parseSubTable`/`_encodeSubTable`)
+- `Export.js` — F-1/Wanted Card Docs export (`_exportDoc`), shared sheet-data loader, template placeholder/image helpers
+- `ExportValues.js` — pure computed-value functions for the correspondence table (`_computeValue` and friends, `_calendarDuration`); no Apps Script services, unit-tested
+- `ExportXlsx.js` — XLSX export (`exportXLSX`)
+- `ExportPhotos.js` — S-КАДР photo export (`startPhotoExport`, `copyPhotosBatch`)
 - `Import.js` — award import from S-КАДР
 - `Config.js` — all constants
-- `WebEditor.html` / `WebEditor.css.html` / `WebEditor.js.html` — client shell, styles, client logic (one global scope, no modules)
-- `tests/` (repo root) — `node --test` unit tests and the `load.js` vm loader; not deployed
+- `WebEditor.html` / `WebEditor.css.html` — client shell (its `<?!= ... ?>` include order is the client load order) and styles
+- Client logic, split by view/responsibility into fragments that share one global scope (no modules; [ADR 0003](docs/decisions/0003-client-script-fragments-single-global-scope.md)): `WebEditor.js.html` (core: bootstrap `init()`, data loading/refresh, shared state and helpers), `WebEditor.list.js.html` (list view, filters, column panel), `WebEditor.images.js.html` (image cache, badges, lightbox, `extractDriveId`), `WebEditor.tables.js.html` (`*-table` mini table, table editor, codec), `WebEditor.edit.js.html` (edit view, validation, save/delete), `WebEditor.export.js.html` (export overlay flows), `WebEditor.move.js.html` (move overlay). Put new client code in the fragment for its view; a new fragment needs its include added to `WebEditor.html` (a test fails otherwise). Each fragment keeps its own state `let`/`const` at the top; nothing may run at load time except the host-sizing calls and the `DOMContentLoaded` listener in the core
+- `tests/` (repo root) — `node --test` unit/contract tests and the `load.js` vm loader; not deployed
+- `docs/decisions/` (repo root) — short ADRs for deliberate-but-surprising choices (see the end of the Architecture section)
 - `samples/` (repo root) — example Database layout and F-1/Wanted Card templates for setting up a new deployment; not deployed
 
 ## Code conventions
@@ -39,8 +45,8 @@ JS style and JSDoc rules are in the global `~/.claude/CLAUDE.md`. Project-specif
 
 Concrete tokens and shared classes already defined here (see global CSS design-system conventions for the reuse-first principle):
 
-- **Variables**: `--color-primary`, `--color-primary-hover`, `--color-focus`, `--color-focus-shadow`, `--color-danger`, `--color-danger-hover`, `--color-success`, `--color-warning`, `--color-warning-hover`, `--color-border`, `--radius`.
-- **Shared classes**: `.btn-primary` (filled accent — Save/Move/Close), `.btn-secondary` (outline — Back/Cancel/toolbar), `.btn-danger` (outline, danger color — Delete, Discard Changes), `.btn-success` (outline, success color — Refresh), `.btn-warning` (outline, warning color — schema-mismatch ⚠ button, Reset), `.btn-dialog-action` (sizing only — `padding`/`font-size` for overlay action buttons: export Cancel/Proceed/Close, move Cancel/Confirm, schema-warning Close, unsaved-changes Keep Editing/Discard Changes — combined with a color class), `.btn-toolbar` (sizing only — `padding: 5px 12px` for every button inside `#toolbar` — combined with a color class the same way), `.overlay`/`.overlay-dialog` (modal scaffolding — export progress, move dialog, unsaved-changes dialog), `.dialog-actions` (`display:flex; gap:10px; justify-content:flex-end` action row — new overlay action rows should use this instead of a one-off `#foo-actions` ID rule), `.log-list` (monospace scrollable per-item log box — used by `#move-log` and `#export-skip-log`; new per-item log/result lists should reuse this instead of a one-off `#foo-log` ID rule).
+- **Variables** (all colors are tokens — never write a raw hex outside `:root`; add a `--color-*` token instead): accent `--color-primary`/`-hover`/`-tint`, `--color-on-accent`, `--color-focus`/`-focus-shadow`; status `--color-danger`/`-hover`/`-tint`/`-shadow`, `--color-success`/`-tint`, `--color-warning`/`-hover`/`-tint`; text `--color-text`/`-muted`/`-subtle`/`-faint`; surfaces `--color-surface`/`-alt`/`-subtle`; borders `--color-border` (inputs), `--color-border-light` (table/panel lines), `--color-border-faint` (row separators); `--select-arrow` (dropdown chevron), `--radius`.
+- **Shared classes**: `.btn-primary` (filled accent — Save/Move/Close), `.btn-secondary` (outline — Back/Cancel/toolbar), `.btn-danger` (outline, danger color — Delete, Discard Changes), `.btn-success` (outline, success color — Refresh), `.btn-warning` (outline, warning color — schema-mismatch ⚠ button, Reset), `.btn-dialog-action` (sizing only — `padding`/`font-size` for overlay action buttons: export Cancel/Proceed/Close, move Cancel/Confirm, schema-warning Close, unsaved-changes Keep Editing/Discard Changes — combined with a color class), `.btn-toolbar` (sizing only — `padding: 5px 12px` for every button inside `#toolbar` — combined with a color class the same way), `.overlay`/`.overlay-dialog` (modal scaffolding — export progress, move dialog, unsaved-changes dialog), `.dialog-actions` (`display:flex; gap:10px; justify-content:flex-end` action row; add `.dialog-actions--center` to center it — new overlay action rows should use this instead of a one-off `#foo-actions` ID rule), `.overlay-title`/`.overlay-text` (dialog heading and body copy — don't restyle titles/messages per ID or inline), `.log-list` (monospace scrollable per-item log box — used by `#move-log` and `#export-skip-log`; new per-item log/result lists should reuse this instead of a one-off `#foo-log` ID rule).
 - **Global states**: `button:disabled` (`opacity: 0.5; cursor: default;`), text input/select focus (`border-color: var(--color-focus); box-shadow: 0 0 0 2px var(--color-focus-shadow);`).
 - **Every new toolbar button must add `btn-toolbar` to its `class`**, alongside a color class (`class="btn-secondary btn-toolbar"`). Do not reintroduce a per-ID padding list — it's a duplication trap: a button (`#btn-export-xlsx`) once shipped without it and rendered with the browser's default padding.
 
@@ -57,22 +63,9 @@ The `Handbook` sheet holds schema metadata, dropdown/table-column definitions, t
 
 Every Handbook range read inside `getSchemaAndData()` (`getMasterMode()`, `getMasterSources()`, `getDataTypeOptionsMap()`, `getTableColumnsMap()`) is wrapped in try/catch with a safe fallback (`false`, `[]`, or `{}`), keeping the editor usable if a range is unreadable for some user. **New Handbook reads added to `getSchemaAndData()` must follow the same pattern.**
 
-Handbook layout — single-value config lives in column A as a vertical list (a documentation label, then its value on the row(s) below):
-- `A2` (`MASTER_MODE_CELL`) — Master Mode checkbox
-- `A4` (`DATA_FOLDER`) — Drive folder ID of the shared "UNITS" parent folder (same value in every unit spreadsheet); each unit's own photo/PDF subfolder is resolved by `getUnitDataFolder()` (see [docs/architecture-master-mode.md](docs/architecture-master-mode.md))
-- `A6` (`ACTUAL_PERSONNEL_SPREADSHEET_CELL`) — link/ID of the spreadsheet containing the actual personnel list
-- `A7` (`ACTUAL_PERSONNEL_RANGE_CELL`) — range address within it (e.g. `Sheet1!A:A`) holding full names
-- `A9` (`EXPORT_F1_TEMPLATE_CELL`) — Drive file ID of the F-1 Docs template
-- `A11` (`EXPORT_WC_TEMPLATE_CELL`) — Drive file ID of the Wanted Card Docs template
-- `A13` (`EXPORT_FOLDER_CELL`) — Drive folder ID where exported documents are saved
-- `B2:B` (`MASTER_MODE_SOURCES_RANGE`) — source spreadsheet IDs/URLs for Master Mode, one per row
+Handbook layout: single-value config lives in column A as a vertical list (a documentation label, then its value on the row(s) below), Master Mode sources in `B2:B`, and three open-ended tables from row 1 onward — export correspondence (`D2:F`), `*-table` sub-columns (`H2:J`), data types (`L2:AL`). Every address is a constant in `Config.js`; the cell-by-cell reference is [docs/spreadsheet-setup.md](docs/spreadsheet-setup.md) (don't restate it here). `A4` (`DATA_FOLDER`) is the shared "UNITS" folder, and each unit's own subfolder is resolved by `getUnitDataFolder()` (see [docs/architecture-master-mode.md](docs/architecture-master-mode.md)); the correspondence table is covered in [docs/architecture-export-import.md](docs/architecture-export-import.md) and data types in [docs/architecture-web-editor.md](docs/architecture-web-editor.md).
 
-Three more tables sit side by side from row 1 onward, each a header row followed by open-ended data rows (no row cap — add a row, it's read):
-- `D2:F` (`HANDBOOK_CORR_RANGE`) — export correspondence: `Template Placeholder | Database Column | Computed Value` (see [docs/architecture-export-import.md](docs/architecture-export-import.md))
-- `H2:J` (`HANDBOOK_TABLE_COLUMNS_RANGE`) — `*-table` sub-columns: `Table Type | Column Name | Column Type`
-- `L2:AL` (`HANDBOOK_DATA_TYPES_RANGE`) — data types: `Data Type | Allowed Values...` (a type with values becomes a dropdown; see [docs/architecture-web-editor.md](docs/architecture-web-editor.md))
-
-All Drive-ID/spreadsheet-link cells above tolerate either a bare ID or a full sharing URL — every read site pipes the value through `parseDriveId()` (directly or via `getDriveIdFromHandbook()`).
+All Drive-ID/spreadsheet-link Handbook cells tolerate either a bare ID or a full sharing URL — every read site pipes the value through `parseDriveId()` (directly or via `getDriveIdFromHandbook()`).
 
 Every target spreadsheet has its own local `Handbook` sheet. Ones that share config with a central source do so via `IMPORTRANGE` formulas in their own cells, not any code-level fallback — to the script every `Handbook` is self-contained.
 
@@ -104,7 +97,7 @@ google.script.run
   .serverFunctionName(arg1, arg2);
 ```
 
-The client code in `WebEditor.js.html` is not a module — everything is a global within the `HtmlService` sandbox.
+The client code (the `WebEditor.*.js.html` fragments) is not a module — everything is a global within the `HtmlService` sandbox.
 
 ### Opening remote spreadsheets safely (`openSpreadsheetSafely`)
 
@@ -117,9 +110,13 @@ Related helpers (`Utils.js`) — use them instead of repeating the inline patter
 - `getDatabaseSheet(spreadsheetId)` → `{ ss, sheet }`; wraps `resolveSpreadsheet` + `getSheetByName(SHEET_DATABASE)` and throws on failure. All write functions needing the `Database` sheet (`addRowWithData`, `updateRow`, `deleteRow`, `deleteRows`, `movePersonnel` destination) use it; destructure only what you need.
 - `getDriveIdFromHandbook(handbookSheet, cellAddress)` — trims the cell and pipes it through `parseDriveId()`; returns `''` if the sheet is missing. Use it for any Handbook cell holding a Drive ID or sharing URL.
 - `findKeyByPattern(obj, pattern)` / `getFieldByPattern(data, pattern)` — the `COL_DRAFT_DATE`, `COL_SERVICE_HISTORY`, `COL_CLOSE_RELATIVES`, `COL_MARITAL_STATUS`, `COL_CONTRACT_UNTIL`, `COL_PHONE_NUMBER` (and `COL_FULL_NAME`/`COL_PHOTO`/`COL_CARD_ID`) constants in `Config.js` are case-insensitive **regexes** (e.g. `/дата призову/i`) so header matching tolerates casing drift across Master Mode sources. They can't be used as an object key (`data[COL_X]`) or compared with `===`; use `getFieldByPattern()` for the cell value, `findKeyByPattern()` when the literal matched header text is needed (as `_fillServiceHistoryTable()` does), and `COL_PHONE_NUMBER.test(...)` for plain matching (as `fixPhoneNumbers()` does).
-- `parseDriveId()` (server) and `extractDriveId()` (client, `WebEditor.js.html`) share URL patterns — update both together.
+- `parseDriveId()` (server, `Utils.js`) and `extractDriveId()` (client, `WebEditor.images.js.html`) share URL patterns — update both together; `tests/drive-id.test.js` checks they agree.
 
 **`PERMISSION_DENIED` despite real access:** check for multiple signed-in Google accounts in the browser before chasing a code fix — the dialog's `google.script.run` calls can authenticate against the wrong account, giving the same error as a genuine sharing gap. Confirmed fix once: log out of all Google accounts except the one with access.
+
+### Decision records
+
+Deliberate-but-surprising choices are recorded in `docs/decisions/` so they aren't re-derived: [0001 open spreadsheets via a Drive probe](docs/decisions/0001-open-spreadsheets-via-drive-probe.md), [0002 lint the client fragments with an inline processor](docs/decisions/0002-lint-client-fragments-with-inline-processor.md), [0003 client script fragments share one global scope](docs/decisions/0003-client-script-fragments-single-global-scope.md).
 
 ### Feature docs (read the relevant one before changing that area)
 
@@ -140,6 +137,6 @@ Rules that apply even if you don't open those docs:
 
 ## Constants — always in `Config.js`
 
-All tuneable values belong in `Config.js`. Constants needed by the client must also be threaded through the `getSchemaAndData()` return value in `Code.js` (see `filterDebounceMs`, `imageFetchBatchSize`, `imageFetchConcurrency`, `masterMode` as examples). Never hardcode magic numbers in `WebEditor.js.html`.
+All tuneable values belong in `Config.js`. Constants needed by the client must also be threaded through the `getSchemaAndData()` return value in `Code.js` (see `filterDebounceMs`, `imageFetchBatchSize`, `imageFetchConcurrency`, `masterMode` as examples). Never hardcode magic numbers in the `WebEditor.*.js.html` fragments.
 
 **Sheet cell/column/row references in `Config.js` use A1 notation**, matching the Handbook range constants (`MASTER_MODE_CELL = 'A2'`, `HANDBOOK_TABLE_COLUMNS_RANGE = 'H2:J'`, `MASTER_MODE_SOURCES_RANGE = 'B2:B'`) — a 0-based numeric index isn't self-describing against the sheet. This includes single-column constants (`AWARDS_IMPORT_ID_COL = 'A'`, not `0`). When code needs a 0-based array index for a raw `getValues()` row, convert once via `columnLetterToIndex(letter)` (`Utils.js`).

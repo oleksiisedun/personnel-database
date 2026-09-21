@@ -1,6 +1,6 @@
 # Web editor internals and Database-sheet utilities
 
-Read this before touching the edit view, save/validation flow, `*-table` rendering, dropdown types, image loading, Trash, or the "More... ⭐️" menu fixers. Paths are relative to `src/`; client code is in `WebEditor.js.html`.
+Read this before touching the edit view, save/validation flow, `*-table` rendering, dropdown types, image loading, Trash, or the "More... ⭐️" menu fixers. Paths are relative to `src/`; client code is in the `WebEditor*.js.html` fragments (core, list, images, tables, edit, export, move — see the File map in CLAUDE.md).
 
 ## Edit view layout
 
@@ -47,7 +47,7 @@ Images are fetched server-side via `DriveApp` (script owner's OAuth token) so us
 
 Loading uses a **concurrency pool** (`IMAGE_FETCH_CONCURRENCY`, `IMAGE_FETCH_BATCH_SIZE` in `Config.js`); too much concurrency exceeds Apps Script's ~30 concurrent-execution limit and drops images (tuning notes are in `Config.js`). `DriveApp.getFileById()` throws for inaccessible files; the server catches it and returns `{ type: 'no-access' }`, which the client renders as a gray "No access" badge.
 
-`extractDriveId()` in `WebEditor.js.html` (image preview/lightbox) mirrors `parseDriveId()`'s URL patterns — update both together when supporting a new Drive URL format. They differ in fallback: `parseDriveId()` returns trusted Handbook values unchanged when nothing matches, while `extractDriveId()` validates untrusted typed text against a bare-ID length check and returns `null`.
+`extractDriveId()` in `WebEditor.images.js.html` (image preview/lightbox) mirrors `parseDriveId()`'s URL patterns — update both together when supporting a new Drive URL format. They differ in fallback: `parseDriveId()` returns trusted Handbook values unchanged when nothing matches, while `extractDriveId()` validates untrusted typed text against a bare-ID length check and returns `null`.
 
 ## Soft delete (Trash sheet)
 

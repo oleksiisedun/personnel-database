@@ -6,13 +6,13 @@ To set it up, see [Getting started](#getting-started). Detailed reference (sprea
 
 ## How it works
 
-The project is a [Google Apps Script](https://developers.google.com/apps-script) bound to a Google Spreadsheet, deployed locally with [CLASP](https://github.com/google/clasp). The Sheets menu (`onOpen()` in `Code.js`) opens the web editor as a modal dialog; the browser-side UI (`WebEditor.*.html`) talks to the server only through `google.script.run`. `Code.js` handles data access and row CRUD, delegates document, XLSX and photo exports to `Export.js`, and shares helpers from `Utils.js` with `Export.js` and `Import.js`. All data lives in the `Database`, `Handbook` and `Trash` sheets (plus remote spreadsheets in Master Mode) and in Google Drive.
+The project is a [Google Apps Script](https://developers.google.com/apps-script) bound to a Google Spreadsheet, deployed locally with [CLASP](https://github.com/google/clasp). The Sheets menu (`onOpen()` in `Code.js`) opens the web editor as a modal dialog; the browser-side UI (`WebEditor.*.html`) talks to the server only through `google.script.run`. `Code.js` handles data access and row CRUD, delegates document, XLSX and photo exports to the `Export*.js` files (pure computed-value logic sits in `ExportValues.js`), and shares helpers from `Utils.js` with the export code and `Import.js`. All data lives in the `Database`, `Handbook` and `Trash` sheets (plus remote spreadsheets in Master Mode) and in Google Drive.
 
 ```mermaid
 flowchart TD
     subgraph client["Browser (client)"]
         html["WebEditor.html<br/>App shell"]
-        js["WebEditor.js.html<br/>Filter, edit, export UI"]
+        js["WebEditor.*.js.html<br/>Filter, edit, export UI"]
         css["WebEditor.css.html<br/>Styles"]
         html --> js
         html --> css
@@ -22,7 +22,7 @@ flowchart TD
         config["Config.js<br/>Constants & IDs"]
         code["Code.js<br/>Menu, data access, image proxy, openSpreadsheetSafely"]
         utils["Utils.js<br/>Shared helpers"]
-        export["Export.js<br/>F-1, WC, XLSX & photo exports"]
+        export["Export*.js<br/>F-1, WC, XLSX & photo exports"]
         import_["Import.js<br/>Award import from S-КАДР"]
     end
 
@@ -82,16 +82,22 @@ All deployable code lives in `src/` (the only directory clasp pushes); tooling a
 |------|---------|
 | `src/Config.js` | All constants — sheet names, column names, Drive IDs, export settings |
 | `src/Code.js` | Server-side script: menu, data access, image proxy |
-| `src/Utils.js` | Shared server-side helpers (spreadsheet resolution, schema comparison, column lookups) used by `Code.js`, `Export.js`, and `Import.js` |
-| `src/Export.js` | Server-side export logic for F-1 and Wanted Card documents, the single-file XLSX export, and the S-КАДР photo export |
+| `src/Utils.js` | Shared server-side helpers (spreadsheet resolution, schema comparison, column lookups, Drive-ID parsing, `*-table` cell codec) used by `Code.js`, the export files, and `Import.js` |
+| `src/Export.js` | Server-side F-1 and Wanted Card document export |
+| `src/ExportValues.js` | Pure computed-value functions for the export correspondence table (service length, relatives, awards, …) |
+| `src/ExportXlsx.js` | The single-file XLSX export |
+| `src/ExportPhotos.js` | The S-КАДР photo export |
 | `src/Import.js` | Server-side award import from an external S-КАДР sheet |
 | `src/appsscript.json` | Apps Script manifest — time zone, V8 runtime, and the Advanced Drive Service used for export thumbnails |
 | `src/WebEditor.html` | Client app shell; includes CSS and JS via `<?!= HtmlService.createHtmlOutputFromFile(...) ?>` |
 | `src/WebEditor.css.html` | Styles for the web editor |
-| `src/WebEditor.js.html` | Client-side logic for the web editor |
+| `src/WebEditor.js.html`, `WebEditor.{list,images,tables,edit,export,move}.js.html` | Client-side logic, split by view into fragments that share one global scope (included in order by `WebEditor.html`) |
 | `docs/` | User-facing reference (spreadsheet setup, features, exports, configuration) and contributor-level `architecture-*.md` notes per feature area |
 | `eslint.config.mjs`, `jsconfig.json` | Lint and typecheck config for `npm run check` |
-| `tests/` | Node unit tests (`npm test`) and the `vm` loader that runs the Apps Script sources under Node; not deployed |
+| `tests/` | Node unit and contract tests (`npm test`) and the `vm` loader that runs the Apps Script sources under Node; not deployed |
+| `docs/decisions/` | Short ADRs for deliberate-but-surprising design choices |
+| `.github/workflows/check.yml` | CI: runs `npm run check` on pushes to `main` and on pull requests |
+| `.editorconfig` | Indentation/formatting settings (also read by `shfmt`) |
 | `clasp-push.sh`, `clasp-targets.json` | Multi-spreadsheet deploy script and its (git-ignored) target list |
 
 ## Features
@@ -168,13 +174,14 @@ The script temporarily swaps the `scriptId` in `.clasp.json` for each target and
 ## Development
 
 ```bash
-npm run check       # typecheck + lint + tests, in sequence
+npm run check       # typecheck + lint + shell lint + tests, in sequence
 npm run typecheck   # tsc over src/*.js against @types/google-apps-script (non-strict)
-npm run lint        # ESLint over src/*.js and the <script> in WebEditor.js.html
-npm test            # node --test unit tests for the pure helpers (no dependencies)
+npm run lint        # ESLint over src/*.js and the client <script> fragments
+npm run lint:sh     # shellcheck + shfmt -d on clasp-push.sh (needs both installed)
+npm test            # node --test unit + contract tests (no dependencies)
 ```
 
-There is no build step. Unit tests in `tests/` cover the pure helpers (`Utils.js`) and keep the server and client Drive-ID parsers in sync; they run under Node, not Apps Script. Because JSDoc is the only source of type info, a typecheck failure often means a stale `@param`/`@returns`. Lint's main job is `no-undef` on `WebEditor.js.html`, which `tsc` can't see into. Feature-level internals are in [`docs/`](docs/).
+There is no build step. Unit tests in `tests/` cover the pure helpers (`Utils.js`, `ExportValues.js`, client row-index bookkeeping), keep the server and client Drive-ID parsers in sync, and statically check the client/HTML contract (element ids, toolbar button classes, `template.mode`); they run under Node, not Apps Script. GitHub Actions runs `npm run check` on every push to `main` and pull request. Because JSDoc is the only source of type info, a typecheck failure often means a stale `@param`/`@returns`. Lint's main job is `no-undef` across the client fragments (linted together as one unit), which `tsc` can't see into. Feature-level internals are in [`docs/`](docs/).
 
 ## Documentation
 

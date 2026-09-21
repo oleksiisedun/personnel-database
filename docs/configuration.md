@@ -35,7 +35,7 @@ All tuneable constants live in `src/Config.js`. Back to the [README](../README.m
 | `AWARDS_IMPORT_DATA_START_ROW` | `2` | First data row (after the header) in the external award import sheet |
 | `AWARDS_ORDER_NUMBER_CLEAN_REGEX` | `/\/\d+\|[\W]+/g` | Strips surrounding text/punctuation from the import sheet's free-text order-number field, keeping just the leading number |
 | `AWARDS_IMPORT_NOT_FOUND_DISPLAY_LIMIT` | `20` | Max "not found" IDs listed by name in the award import summary alert before collapsing the rest into a `(+N more)` suffix |
-| `TABLE_FIELD_SEP` | `' \| '` | Field separator used to encode/decode `*-table` cell values (shared by `Export.js` and `Import.js`; the client declares its own copy) |
+| `TABLE_FIELD_SEP` | `' \| '` | Field separator used to encode/decode `*-table` cell values (shared by the export code and `Import.js` via `Utils.js`; the client declares its own copy) |
 | `TABLE_ROW_SEP` | `'\n'` | Row separator used to encode/decode `*-table` cell values (same sharing as `TABLE_FIELD_SEP`) |
 | `COLUMN_MIN_WIDTHS` | `{ text: 150, image: 150, table: 900 }` | Minimum column widths (px) in the list view |
 | `COLUMN_MAX_WIDTHS` | `{ image: 250 }` | Maximum column widths (px) in the list view |

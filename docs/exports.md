@@ -34,7 +34,7 @@ These keys can be placed in column C of the correspondence table:
 
 | Key | Description |
 |-----|-------------|
-| `totalServiceLength` | Duration from last date in `Дата призову` to today, e.g. `3 роки, 8 місяців, 17 днів (станом на 09.05.2026)` |
+| `totalServiceLength` | Duration from last date in `Дата призову` to today, e.g. `3 роки, 8 місяців, 17 днів (станом на 09.05.2026)`. Whole years and months are counted from the start date (a 31st clamps to the last day of a shorter month), then the leftover days; the parts are never negative |
 | `contractSignDate` | First date in `Дата призову` + unit number from first service entry, e.g. `07.05.2015 з в/ч 3011` |
 | `currentPosition` | Position title from the last entry in `Проходження служби` |
 | `currentPositionStartDate` | Start date of the last entry in `Проходження служби` |
@@ -68,4 +68,4 @@ The "Export XLSX" toolbar button exports the **selected** rows (checkbox column)
 
 The file is named `Export DD.MM.YYYY.xlsx` (today's date) and saved to the same Drive folder as F-1/WC exports (`Handbook!A13`). Repeated exports on the same day are saved as separate files — Drive allows duplicate filenames, so no overwrite/suffix logic is applied.
 
-Since Apps Script has no way to author `.xlsx` bytes directly and this project has no build step (so no bundling a library like ExcelJS), the export is built as a temporary Google Sheet and converted by fetching the Sheets export URL (`.../export?format=xlsx`) via `UrlFetchApp`, authorized with the script's own OAuth token (`Blob.getAs()` doesn't support this conversion); the temp sheet is always deleted afterward, even on error. Unlike F-1/WC export, this is a single `google.script.run` call with no batching — it produces one file for the whole selection, not one file per row, so there's no partial result to resume. See `exportXLSX()` in `Export.js` and `runExportXlsx()` in `WebEditor.js.html`.
+Since Apps Script has no way to author `.xlsx` bytes directly and this project has no build step (so no bundling a library like ExcelJS), the export is built as a temporary Google Sheet and converted by fetching the Sheets export URL (`.../export?format=xlsx`) via `UrlFetchApp`, authorized with the script's own OAuth token (`Blob.getAs()` doesn't support this conversion); the temp sheet is always deleted afterward, even on error. Unlike F-1/WC export, this is a single `google.script.run` call with no batching — it produces one file for the whole selection, not one file per row, so there's no partial result to resume. See `exportXLSX()` in `ExportXlsx.js` and `runExportXlsx()` in `WebEditor.export.js.html`.
