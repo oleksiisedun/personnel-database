@@ -69,38 +69,50 @@ function _filterChildrenRows(rows) {
  * calendar-accurate duration from that date to today.
  *
  * @param {Object.<string, string>} data - Row data map.
+ * @param {Date} [today] - Reference date; defaults to the current date. Injectable for tests.
  * @returns {string} Formatted string, e.g. "3 роки, 8 місяців, 17 днів (станом на 09.05.2026)",
  *                   or empty string if no valid date is found.
  */
-function _computeTotalServiceLength(data) {
+function _computeTotalServiceLength(data, today = new Date()) {
   const raw = getFieldByPattern(data, COL_DRAFT_DATE);
   const matches = raw.match(DATE_REGEX);
   if (!matches) return '';
 
   const parts = matches[matches.length - 1].split('.');
   const start = new Date(Number(parts[2]), Number(parts[1]) - 1, Number(parts[0]));
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
+  const end = new Date(today.getFullYear(), today.getMonth(), today.getDate());
+  const { years, months, days } = _calendarDuration(start, end);
 
-  let years = today.getFullYear() - start.getFullYear();
-  let months = today.getMonth() - start.getMonth();
-  let days = today.getDate() - start.getDate();
+  return `${_pluralizeUk(years, 'year')}, ${_pluralizeUk(months, 'month')}, ${_pluralizeUk(days, 'day')} (станом на ${formatDateDDMMYYYY(end)})`;
+}
 
-  if (days < 0) {
-    months--;
-    const prevMonth = new Date(today.getFullYear(), today.getMonth(), 0);
-    days += prevMonth.getDate();
-  }
-  if (months < 0) {
-    years--;
-    months += 12;
-  }
+/**
+ * Calendar-accurate difference between two dates as whole years, whole months
+ * and leftover days: the whole years+months are added to `start` (clamping to
+ * the last day of a shorter month, so 31 Jan + 1 month = 28/29 Feb), and the
+ * days are counted from that anchor to `end`. Never returns negative parts.
+ * Returns zeros if `end` is before `start`.
+ *
+ * @param {Date} start - Local-midnight start date.
+ * @param {Date} end - Local-midnight end date.
+ * @returns {{years: number, months: number, days: number}}
+ */
+function _calendarDuration(start, end) {
+  if (end < start) return { years: 0, months: 0, days: 0 };
 
-  const dd = String(today.getDate()).padStart(2, '0');
-  const mm = String(today.getMonth() + 1).padStart(2, '0');
-  const yyyy = today.getFullYear();
+  let totalMonths = (end.getFullYear() - start.getFullYear()) * 12 + (end.getMonth() - start.getMonth());
+  if (end.getDate() < start.getDate()) totalMonths--;
 
-  return `${_pluralizeUk(years, 'year')}, ${_pluralizeUk(months, 'month')}, ${_pluralizeUk(days, 'day')} (станом на ${dd}.${mm}.${yyyy})`;
+  const anchorMonthIndex = start.getMonth() + totalMonths;
+  const lastDayOfAnchorMonth = new Date(start.getFullYear(), anchorMonthIndex + 1, 0).getDate();
+  const anchor = new Date(start.getFullYear(), anchorMonthIndex, Math.min(start.getDate(), lastDayOfAnchorMonth));
+
+  // UTC arithmetic keeps a DST change between the two dates from skewing the day count.
+  const msPerDay = 24 * 60 * 60 * 1000;
+  const days = Math.round((Date.UTC(end.getFullYear(), end.getMonth(), end.getDate())
+    - Date.UTC(anchor.getFullYear(), anchor.getMonth(), anchor.getDate())) / msPerDay);
+
+  return { years: Math.floor(totalMonths / 12), months: totalMonths % 12, days };
 }
 
 /**
