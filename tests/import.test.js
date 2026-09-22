@@ -15,7 +15,7 @@ const {
   // Node's own Date constructor (a different realm than the vm context) would
   // never match — the sheet's own Date constructor makes an instance it recognizes.
   Date: ContextDate,
-} = loadServer(['Config.js', 'Utils.js', 'Import.js'], [
+} = loadServer(['Config.js', 'Formatting.js', 'SchemaHelpers.js', 'Utils.js', 'Import.js'], [
   '_groupAwardsById', '_buildImportSummary', 'AWARDS_IMPORT_NOT_FOUND_DISPLAY_LIMIT', 'Date',
 ]);
 

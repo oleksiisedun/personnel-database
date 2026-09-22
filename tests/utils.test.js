@@ -9,7 +9,7 @@ const {
   compareColumnSchemas, extractColumnSchema, findColumnIndex, findKeyByPattern,
   getFieldByPattern, padRowToColumnCount, formatDateDDMMYYYY, groupAndSortBySpreadsheetId,
   parseGidFromUrl, UNIT_NAME_SEPARATOR, COL_FULL_NAME, COL_PHONE_NUMBER, COL_DRAFT_DATE,
-} = loadServer(['Config.js', 'Utils.js'], [
+} = loadServer(['Config.js', 'Formatting.js', 'DriveHelpers.js', 'SchemaHelpers.js', 'Utils.js'], [
   'normalizeFullName', 'normalizePhoneNumber', 'extractUnitName', 'columnLetterToIndex',
   'compareColumnSchemas', 'extractColumnSchema', 'findColumnIndex', 'findKeyByPattern',
   'getFieldByPattern', 'padRowToColumnCount', 'formatDateDDMMYYYY', 'groupAndSortBySpreadsheetId',

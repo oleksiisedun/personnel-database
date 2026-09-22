@@ -11,7 +11,7 @@ const {
   _pluralizeUk, _calendarDuration, _computeTotalServiceLength, _computeContractSignDate,
   _computeValue, _computeChildrenNamesBirthDates, _parseSubTable, _encodeSubTable,
   _escapeRegex, _escapeReplacement, _escapeFormulaString, _colIndexToA1Column,
-} = loadServer(['Config.js', 'Utils.js', 'ExportValues.js', 'ExportXlsx.js', 'Export.js'], [
+} = loadServer(['Config.js', 'Formatting.js', 'DriveHelpers.js', 'SchemaHelpers.js', 'Utils.js', 'ExportValues.js', 'ExportXlsx.js', 'Export.js'], [
   '_pluralizeUk', '_calendarDuration', '_computeTotalServiceLength', '_computeContractSignDate',
   '_computeValue', '_computeChildrenNamesBirthDates', '_parseSubTable', '_encodeSubTable',
   '_escapeRegex', '_escapeReplacement', '_escapeFormulaString', '_colIndexToA1Column',
