@@ -70,6 +70,22 @@
   }
 
   /**
+   * Kicks off up to `concurrency` concurrent workers pulling from a `count`-item
+   * queue. `next` is a self-scheduling dispatcher (it calls itself again once
+   * its own unit of work completes, until the queue is drained) — this just
+   * starts the initial pool. Used by queueImageFetch() and queueMasterSourceFetch()
+   * to run their respective google.script.run batches with bounded concurrency.
+   * @param {number} concurrency
+   * @param {number} count - Number of dispatch units in the queue (items or batches).
+   * @param {() => void} next
+   * @returns {void}
+   */
+  function startWorkerPool(concurrency, count, next) {
+    const workers = Math.min(concurrency, count);
+    for (let i = 0; i < workers; i++) next();
+  }
+
+  /**
    * Sets the text of an error element and makes it visible.
    * @param {string} elementId - ID of the error display element.
    * @param {string} prefix - Message prefix, e.g. "Save failed".
@@ -389,6 +405,7 @@
     const concurrency = schema.masterModeFetchConcurrency;
     const debouncedApplyFilters = debounce(applyFilters, schema.filterDebounceMs);
     let offset = 0;
+    /** Fetches the next source's rows and, on completion, calls itself again. @returns {void} */
     const fetchNext = () => {
       if (myGeneration !== refreshGeneration) return; // a newer refresh superseded this run
       if (offset >= ids.length) return;
@@ -413,8 +430,7 @@
         })
         .getMasterSourceRows(id);
     };
-    const workers = Math.min(concurrency, ids.length);
-    for (let i = 0; i < workers; i++) fetchNext();
+    startWorkerPool(concurrency, ids.length, fetchNext);
   }
 
   /**

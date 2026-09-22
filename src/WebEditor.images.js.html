@@ -112,6 +112,7 @@
     const batchSize = schema.imageFetchBatchSize;
     const concurrency = schema.imageFetchConcurrency;
     let offset = 0;
+    /** Fetches the next batch of ids and, on completion, calls itself again. @returns {void} */
     const fetchNext = () => {
       if (offset >= ids.length) return;
       const batch = ids.slice(offset, offset + batchSize);
@@ -140,8 +141,7 @@
         })
         .getImagesDataUrls(batch);
     };
-    const workers = Math.min(concurrency, Math.ceil(ids.length / batchSize));
-    for (let i = 0; i < workers; i++) fetchNext();
+    startWorkerPool(concurrency, Math.ceil(ids.length / batchSize), fetchNext);
   }
 
   /**

@@ -62,6 +62,12 @@ function exportXLSX(rowEntries, visibleColumnIndices) {
   const headerRow = colIndices.map(i => localData.columns[i].name);
 
   const driveInfoCache = new Map();
+  /**
+   * Memoized resolveDriveFileForExport(), so each fileId's link classification
+   * is computed at most once per call.
+   * @param {string} fileId
+   * @returns {ReturnType<typeof resolveDriveFileForExport>}
+   */
   const resolveDriveInfo = fileId => {
     if (!driveInfoCache.has(fileId)) driveInfoCache.set(fileId, resolveDriveFileForExport(fileId));
     return driveInfoCache.get(fileId);

@@ -99,11 +99,13 @@
     let doneCount = 0;
     const progressBar = document.getElementById('export-progress-bar');
 
+    /** Sets the progress bar to a determinate percentage. @param {number} pct @returns {void} */
     const setProgress = pct => {
       progressBar.classList.remove('indeterminate');
       progressBar.style.width = `${pct}%`;
     };
 
+    /** Kicks off one server-side export batch. @param {Array<{rowIndex: number, spreadsheetId: string|null}>} batch @returns {void} */
     const fire = batch => {
       progressBar.classList.add('indeterminate');
       const runner = google.script.run
