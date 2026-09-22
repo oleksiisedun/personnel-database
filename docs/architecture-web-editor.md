@@ -55,7 +55,7 @@ Loading uses a **concurrency pool** (`IMAGE_FETCH_CONCURRENCY`, `IMAGE_FETCH_BAT
 
 ## "More... ⭐️" menu fixers
 
-Both run synchronously over the whole `Database` sheet, locate their column via `findColumnIndex()`, report a count via `ui.alert()`, and have no undo beyond manual edit or Trash recovery. Already-normalized values are left untouched.
+Both live in `DataFixes.js` and share `_normalizeDatabaseColumn()`. They run synchronously over the whole `Database` sheet, locate their column via `findColumnIndex()` (`SchemaHelpers.js`), report a count via `ui.alert()`, and have no undo beyond manual edit or Trash recovery. Already-normalized values are left untouched.
 
 - **`fixPhoneNumbers()`** — in the `COL_PHONE_NUMBER` (`Номер телефону`) column, rewrites bare 9-digit numbers missing the leading `0` and 12-digit numbers with a `38` prefix.
-- **`fixFullNames()`** — in the `COL_FULL_NAME` (`ПІБ`) column, applies `normalizeFullName()` (`Utils.js`): trims, collapses whitespace runs (including newlines, via `WHITESPACE_RUN_REGEX`) to one space, uppercases the first word (surname).
+- **`fixFullNames()`** — in the `COL_FULL_NAME` (`ПІБ`) column, applies `normalizeFullName()` (`Formatting.js`): trims, collapses whitespace runs (including newlines, via `WHITESPACE_RUN_REGEX`) to one space, uppercases the first word (surname).

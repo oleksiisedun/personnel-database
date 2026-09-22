@@ -6,7 +6,7 @@ To set it up, see [Getting started](#getting-started). Detailed reference (sprea
 
 ## How it works
 
-The project is a [Google Apps Script](https://developers.google.com/apps-script) bound to a Google Spreadsheet, deployed locally with [CLASP](https://github.com/google/clasp). The Sheets menu (`onOpen()` in `Code.js`) opens the web editor as a modal dialog; the browser-side UI (`WebEditor.*.html`) talks to the server only through `google.script.run`. `Code.js` handles data access and row CRUD, delegates document, XLSX and photo exports to the `Export*.js` files (pure computed-value logic sits in `ExportValues.js`), and shares helpers from `Utils.js` with the export code and `Import.js`. All data lives in the `Database`, `Handbook` and `Trash` sheets (plus remote spreadsheets in Master Mode) and in Google Drive.
+The project is a [Google Apps Script](https://developers.google.com/apps-script) bound to a Google Spreadsheet, deployed locally with [CLASP](https://github.com/google/clasp). The Sheets menu (`onOpen()` in `Code.js`) opens the web editor as a modal dialog; the browser-side UI (`WebEditor.*.html`) talks to the server only through `google.script.run`. `Code.js` handles menu/dialog bootstrap, Master Mode data access, and the schema loader; row CRUD lives in `RowCrud.js`, the Drive image/PDF proxy in `ImageProxy.js`, and the menu's phone-number/full-name fixers in `DataFixes.js`. `Utils.js`, `DriveHelpers.js`, `SchemaHelpers.js`, and `Formatting.js` hold shared helpers (spreadsheet/Handbook resolution and the `*-table` codec, Drive-ID/folder resolution, schema/column lookups, and value formatting respectively), used by the server files above plus the `Export*.js` files (pure computed-value logic sits in `ExportValues.js`) and `Import.js`. All data lives in the `Database`, `Handbook` and `Trash` sheets (plus remote spreadsheets in Master Mode) and in Google Drive.
 
 ```mermaid
 flowchart TD
@@ -20,8 +20,9 @@ flowchart TD
 
     subgraph server["Server — Google Apps Script"]
         config["Config.js<br/>Constants & IDs"]
-        code["Code.js<br/>Menu, data access, image proxy, openSpreadsheetSafely"]
-        utils["Utils.js<br/>Shared helpers"]
+        code["Code.js<br/>Menu, bootstrap, Master Mode,<br/>openSpreadsheetSafely, schema"]
+        codeHelpers["RowCrud.js, ImageProxy.js,<br/>DataFixes.js<br/>Row CRUD, image proxy, column fixers"]
+        utils["Utils.js, DriveHelpers.js,<br/>SchemaHelpers.js, Formatting.js<br/>Shared helpers"]
         export["Export*.js<br/>F-1, WC, XLSX & photo exports"]
         import_["Import.js<br/>Award import from S-КАДР"]
     end
@@ -44,6 +45,7 @@ flowchart TD
     end
 
     js -- "google.script.run" --> code
+    js -- "google.script.run" --> codeHelpers
     code -. return data .-> js
     code --> config
     code --> database
@@ -53,6 +55,9 @@ flowchart TD
     code -. "Master Mode read" .-> remote
     code -- "batch export" --> export
     code --> utils
+    codeHelpers --> utils
+    codeHelpers --> database
+    codeHelpers --> drive
     export --> utils
     import_ --> utils
     export --> drive
@@ -70,7 +75,7 @@ flowchart TD
     classDef devtools fill:#F1EFE8,stroke:#5F5E5A,color:#2C2C2A
 
     class html,js,css client
-    class config,code,utils code
+    class config,code,codeHelpers,utils code
     class database,handbook,trash,drive,remote store
     class export,import_ export
     class clasp,claspPush,manifest devtools
@@ -81,8 +86,14 @@ All deployable code lives in `src/` (the only directory clasp pushes); tooling a
 | File | Purpose |
 |------|---------|
 | `src/Config.js` | All constants — sheet names, column names, Drive IDs, export settings |
-| `src/Code.js` | Server-side script: menu, data access, image proxy |
-| `src/Utils.js` | Shared server-side helpers (spreadsheet resolution, schema comparison, column lookups, Drive-ID parsing, `*-table` cell codec) used by `Code.js`, the export files, and `Import.js` |
+| `src/Code.js` | Server-side script: menu, dialog bootstrap, Master Mode data access, `openSpreadsheetSafely`, schema loader |
+| `src/RowCrud.js` | Row CRUD (add/update/delete) against the `Database`/`Trash` sheets |
+| `src/ImageProxy.js` | Server-side Drive image/PDF/folder proxy for the client and XLSX export |
+| `src/DataFixes.js` | The "Fix phone numbers"/"Fix full names" menu commands |
+| `src/Utils.js` | Spreadsheet/Handbook resolution and the `*-table` cell codec |
+| `src/DriveHelpers.js` | Drive-ID/URL parsing and per-unit Drive folder resolution |
+| `src/SchemaHelpers.js` | Column/schema helpers: schema comparison, column lookups |
+| `src/Formatting.js` | Value formatting/normalization (dates, full names, phone numbers) |
 | `src/Export.js` | Server-side F-1 and Wanted Card document export |
 | `src/ExportValues.js` | Pure computed-value functions for the export correspondence table (service length, relatives, awards, …) |
 | `src/ExportXlsx.js` | The single-file XLSX export |

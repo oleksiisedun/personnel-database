@@ -8,7 +8,7 @@ When `Handbook!A2` is `true`, `getSchemaAndData()` reads source spreadsheet IDs 
 
 After the initial render, the client (`onDataLoaded()` in `WebEditor.js.html`) calls `queueMasterSourceFetch()`, which fetches each remote source's rows one at a time through a worker pool (size `masterModeFetchConcurrency`/`MASTER_MODE_FETCH_CONCURRENCY`, mirroring the image-fetch pool) via `getMasterSourceRows(spreadsheetId)`. Rows may still be arriving for a short time after `onDataLoaded()` fires — code that needs "all master-mode rows" must account for that.
 
-Before returning rows, `getMasterSourceRows()` validates the remote column schema against the local `Database` sheet with `compareColumnSchemas()` (`Utils.js`; compares names and types at every index, skipping trailing blanks from `getDataRange()` overreach). On mismatch it returns `rows: []` plus `columnMismatches: Array<{colIndex, localName, localType, remoteName, remoteType}>`. The client records these in `schema.sourceColumnMismatches` (keyed by `spreadsheetId`) and reveals the amber `#btn-schema-warning` ⚠ button, whose overlay lists each mismatched source and column. Inaccessible sources are skipped silently with `columnMismatches: null` — never flagged as mismatched. The `{id, name}` entry is always pushed onto `schema.masterSources` regardless of mismatch, so the overlay can resolve IDs to names.
+Before returning rows, `getMasterSourceRows()` validates the remote column schema against the local `Database` sheet with `compareColumnSchemas()` (`SchemaHelpers.js`; compares names and types at every index, skipping trailing blanks from `getDataRange()` overreach). On mismatch it returns `rows: []` plus `columnMismatches: Array<{colIndex, localName, localType, remoteName, remoteType}>`. The client records these in `schema.sourceColumnMismatches` (keyed by `spreadsheetId`) and reveals the amber `#btn-schema-warning` ⚠ button, whose overlay lists each mismatched source and column. Inaccessible sources are skipped silently with `columnMismatches: null` — never flagged as mismatched. The `{id, name}` entry is always pushed onto `schema.masterSources` regardless of mismatch, so the overlay can resolve IDs to names.
 
 ### Refresh and Reset
 
@@ -41,7 +41,7 @@ Before returning rows, `getMasterSourceRows()` validates the remote column schem
 3. Rows where source === destination, or whose source spreadsheet/sheet is inaccessible, are skipped (logged, not moved/deleted) and returned in `skippedEntries: Array<{rowIndex, spreadsheetId}>`.
 4. After each row move, it tries to move the person's Drive folder (named after the first column value) from the source's unit folder to the destination's, via `DriveApp.getFolderById()` / `findFolderByNameCaseInsensitive()` / `moveTo()`. If either unit folder can't be resolved or the person folder isn't found, the row move still completes and a note is logged.
 
-`findFolderByNameCaseInsensitive()` (`Utils.js`) exists because `Folder.getFoldersByName()` is exact and case-sensitive.
+`findFolderByNameCaseInsensitive()` (`DriveHelpers.js`) exists because `Folder.getFoldersByName()` is exact and case-sensitive.
 
 Returns `{ log, movedRows, skippedEntries }`. The client (`runMove()`/`onMoveSuccess()`) stashes the sent entries as `pendingMoveEntries`, then subtracts `skippedEntries` to get what was *actually* hard-deleted. Two consequences:
 
@@ -50,7 +50,7 @@ Returns `{ log, movedRows, skippedEntries }`. The client (`runMove()`/`onMoveSuc
 
 ### Per-unit Drive folder resolution
 
-`DATA_FOLDER` (`Handbook!A4`) holds the shared "UNITS" parent folder — the same ID in every unit spreadsheet (imported via `IMPORTRANGE`). A plain `getDriveIdFromHandbook(handbookSheet, DATA_FOLDER)` therefore resolves to the same folder for every unit; use `getUnitDataFolder(handbookSheet, ss)` (`Utils.js`) to get a spreadsheet's own photo/PDF folder.
+`DATA_FOLDER` (`Handbook!A4`) holds the shared "UNITS" parent folder — the same ID in every unit spreadsheet (imported via `IMPORTRANGE`). A plain `getDriveIdFromHandbook(handbookSheet, DATA_FOLDER)` therefore resolves to the same folder for every unit; use `getUnitDataFolder(handbookSheet, ss)` (`DriveHelpers.js`) to get a spreadsheet's own photo/PDF folder.
 
 - It opens the parent folder and finds the direct subfolder named `extractUnitName(ss.getName())` (case-insensitive, via `findFolderByNameCaseInsensitive()`). Returns `''` (not an error) if `DATA_FOLDER` is unconfigured, the parent is inaccessible, or nothing matches; callers treat that as "not configured".
 - `extractUnitName(spreadsheetName)` splits on the *last* `UNIT_NAME_SEPARATOR` (`Config.js`, `' - '`) and trims, e.g. `"УСТАНОВЧІ ДАНІ О/С - 7 РОП"` → `"7 РОП"`; with no separator it falls back to the whole trimmed name. **Keep a unit's spreadsheet title and its Drive subfolder name in sync when renaming either.**
