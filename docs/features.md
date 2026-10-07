@@ -33,6 +33,8 @@ After a successful move the rows reappear in the list immediately under their ne
 
 Opening the web editor (either "Open Web Editor" or "Export photos for S-КАДР" below) first checks that the `Database` and `Handbook` sheets exist. If either is missing, a dialog reports it instead of the editor opening in a silently broken state.
 
+`onOpen()` also hides the `Database` and `Trash` sheets, a light nudge to edit through the web editor instead of directly in the sheets (users can still unhide them; they are re-hidden on the next open).
+
 The Sheets **More... ⭐️** menu (added by `onOpen()`) always has three items, plus two more shown only when Master Mode (`Handbook!A2`) is on:
 
 | Item | Action |

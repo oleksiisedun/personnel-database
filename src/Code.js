@@ -54,6 +54,7 @@ function getColumnMaxWidths() {
  * aggregate across.
  */
 function onOpen() {
+  hideDataSheets();
   const menu = SpreadsheetApp.getUi()
     .createMenu('More... ⭐️')
     .addItem('Open Web Editor', 'openWebEditor')
@@ -64,6 +65,25 @@ function onOpen() {
     menu.addSeparator().addItem('Export photos for S-КАДР', 'openPhotoExport').addItem('Import awards from S-КАДР', 'importAwards');
   }
   menu.addToUi();
+}
+
+/**
+ * Hides the Database and Trash sheets, a light nudge for users to edit data
+ * through the web editor rather than directly in the sheets. Not a security
+ * boundary: users can unhide them (and onOpen() re-hides them next time). Each
+ * sheet is skipped if missing or already hidden; a failure (e.g. it is the only
+ * visible sheet) is ignored so it never breaks onOpen().
+ */
+function hideDataSheets() {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  [SHEET_DATABASE, SHEET_TRASH].forEach((name) => {
+    try {
+      const sheet = ss.getSheetByName(name);
+      if (sheet && !sheet.isSheetHidden()) sheet.hideSheet();
+    } catch (e) {
+      console.warn(`Could not hide sheet "${name}": ${e}`);
+    }
+  });
 }
 
 /**
