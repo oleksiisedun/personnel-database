@@ -1,12 +1,16 @@
 /**
  * Converts every cell in a raw sheet row to a string, treating null and undefined
- * as empty string.
+ * as empty string. Date cells (a typed "18.10.1987" is auto-parsed into a Date by
+ * Sheets) are rendered as DD.MM.YYYY rather than the verbose default Date string.
  *
  * @param {Array<*>} row - Raw row array as returned by Sheet.getValues().
  * @returns {string[]}
  */
 function stringifyRowValues(row) {
-  return row.map((c) => String(c == null ? '' : c));
+  return row.map((c) => {
+    if (Object.prototype.toString.call(c) === '[object Date]') return isNaN(c.getTime()) ? '' : formatDateDDMMYYYY(c);
+    return String(c == null ? '' : c);
+  });
 }
 
 /**

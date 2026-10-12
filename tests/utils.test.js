@@ -18,6 +18,7 @@ const {
   getFieldByPattern,
   padRowToColumnCount,
   formatDateDDMMYYYY,
+  stringifyRowValues,
   groupAndSortBySpreadsheetId,
   parseGidFromUrl,
   UNIT_NAME_SEPARATOR,
@@ -40,6 +41,7 @@ const {
     'getFieldByPattern',
     'padRowToColumnCount',
     'formatDateDDMMYYYY',
+    'stringifyRowValues',
     'groupAndSortBySpreadsheetId',
     'parseGidFromUrl',
     'UNIT_NAME_SEPARATOR',
@@ -247,5 +249,12 @@ describe('groupAndSortBySpreadsheetId', () => {
     const groups = groupAndSortBySpreadsheetId([{ rowIndex: 4, spreadsheetId: null }, { rowIndex: 6 }]);
     assert.deepEqual(plain([...groups.keys()]), [null]);
     assert.deepEqual(plain(groups.get(null).map((e) => e.rowIndex)), [6, 4]);
+  });
+});
+
+describe('stringifyRowValues', () => {
+  test('renders Date cells as DD.MM.YYYY, not the verbose Date string', () => {
+    const row = [new Date(1987, 9, 18), null, undefined, 42, 'text', new Date(NaN)];
+    assert.deepEqual(plain(stringifyRowValues(row)), ['18.10.1987', '', '', '42', 'text', '']);
   });
 });
