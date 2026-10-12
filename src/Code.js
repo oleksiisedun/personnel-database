@@ -60,7 +60,8 @@ function onOpen() {
     .addItem('Open Web Editor', 'openWebEditor')
     .addSeparator()
     .addItem('Fix phone numbers', 'fixPhoneNumbers')
-    .addItem('Fix full names', 'fixFullNames');
+    .addItem('Fix full names', 'fixFullNames')
+    .addItem('Add sex', 'addSex');
   if (getMasterMode()) {
     menu.addSeparator().addItem('Export photos for S-КАДР', 'openPhotoExport').addItem('Import awards from S-КАДР', 'importAwards');
   }

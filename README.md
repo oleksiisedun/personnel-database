@@ -89,7 +89,7 @@ All deployable code lives in `src/` (the only directory clasp pushes); tooling a
 | `src/Code.js` | Server-side script: menu, dialog bootstrap, Master Mode data access, `openSpreadsheetSafely`, schema loader |
 | `src/RowCrud.js` | Row CRUD (add/update/delete) against the `Database`/`Trash` sheets |
 | `src/ImageProxy.js` | Server-side Drive image/PDF/folder proxy for the client and XLSX export |
-| `src/DataFixes.js` | The "Fix phone numbers"/"Fix full names" menu commands |
+| `src/DataFixes.js` | The "Fix phone numbers"/"Fix full names"/"Add sex" menu commands |
 | `src/Utils.js` | Spreadsheet/Handbook resolution and the `*-table` cell codec |
 | `src/DriveHelpers.js` | Drive-ID/URL parsing and per-unit Drive folder resolution |
 | `src/SchemaHelpers.js` | Column/schema helpers: schema comparison, column lookups |

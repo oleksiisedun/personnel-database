@@ -72,3 +72,52 @@ function fixPhoneNumbers() {
 function fixFullNames() {
   _normalizeDatabaseColumn(COL_FULL_NAME, normalizeFullName, 'full name');
 }
+
+/**
+ * Fills empty cells of the Database sheet's sex column (the one typed `sex` in
+ * row 2) from the patronymic in the "ПІБ" column. Cells already set, and rows
+ * whose patronymic is unrecognizable, are left untouched. Triggered only from
+ * the custom menu.
+ * @returns {void}
+ */
+function addSex() {
+  const ui = SpreadsheetApp.getUi();
+  const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(SHEET_DATABASE);
+  if (!sheet) {
+    ui.alert(`Sheet "${SHEET_DATABASE}" not found.`);
+    return;
+  }
+
+  const [headers, types] = sheet.getRange(1, 1, 2, sheet.getLastColumn()).getValues();
+  const sexCol = types.findIndex((t) => String(t).trim().toLowerCase() === COL_SEX_TYPE);
+  if (sexCol === -1) {
+    ui.alert(`No column of type "${COL_SEX_TYPE}" found in row 2.`);
+    return;
+  }
+  const nameCol = findColumnIndex(headers, COL_FULL_NAME);
+  if (nameCol === -1) {
+    ui.alert(`Column matching "${COL_FULL_NAME.source}" not found in row 1.`);
+    return;
+  }
+
+  const numRows = sheet.getLastRow() - 2;
+  if (numRows <= 0) {
+    ui.alert('No data rows to process.');
+    return;
+  }
+
+  const names = sheet.getRange(3, nameCol + 1, numRows, 1).getValues();
+  const sexRange = sheet.getRange(3, sexCol + 1, numRows, 1);
+  let addedCount = 0;
+
+  const result = sexRange.getValues().map((row, i) => {
+    if (String(row[0]).trim()) return row;
+    const sex = inferSexFromFullName(names[i][0]);
+    if (!sex) return row;
+    addedCount++;
+    return [sex];
+  });
+
+  sexRange.setValues(result);
+  ui.alert(`Added sex to ${addedCount} row(s).`);
+}

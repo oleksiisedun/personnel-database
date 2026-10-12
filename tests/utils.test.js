@@ -6,6 +6,7 @@ const { loadServer, plain } = require('./load.js');
 
 const {
   normalizeFullName,
+  inferSexFromFullName,
   normalizeRowFullName,
   normalizePhoneNumber,
   extractUnitName,
@@ -27,6 +28,7 @@ const {
   ['Config.js', 'Formatting.js', 'DriveHelpers.js', 'SchemaHelpers.js', 'Utils.js'],
   [
     'normalizeFullName',
+    'inferSexFromFullName',
     'normalizeRowFullName',
     'normalizePhoneNumber',
     'extractUnitName',
@@ -46,6 +48,20 @@ const {
     'COL_DRAFT_DATE',
   ],
 );
+
+describe('inferSexFromFullName', () => {
+  test('-ич patronymic is male, -на is female', () => {
+    assert.equal(inferSexFromFullName('Шевченко Тарас Григорович'), 'ч');
+    assert.equal(inferSexFromFullName('Франко Іван Ілліч'), 'ч');
+    assert.equal(inferSexFromFullName('Українка Леся Петрівна'), 'ж');
+    assert.equal(inferSexFromFullName('Іваненко Марія Іллінічна'), 'ж');
+  });
+  test('returns empty when there is no recognizable patronymic', () => {
+    assert.equal(inferSexFromFullName('Шевченко Тарас'), '');
+    assert.equal(inferSexFromFullName(''), '');
+    assert.equal(inferSexFromFullName('Іваненко Ахмед Огли'), '');
+  });
+});
 
 describe('normalizeFullName', () => {
   test('uppercases the surname and keeps the rest as-is', () => {

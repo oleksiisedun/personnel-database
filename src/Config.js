@@ -56,6 +56,16 @@ const COL_FULL_NAME = /ПІБ/i;
 const COL_PHOTO = /фото/i;
 const COL_CARD_ID = /s-кадр id/i;
 
+// "Add sex": the sex column is located by its row-2 type, not its header; the values written
+// must match the Handbook's `sex` dropdown. The patronymic (father's name, 3rd word of the
+// full name) ending decides the value: -ич/-іч (Олексійович, Ілліч) male, -на (Олексіївна, Іллінічна) female.
+const COL_SEX_TYPE = 'sex';
+const SEX_MALE = 'ч';
+const SEX_FEMALE = 'ж';
+const PATRONYMIC_WORD_INDEX = 2;
+const PATRONYMIC_MALE_REGEX = /[иі]ч$/i;
+const PATRONYMIC_FEMALE_REGEX = /на$/i;
+
 // Tab name for grouping all image-type columns in the edit view, instead of
 // showing them inline in the main grid panel. See getSchemaAndData()/openEditView().
 const DOCUMENT_PHOTO_TAB_NAME = 'Фото документи';

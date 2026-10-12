@@ -35,6 +35,18 @@ function normalizeFullName(value) {
 }
 
 /**
+ * Infers sex from the patronymic (third word) of a full name.
+ * @param {string} fullName
+ * @returns {string} SEX_MALE, SEX_FEMALE, or '' when there is no recognizable patronymic.
+ */
+function inferSexFromFullName(fullName) {
+  const patronymic = String(fullName).trim().split(WHITESPACE_RUN_REGEX)[PATRONYMIC_WORD_INDEX] || '';
+  if (PATRONYMIC_MALE_REGEX.test(patronymic)) return SEX_MALE;
+  if (PATRONYMIC_FEMALE_REGEX.test(patronymic)) return SEX_FEMALE;
+  return '';
+}
+
+/**
  * Returns a copy of a row with its full-name cell (the column whose header matches
  * COL_FULL_NAME) passed through normalizeFullName(). Rows without such a column,
  * or with a short row not reaching it, are returned unchanged.
