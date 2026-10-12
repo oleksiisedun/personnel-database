@@ -24,7 +24,7 @@ The **Move** toolbar button appears only when Master Mode is on. Select one or m
 
 What happens on the server:
 1. The row is appended to the destination `Database` sheet and **hard-deleted** from the source (not sent to Trash).
-2. The person's Drive folder — searched by full name (first column) inside the source spreadsheet's own unit folder (resolved as the subfolder of `DATA_FOLDER` matching the unit name extracted from that spreadsheet's title, or `DATA_FOLDER` itself directly if Master Mode is on for that spreadsheet) — is moved to the destination spreadsheet's own unit folder using `DriveApp`. If either unit folder can't be resolved, or the person's folder is not found inside it, the row move still completes; the result dialog shows a per-person note.
+2. The person's Drive folder — located from the row's photo link (the folder itself, or the parent of the linked photo) — is moved into the destination's shared person-folders folder, found as the parent of an existing person's folder among the first 20 destination rows. There is no name matching: if the photo link is missing or ambiguous, or the destination has no photo to probe, the row move still completes and the result dialog shows a per-person note.
 3. Rows that already belong to the destination spreadsheet are skipped.
 
 After a successful move the rows reappear in the list immediately under their new spreadsheet, without reopening the webview.

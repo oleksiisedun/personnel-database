@@ -30,7 +30,7 @@ Google Apps Script project (V8 runtime) bound to a Google Spreadsheet; the web e
 - `ImageProxy.js` — Drive image/PDF/folder proxy (`getImagesDataUrls`, `resolveDriveFileForExport`, `_classifyDriveFile`)
 - `DataFixes.js` — in-place column normalization menu commands (`fixPhoneNumbers`, `fixFullNames`, `_normalizeDatabaseColumn`)
 - `Utils.js` — spreadsheet/Handbook resolution (`getHandbookSheet`, `resolveSpreadsheet`, `getDatabaseSheet`, `getDriveIdFromHandbook`, `handbookCheck`), `*-table` cell codec (`_parseSubTable`/`_encodeSubTable`) and the Trash sheet/row-grouping helpers it uses
-- `DriveHelpers.js` — Drive-ID/URL parsing (`parseDriveId`, `looksLikeDriveUrl`) and per-unit folder resolution (`getUnitDataFolder`, `extractUnitName`, `getExportFolderSafely`)
+- `DriveHelpers.js` — Drive-ID/URL parsing (`parseDriveId`, `looksLikeDriveUrl`) and person/unit folder resolution for Move (`resolvePersonFolderId`, `findUnitFolderIdFromPhotos`, `lookupDriveItem`), `getExportFolderSafely`
 - `SchemaHelpers.js` — column/schema helpers: schema comparison, column lookups (`compareColumnSchemas`, `findColumnIndex`, `findKeyByPattern`/`getFieldByPattern`, `columnLetterToIndex`)
 - `Formatting.js` — value formatting/normalization (`formatDateDDMMYYYY`, `normalizeFullName`, `normalizePhoneNumber`, `stringifyRowValues`)
 - `Export.js` — F-1/Wanted Card Docs export (`_exportDoc`), shared sheet-data loader, template placeholder/image helpers
@@ -62,11 +62,11 @@ The `Database` sheet has a fixed structure:
 - Row 2 — column types (`text`, `image`, `*-table`, `unit`, `origin`, `marital-status`, `sex`, `tin`, `number`, …)
 - Row 3+ — one person record per row
 
-The `Handbook` sheet holds schema metadata, dropdown/table-column definitions, the Master Mode toggle, the data folder cell, and export correspondence tables. `Config.js` defines each range address.
+The `Handbook` sheet holds schema metadata, dropdown/table-column definitions, the Master Mode toggle, and export correspondence tables. `Config.js` defines each range address.
 
 Every Handbook range read inside `getSchemaAndData()` (`getMasterMode()`, `getMasterSources()`, `getDataTypeOptionsMap()`, `getTableColumnsMap()`) is wrapped in try/catch with a safe fallback (`false`, `[]`, or `{}`), keeping the editor usable if a range is unreadable for some user. **New Handbook reads added to `getSchemaAndData()` must follow the same pattern.**
 
-Handbook layout: single-value config lives in column A as a vertical list (a documentation label, then its value on the row(s) below), Master Mode sources in `B2:B`, and three open-ended tables from row 1 onward — export correspondence (`D2:F`), `*-table` sub-columns (`H2:J`), data types (`L2:AL`). Every address is a constant in `Config.js`; the cell-by-cell reference is [docs/spreadsheet-setup.md](docs/spreadsheet-setup.md) (don't restate it here). `A4` (`DATA_FOLDER`) is the shared "UNITS" folder, and each unit's own subfolder is resolved by `getUnitDataFolder()` (see [docs/architecture-master-mode.md](docs/architecture-master-mode.md)); the correspondence table is covered in [docs/architecture-export-import.md](docs/architecture-export-import.md) and data types in [docs/architecture-web-editor.md](docs/architecture-web-editor.md).
+Handbook layout: single-value config lives in column A as a vertical list (a documentation label, then its value on the row(s) below), Master Mode sources in `B2:B`, and three open-ended tables from row 1 onward — export correspondence (`D2:F`), `*-table` sub-columns (`H2:J`), data types (`L2:AL`). Every address is a constant in `Config.js`; the cell-by-cell reference is [docs/spreadsheet-setup.md](docs/spreadsheet-setup.md) (don't restate it here). `A4` is unused; the correspondence table is covered in [docs/architecture-export-import.md](docs/architecture-export-import.md) and data types in [docs/architecture-web-editor.md](docs/architecture-web-editor.md).
 
 All Drive-ID/spreadsheet-link Handbook cells tolerate either a bare ID or a full sharing URL — every read site pipes the value through `parseDriveId()` (directly or via `getDriveIdFromHandbook()`).
 
@@ -119,11 +119,11 @@ Related helpers — use them instead of repeating the inline pattern:
 
 ### Decision records
 
-Deliberate-but-surprising choices are recorded in `docs/decisions/` so they aren't re-derived: [0001 open spreadsheets via a Drive probe](docs/decisions/0001-open-spreadsheets-via-drive-probe.md), [0002 lint the client fragments with an inline processor](docs/decisions/0002-lint-client-fragments-with-inline-processor.md), [0003 client script fragments share one global scope](docs/decisions/0003-client-script-fragments-single-global-scope.md).
+Deliberate-but-surprising choices are recorded in `docs/decisions/` so they aren't re-derived: [0001 open spreadsheets via a Drive probe](docs/decisions/0001-open-spreadsheets-via-drive-probe.md), [0002 lint the client fragments with an inline processor](docs/decisions/0002-lint-client-fragments-with-inline-processor.md), [0003 client script fragments share one global scope](docs/decisions/0003-client-script-fragments-single-global-scope.md), [0004 locate Move folders from photo links](docs/decisions/0004-locate-move-folders-from-photo-links.md).
 
 ### Feature docs (read the relevant one before changing that area)
 
-- [docs/architecture-master-mode.md](docs/architecture-master-mode.md) — Master Mode loading (`getMasterSourceRows`, `queueMasterSourceFetch`, schema-mismatch warning), Refresh/Reset, source ordering, the Actual personnel filter, Move personnel, per-unit Drive folder resolution (`getUnitDataFolder`, `extractUnitName`).
+- [docs/architecture-master-mode.md](docs/architecture-master-mode.md) — Master Mode loading (`getMasterSourceRows`, `queueMasterSourceFetch`, schema-mismatch warning), Refresh/Reset, source ordering, the Actual personnel filter, Move personnel, person/unit Drive folder resolution from photo links.
 - [docs/architecture-export-import.md](docs/architecture-export-import.md) — F-1/WC Docs export (4-pass order), XLSX export, S-КАДР photo export (two-phase, `mode = 'photoExport'`), award import.
 - [docs/architecture-web-editor.md](docs/architecture-web-editor.md) — edit view tabs/panels, unsaved-changes and validation flow, `*-table` widths, dropdown/typed sub-column types, image loading/caching, Trash soft delete, `fixPhoneNumbers`/`fixFullNames`.
 

@@ -8,7 +8,6 @@ All tuneable constants live in `src/Config.js`. Back to the [README](../README.m
 | `SHEET_HANDBOOK` | `'Handbook'` | Name of the handbook sheet |
 | `SHEET_TRASH` | `'Trash'` | Name of the trash sheet (created automatically on first delete) |
 | `MASTER_MODE_CELL` | `'A2'` | Cell that holds the Master Mode checkbox |
-| `DATA_FOLDER` | `'A4'` | Cell that holds the Google Drive folder ID of the shared "UNITS" parent folder |
 | `MASTER_MODE_SOURCES_RANGE` | `'B2:B'` | Range of source spreadsheet IDs/URLs for Master Mode |
 | `ACTUAL_PERSONNEL_SPREADSHEET_CELL` | `'A6'` | Cell holding the link/ID of the external spreadsheet with the actual personnel list |
 | `ACTUAL_PERSONNEL_RANGE_CELL` | `'A7'` | Cell holding the range address within that spreadsheet (e.g. `Sheet1!A:A`) |
@@ -30,7 +29,7 @@ All tuneable constants live in `src/Config.js`. Back to the [README](../README.m
 | `EXPORT_IMAGE_THUMBNAIL_SIZE` | `800` | Width (px) requested from Drive's thumbnail service for export images, before the `IMAGE_MAX_HEIGHT` display clamp is applied |
 | `PHOTO_EXPORT_FOLDER_PREFIX` | `'Photos for S-КАДР '` | Destination folder name prefix for [Photo export for S-КАДР](features.md#photo-export-for-s-кадр), combined with today's date |
 | `GID_REGEX` | `/[?&#]gid=(\d+)/` | Extracts the tab id from a Google Sheets URL's `gid` parameter; used by [Award import](features.md#award-import-from-s-кадр) to pick the correct tab |
-| `UNIT_NAME_SEPARATOR` | `' - '` | Separator between a unit spreadsheet's fixed title prefix and its actual unit name (e.g. `"УСТАНОВЧІ ДАНІ О/С - 7 РОП"` → `"7 РОП"`); used by `extractUnitName()` to match against Drive folder names in `getUnitDataFolder()` |
+| `MOVE_DEST_FOLDER_PROBE_ROWS` | `20` | How many leading destination `Database` rows Move personnel probes for a photo link, to locate the destination's shared person-folders parent |
 | `AWARDS_IMPORT_ID_COL` / `_NAME_COL` / `_ORDER_NUMBER_COL` / `_ORDER_DATE_COL` | `'A'` / `'F'` / `'G'` / `'H'` | Fixed column letters (A1 notation) for the ID/name/order-number/order-date fields in the external award import sheet |
 | `AWARDS_IMPORT_DATA_START_ROW` | `2` | First data row (after the header) in the external award import sheet |
 | `AWARDS_ORDER_NUMBER_CLEAN_REGEX` | `/\/\d+\|[\W]+/g` | Strips surrounding text/punctuation from the import sheet's free-text order-number field, keeping just the leading number |

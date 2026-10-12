@@ -39,19 +39,9 @@ Before returning rows, `getMasterSourceRows()` validates the remote column schem
 1. Groups `rowEntries` by source `spreadsheetId`, each group sorted in descending `rowIndex` order (so deleting lower rows doesn't shift higher ones).
 2. Per row: reads the data, appends it to the destination `Database` sheet, then **hard-deletes** it from the source (`sheet.deleteRow()` — not the soft delete `deleteRow()` does). Returns the new `rowIndex` and `values` so the client can update `schema.rows` in place.
 3. Rows where source === destination, or whose source spreadsheet/sheet is inaccessible, are skipped (logged, not moved/deleted) and returned in `skippedEntries: Array<{rowIndex, spreadsheetId}>`.
-4. After each row move, it tries to move the person's Drive folder (named after the first column value) from the source's unit folder to the destination's, via `DriveApp.getFolderById()` / `findFolderByNameCaseInsensitive()` / `moveTo()`. If either unit folder can't be resolved or the person folder isn't found, the row move still completes and a note is logged.
-
-`findFolderByNameCaseInsensitive()` (`DriveHelpers.js`) exists because `Folder.getFoldersByName()` is exact and case-sensitive.
+4. After each row move, it tries to move the person's Drive folder. The folder is located from the row's photo-column link (`resolvePersonFolderId()`, `DriveHelpers.js`): a folder link is the person's folder, a file link resolves to its single parent folder. The destination folder is the parent of the first resolvable person folder among the first `MOVE_DEST_FOLDER_PROBE_ROWS` (20) destination rows (`findUnitFolderIdFromPhotos()`), read before any row is appended. There is no name matching and no fallback: if the photo link is missing/inaccessible/ambiguous, or the destination has no photo to probe, the row move still completes and the log note says why the folder was not moved. A folder already in the destination is left alone.
 
 Returns `{ log, movedRows, skippedEntries }`. The client (`runMove()`/`onMoveSuccess()`) stashes the sent entries as `pendingMoveEntries`, then subtracts `skippedEntries` to get what was *actually* hard-deleted. Two consequences:
 
 - Skipped rows must stay in `schema.rows` — they're still in the source sheet.
 - Every other remaining row sharing a deleted row's source `spreadsheetId` needs its cached `rowIndex` decremented by the number of actually-deleted rows above it, otherwise a later move/edit/delete addresses the wrong physical row (`sheet.deleteRow()` shifts everything below up). Any new client code that hard-deletes source rows must apply the same adjustment (see `onDeleteSuccess()` for the single-row equivalent).
-
-### Per-unit Drive folder resolution
-
-`DATA_FOLDER` (`Handbook!A4`) holds the shared "UNITS" parent folder — the same ID in every unit spreadsheet (imported via `IMPORTRANGE`). A plain `getDriveIdFromHandbook(handbookSheet, DATA_FOLDER)` therefore resolves to the same folder for every unit; use `getUnitDataFolder(handbookSheet, ss)` (`DriveHelpers.js`) to get a spreadsheet's own photo/PDF folder.
-
-- It opens the parent folder and finds the direct subfolder named `extractUnitName(ss.getName())` (case-insensitive, via `findFolderByNameCaseInsensitive()`). Returns `''` (not an error) if `DATA_FOLDER` is unconfigured, the parent is inaccessible, or nothing matches; callers treat that as "not configured".
-- `extractUnitName(spreadsheetName)` splits on the *last* `UNIT_NAME_SEPARATOR` (`Config.js`, `' - '`) and trims, e.g. `"УСТАНОВЧІ ДАНІ О/С - 7 РОП"` → `"7 РОП"`; with no separator it falls back to the whole trimmed name. **Keep a unit's spreadsheet title and its Drive subfolder name in sync when renaming either.**
-- Only one spreadsheet runs in Master Mode (the central aggregator), so `getUnitDataFolder()` reuses `Handbook!MASTER_MODE_CELL` as the signal that this spreadsheet's folder isn't under the UNITS tree: when on, `DATA_FOLDER` is returned directly as its own dedicated folder. `readMasterModeFromSheet(handbookSheet)` (`Utils.js`) reads that cell from any Handbook sheet; `getMasterMode()` (`Code.js`) is a thin wrapper over it for the active spreadsheet.

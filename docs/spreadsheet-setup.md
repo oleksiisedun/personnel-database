@@ -23,7 +23,6 @@ Single-value config lives in column A as a vertical list (a documentation label,
 | Cell | Purpose |
 |------|---------|
 | `A2` (`MASTER_MODE_CELL`) | Master Mode toggle (checkbox) — when checked, the webview aggregates data from all source spreadsheets listed in `B2:B` |
-| `A4` (`DATA_FOLDER`) | Google Drive folder ID of the shared "UNITS" parent folder (same value everywhere, imported like most other Handbook config) — each unit's own person images/PDFs subfolder inside it is resolved per spreadsheet by matching the unit name extracted from the spreadsheet's own title (e.g. `"УСТАНОВЧІ ДАНІ О/С - 7 РОП"` → `"7 РОП"`), *unless* Master Mode is on for that spreadsheet, in which case `DATA_FOLDER` is used directly as that spreadsheet's own dedicated folder |
 | `A6` (`ACTUAL_PERSONNEL_SPREADSHEET_CELL`) | Link or bare ID of the spreadsheet that holds the authoritative personnel list |
 | `A7` (`ACTUAL_PERSONNEL_RANGE_CELL`) | Range address within that spreadsheet (e.g. `Sheet1!A:A`) containing full names |
 | `A9` (`EXPORT_F1_TEMPLATE_CELL`) | Google Drive file ID (or shareable link) of the F-1 Docs template |
