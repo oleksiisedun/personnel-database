@@ -9,7 +9,6 @@ const {
   inferSexFromFullName,
   normalizeRowFullName,
   normalizePhoneNumber,
-  extractUnitName,
   columnLetterToIndex,
   compareColumnSchemas,
   extractColumnSchema,
@@ -21,7 +20,6 @@ const {
   stringifyRowValues,
   groupAndSortBySpreadsheetId,
   parseGidFromUrl,
-  UNIT_NAME_SEPARATOR,
   COL_FULL_NAME,
   COL_PHONE_NUMBER,
   COL_DRAFT_DATE,
@@ -32,7 +30,6 @@ const {
     'inferSexFromFullName',
     'normalizeRowFullName',
     'normalizePhoneNumber',
-    'extractUnitName',
     'columnLetterToIndex',
     'compareColumnSchemas',
     'extractColumnSchema',
@@ -44,7 +41,6 @@ const {
     'stringifyRowValues',
     'groupAndSortBySpreadsheetId',
     'parseGidFromUrl',
-    'UNIT_NAME_SEPARATOR',
     'COL_FULL_NAME',
     'COL_PHONE_NUMBER',
     'COL_DRAFT_DATE',
@@ -106,16 +102,6 @@ describe('normalizePhoneNumber', () => {
     for (const phone of ['0501234567', '012345678', '38050123456', '3805012345678', '+380501234567', '050 123 45 67', '']) {
       assert.equal(normalizePhoneNumber(phone), phone);
     }
-  });
-});
-
-describe('extractUnitName', () => {
-  test('returns the text after the last separator, trimmed', () => {
-    const sep = UNIT_NAME_SEPARATOR;
-    assert.equal(extractUnitName(`Personnel${sep}Alpha${sep} 3rd Battalion `), '3rd Battalion');
-  });
-  test('falls back to the trimmed whole name when there is no separator', () => {
-    assert.equal(extractUnitName('  Just a name '), 'Just a name');
   });
 });
 

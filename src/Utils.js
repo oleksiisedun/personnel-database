@@ -131,9 +131,8 @@ function getDriveIdFromHandbook(handbookSheet, cellAddress) {
  * Reads the Master Mode toggle (MASTER_MODE_CELL) directly from a given
  * Handbook sheet, rather than resolving the active spreadsheet's own Handbook
  * via getHandbookSheet() the way getMasterMode() (Code.js) does. Shared by
- * getMasterMode() and getUnitDataFolder() (DriveHelpers.js), which already holds a
- * Handbook sheet reference for a spreadsheet that isn't necessarily the
- * active one (a Master Mode source, or the destination in movePersonnel()).
+ * getMasterMode(); also usable for a Handbook sheet of a spreadsheet that isn't
+ * necessarily the active one (a Master Mode source).
  *
  * @param {GoogleAppsScript.Spreadsheet.Sheet|null} handbookSheet
  * @returns {boolean}

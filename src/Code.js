@@ -223,14 +223,13 @@ function getActualPersonnelNames() {
  * the source. Within each source the rows are processed in descending rowIndex
  * order so that deleting one row does not shift the indices of others.
  *
- * After moving each row the function tries to find the person's Drive folder
- * (by full name, first column) inside the source spreadsheet's own unit
- * folder and move it into the destination spreadsheet's own unit folder —
- * both resolved via getUnitDataFolder(), which looks up a subfolder matching
- * the spreadsheet's own name under the shared Handbook!DATA_FOLDER parent
- * folder. If that unit folder can't be resolved on either side, or the named
- * folder is not found inside it, the row move still succeeds and a note is
- * added to the log.
+ * After moving each row the function tries to move the person's Drive folder,
+ * located from the row's photo-column link (resolvePersonFolderId()), into the
+ * destination's shared person-folders parent, located from the parent of an
+ * existing person's folder among the first MOVE_DEST_FOLDER_PROBE_ROWS
+ * destination rows (findUnitFolderIdFromPhotos()). No name matching and no
+ * fallback: if either folder can't be resolved the row move still succeeds
+ * and a note is added to the log.
  *
  * @param {Array<{rowIndex: number, spreadsheetId: string|null, name?: string}>} rowEntries
  * @param {string|null} destinationSpreadsheetId
@@ -243,8 +242,10 @@ function getActualPersonnelNames() {
 function movePersonnel(rowEntries, destinationSpreadsheetId) {
   const { ss: destSs, sheet: destSheet } = getDatabaseSheet(destinationSpreadsheetId);
 
-  const destHandbook = destSs.getSheetByName(SHEET_HANDBOOK);
-  const destFolderId = getUnitDataFolder(destHandbook, destSs);
+  // Read before any row is appended, so a moved person's own photo is never the probe.
+  const destPhotoCells = readPhotoCells(destSheet, 3, MOVE_DEST_FOLDER_PROBE_ROWS);
+  /** @type {string|null} Resolved lazily — only needed once a folder is actually found. */
+  let destFolderId = null;
 
   const groups = groupAndSortBySpreadsheetId(rowEntries);
 
@@ -270,8 +271,7 @@ function movePersonnel(rowEntries, destinationSpreadsheetId) {
       return;
     }
 
-    const srcHandbook = srcSs.getSheetByName(SHEET_HANDBOOK);
-    const srcFolderId = getUnitDataFolder(srcHandbook, srcSs);
+    const srcPhotoCol = findColumnIndex(srcSheet.getRange(1, 1, 1, srcSheet.getLastColumn()).getValues()[0], COL_PHOTO);
 
     const destNumCols = destSheet.getLastColumn();
 
@@ -303,24 +303,13 @@ function movePersonnel(rowEntries, destinationSpreadsheetId) {
       if (destinationSpreadsheetId) newRow.spreadsheetId = destinationSpreadsheetId;
       movedRows.push(newRow);
 
-      // Try to move the person's Drive folder.
+      const person = srcPhotoCol === -1 ? { id: '', reason: 'No photo column' } : resolvePersonFolderId(rowData[srcPhotoCol], lookupDriveItem);
       let folderNote;
-      if (!srcFolderId || !destFolderId) {
-        folderNote = 'Unit data folder not found — folder not moved';
+      if (!person.id) {
+        folderNote = `${person.reason} — folder not moved`;
       } else {
-        try {
-          const srcDataFolder = DriveApp.getFolderById(srcFolderId);
-          const personFolder = findFolderByNameCaseInsensitive(srcDataFolder, fullName);
-          if (!personFolder) {
-            folderNote = 'Folder not found — skipped';
-          } else {
-            const destDataFolder = DriveApp.getFolderById(destFolderId);
-            personFolder.moveTo(destDataFolder);
-            folderNote = 'Folder moved';
-          }
-        } catch (e) {
-          folderNote = `Folder move failed: ${e.message}`;
-        }
+        if (destFolderId === null) destFolderId = findUnitFolderIdFromPhotos(destPhotoCells, lookupDriveItem);
+        folderNote = moveFolderTo(person.id, destFolderId);
       }
 
       log.push({ name: fullName, folderNote });
@@ -420,4 +409,42 @@ function getSchemaAndData() {
     xlsxExportSecondsPerRow: XLSX_EXPORT_SECONDS_PER_ROW,
     documentPhotoTabName: DOCUMENT_PHOTO_TAB_NAME,
   };
+}
+
+/**
+ * Reads the photo-column cells of up to maxRows records starting at startRow.
+ *
+ * @param {GoogleAppsScript.Spreadsheet.Sheet} sheet - A Database sheet (header in row 1).
+ * @param {number} startRow - First data row (1-based).
+ * @param {number} maxRows
+ * @returns {string[]} Raw cell texts; empty if the sheet has no photo column or no such rows.
+ */
+function readPhotoCells(sheet, startRow, maxRows) {
+  const numRows = Math.min(maxRows, sheet.getLastRow() - startRow + 1);
+  const photoCol = findColumnIndex(sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0], COL_PHOTO);
+  if (photoCol === -1 || numRows < 1) return [];
+  return sheet
+    .getRange(startRow, photoCol + 1, numRows, 1)
+    .getValues()
+    .map((r) => String(r[0]));
+}
+
+/**
+ * Moves a Drive folder into the destination folder and returns the log note.
+ *
+ * @param {string} folderId
+ * @param {string} destFolderId - '' when the destination folder could not be located.
+ * @returns {string}
+ */
+function moveFolderTo(folderId, destFolderId) {
+  if (!destFolderId) return 'Destination folder not found (no existing photos) — folder not moved';
+  try {
+    const folder = DriveApp.getFolderById(folderId);
+    const parents = folder.getParents();
+    if (parents.hasNext() && parents.next().getId() === destFolderId) return 'Folder already in destination';
+    folder.moveTo(DriveApp.getFolderById(destFolderId));
+    return 'Folder moved';
+  } catch (e) {
+    return `Folder move failed: ${e.message}`;
+  }
 }

@@ -28,74 +28,64 @@ function looksLikeDriveUrl(value) {
 }
 
 /**
- * Extracts the unit name portion of a unit spreadsheet's own file name.
- * Spreadsheet names follow a "<fixed prefix>UNIT_NAME_SEPARATOR<unit name>"
- * convention, e.g. "УСТАНОВЧІ ДАНІ О/С - 7 РОП" → "7 РОП", which is what the
- * unit's actual Drive folder (a direct subfolder of the shared UNITS parent)
- * is named — matching the full spreadsheet name against the folder name
- * would never succeed. Splits on the *last* UNIT_NAME_SEPARATOR occurrence
- * and trims; falls back to the full name unchanged if the separator isn't
- * present, so an unexpected spreadsheet name degrades to the old
- * whole-name-match behavior instead of throwing.
- *
- * @param {string} spreadsheetName
- * @returns {string}
+ * @typedef {{isFolder: boolean, parentIds: string[]}} DriveItemInfo
  */
-function extractUnitName(spreadsheetName) {
-  const idx = spreadsheetName.lastIndexOf(UNIT_NAME_SEPARATOR);
-  return idx === -1 ? spreadsheetName.trim() : spreadsheetName.slice(idx + UNIT_NAME_SEPARATOR.length).trim();
-}
 
 /**
- * Finds a direct subfolder of parentFolder matching name, case-insensitively.
- * DriveApp's Folder.getFoldersByName() only does exact, case-sensitive matches.
- * @param {GoogleAppsScript.Drive.Folder} parentFolder
- * @param {string} name
- * @returns {GoogleAppsScript.Drive.Folder|null}
- */
-function findFolderByNameCaseInsensitive(parentFolder, name) {
-  const target = name.toLowerCase();
-  const folders = parentFolder.getFolders();
-  while (folders.hasNext()) {
-    const folder = folders.next();
-    if (folder.getName().toLowerCase() === target) return folder;
-  }
-  return null;
-}
-
-/**
- * Resolves a spreadsheet's own unit-specific person-photo folder.
- * Only one spreadsheet is expected to run in Master Mode — the central one
- * that aggregates every other unit — so Handbook!MASTER_MODE_CELL doubles as
- * the signal for "this spreadsheet's own folder isn't organized under the
- * shared UNITS tree": when it's true, Handbook!DATA_FOLDER is returned
- * directly as this spreadsheet's own dedicated folder (e.g. the master
- * spreadsheet's separate headquarters personnel folder). When Master Mode is
- * off, DATA_FOLDER is treated as the shared parent "UNITS" folder — the same
- * ID across every unit spreadsheet, since it's imported via IMPORTRANGE like
- * most other Handbook config — and searched for a direct subfolder matching
- * extractUnitName(ss.getName()), case-insensitively (via
- * findFolderByNameCaseInsensitive()). Returns '' if DATA_FOLDER is
- * unconfigured, the folder is inaccessible, or (Master Mode off) no subfolder
- * matches the extracted unit name.
+ * Describes a Drive file/folder for resolvePersonFolderId(). Returns null
+ * when the item can't be opened (missing, or no access for the script owner).
  *
- * @param {GoogleAppsScript.Spreadsheet.Sheet|null} handbookSheet
- * @param {GoogleAppsScript.Spreadsheet.Spreadsheet} ss
- * @returns {string}
+ * @param {string} id
+ * @returns {DriveItemInfo|null}
  */
-function getUnitDataFolder(handbookSheet, ss) {
-  const folderId = getDriveIdFromHandbook(handbookSheet, DATA_FOLDER);
-  if (!folderId) return '';
-
-  if (readMasterModeFromSheet(handbookSheet)) return folderId;
-
+function lookupDriveItem(id) {
   try {
-    const parentFolder = DriveApp.getFolderById(folderId);
-    const unitFolder = findFolderByNameCaseInsensitive(parentFolder, extractUnitName(ss.getName()));
-    return unitFolder ? unitFolder.getId() : '';
+    const file = DriveApp.getFileById(id);
+    const parentIds = [];
+    const parents = file.getParents();
+    while (parents.hasNext()) parentIds.push(parents.next().getId());
+    return { isFolder: file.getMimeType() === 'application/vnd.google-apps.folder', parentIds };
   } catch (e) {
-    return '';
+    return null;
   }
+}
+
+/**
+ * Resolves a person's Drive folder from the raw cell of the photo column: a
+ * folder link is the person's folder itself; a file link is a photo assumed
+ * to sit directly in it, so its single parent is. Never guesses — any
+ * ambiguity returns a reason for the move log instead of an ID.
+ *
+ * @param {string} photoCell - Raw photo-column cell (bare ID or Drive URL).
+ * @param {(id: string) => (DriveItemInfo|null)} lookup - Usually lookupDriveItem; injected for tests.
+ * @returns {{id: string, reason: string}}
+ */
+function resolvePersonFolderId(photoCell, lookup) {
+  const raw = String(photoCell ?? '').trim();
+  if (!raw) return { id: '', reason: 'No photo link' };
+  const item = lookup(parseDriveId(raw));
+  if (!item) return { id: '', reason: 'Photo not accessible' };
+  if (item.isFolder) return { id: parseDriveId(raw), reason: '' };
+  if (item.parentIds.length !== 1) return { id: '', reason: 'Photo has no single parent folder' };
+  return { id: item.parentIds[0], reason: '' };
+}
+
+/**
+ * Finds a unit's shared data folder from existing people: the parent of the
+ * first person folder that resolves from the given photo cells.
+ *
+ * @param {string[]} photoCells - Raw photo-column cells of existing records.
+ * @param {(id: string) => (DriveItemInfo|null)} lookup
+ * @returns {string} Folder ID, or '' if no cell resolves to a person folder with a single parent.
+ */
+function findUnitFolderIdFromPhotos(photoCells, lookup) {
+  for (const cell of photoCells) {
+    const person = resolvePersonFolderId(cell, lookup);
+    if (!person.id) continue;
+    const parentIds = (lookup(person.id) ?? { parentIds: [] }).parentIds;
+    if (parentIds.length === 1) return parentIds[0];
+  }
+  return '';
 }
 
 /**
