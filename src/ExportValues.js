@@ -18,6 +18,9 @@ function _computeValue(name, data) {
   if (name === 'spousePhoneNumber') return _findSpouseField(data, 3);
   if (name === 'childrenNamesBirthDates') return _computeChildrenNamesBirthDates(data);
   if (name === 'childrenPhoneNumbers') return _computeChildrenPhoneNumbers(data);
+  if (name === 'currentRank') return _computeCurrentRank(data);
+  if (name === 'currentMaxRank') return _computeCurrentMaxRank(data);
+  if (name === 'rankAssignmentDate') return _computeRankAssignmentDate(data);
   if (name === 'currentPosition') return _computeCurrentPosition(data);
   if (name === 'currentPositionStartDate') return _computeCurrentPositionStartDate(data);
   if (name === 'contractSignDate') return _computeContractSignDate(data);
@@ -159,17 +162,73 @@ function _computeCurrentPositionStartDate(data) {
 }
 
 /**
- * Returns the position title from the last entry in the "Проходження служби"
- * column (the most recent / current position).
+ * Returns the raw text of the last (current) entry's position field in the
+ * "Проходження служби" column, before any slashed rank is stripped out.
  * Each row is encoded as "period | position title".
  *
  * @param {Object.<string, string>} data - Row data map.
- * @returns {string} Trimmed position title, or empty string if not found.
+ * @returns {string} Trimmed position text, or empty string if not found.
  */
-function _computeCurrentPosition(data) {
+function _getRawCurrentPosition(data) {
   const rows = _getServiceHistoryRows(data);
   if (!rows.length) return '';
   return (rows[rows.length - 1][1] || '').trim();
+}
+
+/**
+ * Returns the position title from the last entry in the "Проходження служби"
+ * column (the most recent / current position), without any part surrounded by
+ * slashes (e.g. "/капітан/") and without trailing whitespace or punctuation.
+ *
+ * @param {Object.<string, string>} data - Row data map.
+ * @returns {string} Cleaned position title, or empty string if not found.
+ */
+function _computeCurrentPosition(data) {
+  return _getRawCurrentPosition(data)
+    .replace(SLASHED_RANK_REGEX, ' ')
+    .replace(WHITESPACE_RUN_REGEX, ' ')
+    .trim()
+    .replace(POSITION_TRAILING_PUNCTUATION_REGEX, '');
+}
+
+/**
+ * Returns the current rank from the "Військове звання" column: the text with
+ * digits and punctuation removed (hyphens and apostrophes inside words are kept).
+ *
+ * @param {Object.<string, string>} data - Row data map.
+ * @returns {string} e.g. "старший лейтенант" from "старший лейтенант, 01.02.2023", or empty string.
+ */
+function _computeCurrentRank(data) {
+  return getFieldByPattern(data, COL_RANK).replace(NON_RANK_CHARS_REGEX, ' ').replace(RANK_EDGE_REGEX, '').replace(WHITESPACE_RUN_REGEX, ' ').trim();
+}
+
+/**
+ * Returns the highest rank the person may hold: the first rank surrounded by
+ * slashes in the current position (e.g. "/капітан/"), falling back to the
+ * current rank when the position has none.
+ *
+ * @param {Object.<string, string>} data - Row data map.
+ * @returns {string} e.g. "капітан", or empty string if neither is available.
+ */
+function _computeCurrentMaxRank(data) {
+  const slashed = _getRawCurrentPosition(data).match(SLASHED_RANK_REGEX);
+  const rank = slashed ? slashed[0].slice(1, -1).trim() : '';
+  return rank || _computeCurrentRank(data);
+}
+
+/**
+ * Returns the date the current rank was assigned: the last DD.MM.YYYY date in
+ * the "Військове звання" column, falling back to the first date in the
+ * "Дата призову" column.
+ *
+ * @param {Object.<string, string>} data - Row data map.
+ * @returns {string} Date string e.g. "01.02.2023", or empty string if none found.
+ */
+function _computeRankAssignmentDate(data) {
+  const rankDates = getFieldByPattern(data, COL_RANK).match(DATE_REGEX);
+  if (rankDates) return rankDates[rankDates.length - 1];
+  const draftDates = getFieldByPattern(data, COL_DRAFT_DATE).match(DATE_REGEX);
+  return draftDates ? draftDates[0] : '';
 }
 
 /**

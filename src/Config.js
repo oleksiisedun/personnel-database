@@ -43,6 +43,7 @@ const HANDBOOK_DATA_TYPES_RANGE = 'L2:AL';
 // header text read from row 1 (row 1 is not required to be byte-exact across
 // Master Mode source spreadsheets).
 const COL_DRAFT_DATE = /дата призову/i;
+const COL_RANK = /військове звання/i;
 const COL_SERVICE_HISTORY = /проходження служби/i;
 const COL_CLOSE_RELATIVES = /близькі родичі/i;
 const COL_AWARDS = /нагороди/i;
@@ -179,6 +180,21 @@ const WHITESPACE_RUN_REGEX = /\s+/g;
 
 // DD.MM.YYYY date pattern (global flag — safe to reuse with String.prototype.match()).
 const DATE_REGEX = /\d{2}\.\d{2}\.\d{4}/g;
+
+// Rank between two slashes in a service-history position, e.g. "/капітан/" — the rank the
+// person holds above their position's own rank. The opening slash must start a word and the
+// closing one must not be followed by a letter/digit, so slashes inside words ("в/ч 3102") never
+// pair up (global flag — safe with match()/replace()).
+const SLASHED_RANK_REGEX = /(?<!\S)\/([^/\s](?:[^/]*[^/\s])?)\/(?![\p{L}\p{N}])/gu;
+
+// Everything that is not a letter, whitespace, hyphen or apostrophe (kept for "генерал-майор", "м'який").
+const NON_RANK_CHARS_REGEX = /[^\p{L}\s'’-]/gu;
+
+// Leading/trailing non-letters left around a rank once digits and punctuation are removed.
+const RANK_EDGE_REGEX = /^[^\p{L}]+|[^\p{L}]+$/gu;
+
+// Whitespace and punctuation trailing a position title once the slashed rank is removed.
+const POSITION_TRAILING_PUNCTUATION_REGEX = /[\s.,;:!?\-–—]+$/;
 
 // First 4-digit sequence in a string, used to extract military unit numbers.
 const UNIT_NUMBER_REGEX = /\b(\d{4})\b/;

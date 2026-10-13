@@ -36,7 +36,10 @@ These keys can be placed in column C of the correspondence table:
 |-----|-------------|
 | `totalServiceLength` | Duration from last date in `Дата призову` to today, e.g. `3 роки, 8 місяців, 17 днів (станом на 09.05.2026)`. Whole years and months are counted from the start date (a 31st clamps to the last day of a shorter month), then the leftover days; the parts are never negative |
 | `contractSignDate` | First date in `Дата призову` + unit number from first service entry, e.g. `07.05.2015 з в/ч 3011` |
-| `currentPosition` | Position title from the last entry in `Проходження служби` |
+| `currentPosition` | Position title from the last entry in `Проходження служби`, with any `/…/` rank (e.g. `/капітан/`) removed and trailing whitespace/punctuation trimmed. A rank is only recognised when its opening `/` starts a word, so slashes inside words like `в/ч` are left alone |
+| `currentRank` | `Військове звання` with digits and punctuation removed (hyphens/apostrophes inside words are kept), e.g. `старший лейтенант` |
+| `currentMaxRank` | The first `/…/` rank in the last `Проходження служби` position (e.g. `/капітан/` → `капітан`); falls back to `currentRank` |
+| `rankAssignmentDate` | Last `DD.MM.YYYY` date in `Військове звання`; falls back to the first date in `Дата призову` |
 | `currentPositionStartDate` | Start date of the last entry in `Проходження служби` |
 | `motherFullName` | Full name of relative with relation `мати` |
 | `fatherFullName` | Full name of relative with relation `батько` |

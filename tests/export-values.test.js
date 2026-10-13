@@ -12,6 +12,7 @@ const {
   _calendarDuration,
   _computeTotalServiceLength,
   _computeContractSignDate,
+  _computeCurrentRank,
   _computeValue,
   _computeChildrenNamesBirthDates,
   _parseSubTable,
@@ -27,6 +28,7 @@ const {
     '_calendarDuration',
     '_computeTotalServiceLength',
     '_computeContractSignDate',
+    '_computeCurrentRank',
     '_computeValue',
     '_computeChildrenNamesBirthDates',
     '_parseSubTable',
@@ -120,6 +122,45 @@ describe('_computeContractSignDate', () => {
     assert.equal(_computeContractSignDate({ 'Дата призову': '07.05.2015', 'Контракт укладено до': 'Мобілізований' }), '');
     assert.equal(_computeContractSignDate({ 'Дата призову': '07.05.2015', 'Контракт укладено до': 'мобілізована' }), '');
     assert.equal(_computeContractSignDate({ 'Проходження служби': history }), '');
+  });
+});
+
+describe('rank and position computed values', () => {
+  const history = (position) =>
+    _encodeSubTable([
+      ['01.01.2020 - 01.01.2022', 'стрілець'],
+      ['01.01.2022', position],
+    ]);
+
+  test('currentPosition drops slashed ranks and trailing punctuation', () => {
+    assert.equal(_computeValue('currentPosition', { 'Проходження служби': history('командир взводу /капітан/.') }), 'командир взводу');
+    assert.equal(_computeValue('currentPosition', { 'Проходження служби': history('/капітан/ командир роти; ') }), 'командир роти');
+    assert.equal(_computeValue('currentPosition', { 'Проходження служби': history('командир «Альфа»') }), 'командир «Альфа»');
+    assert.equal(_computeValue('currentPosition', {}), '');
+  });
+  test('slashes inside words such as в/ч are not mistaken for a rank', () => {
+    const position = 'перекладач секції s-1 (персоналу) штабу 3-го батальйону оперативного призначення в/ч 3102 /капітан/';
+    const data = { 'Проходження служби': history(position), 'Військове звання': 'лейтенант' };
+    assert.equal(_computeValue('currentPosition', data), 'перекладач секції s-1 (персоналу) штабу 3-го батальйону оперативного призначення в/ч 3102');
+    assert.equal(_computeValue('currentMaxRank', data), 'капітан');
+    assert.equal(_computeValue('currentPosition', { 'Проходження служби': history('водій в/ч 3102') }), 'водій в/ч 3102');
+    assert.equal(_computeValue('currentMaxRank', { 'Проходження служби': history('водій в/ч 3102'), 'Військове звання': 'лейтенант' }), 'лейтенант');
+  });
+  test('currentRank strips digits and punctuation but keeps in-word hyphens', () => {
+    assert.equal(_computeCurrentRank({ 'Військове звання': 'старший лейтенант, 01.02.2023' }), 'старший лейтенант');
+    assert.equal(_computeCurrentRank({ 'Військове звання': '12.03.2020 - генерал-майор.' }), 'генерал-майор');
+    assert.equal(_computeCurrentRank({}), '');
+  });
+  test('currentMaxRank prefers the slashed rank and falls back to currentRank', () => {
+    const rank = { 'Військове звання': 'лейтенант 01.02.2023' };
+    assert.equal(_computeValue('currentMaxRank', { ...rank, 'Проходження служби': history('командир /капітан/') }), 'капітан');
+    assert.equal(_computeValue('currentMaxRank', { ...rank, 'Проходження служби': history('командир') }), 'лейтенант');
+    assert.equal(_computeValue('currentMaxRank', rank), 'лейтенант');
+  });
+  test('rankAssignmentDate uses the rank column date, then the draft date', () => {
+    assert.equal(_computeValue('rankAssignmentDate', { 'Військове звання': 'лейтенант 01.02.2023', 'Дата призову': '07.05.2015' }), '01.02.2023');
+    assert.equal(_computeValue('rankAssignmentDate', { 'Військове звання': 'лейтенант', 'Дата призову': '07.05.2015' }), '07.05.2015');
+    assert.equal(_computeValue('rankAssignmentDate', { 'Військове звання': 'лейтенант' }), '');
   });
 });
 
