@@ -112,7 +112,8 @@ The `samples/` directory contains example files for setting up a new deployment:
 
 | File | Purpose |
 |------|---------|
-| `УСТАНОВЧІ ДАНІ ОС.xlsx` | Sample `Database` sheet layout — column headers matching the schema described in [Spreadsheet structure](#spreadsheet-structure), usable as a starting point for a new spreadsheet |
+| `Database.xlsx` | Sample `Database` sheet layout — column headers matching the schema described in [Spreadsheet structure](#spreadsheet-structure), usable as a starting point for a new spreadsheet |
+| `Handbook.xlsx` | Sample `Handbook` sheet — schema metadata, dropdown/table-column definitions and export correspondence table (see [`Handbook` sheet](#handbook-sheet)) |
 | `ДОВІДКА (Ф-1).docx` | Sample F-1 export template (see [Document export](exports.md#document-export)) with `{Column Name}` placeholders matching this schema |
 | `РОЗШУКОВА КАРТКА.docx` | Sample Wanted Card export template (see [Document export](exports.md#document-export)) with `{Column Name}` placeholders matching this schema |
 
