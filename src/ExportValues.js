@@ -3,9 +3,10 @@
  *
  * @param {string} name - Computed value key from the correspondence table.
  * @param {Object.<string, string>} data - Map of column name to cell value for the current row.
+ * @param {{militaryUnit?: string}} [context] - Values from outside the row (Handbook), e.g. the unit's own number.
  * @returns {string} Computed replacement value, or empty string if key is unknown.
  */
-function _computeValue(name, data) {
+function _computeValue(name, data, context = {}) {
   if (name === 'totalServiceLength') return _computeTotalServiceLength(data);
   if (name === 'motherFullName') return _findRelativeField(data, 'мати', 1);
   if (name === 'fatherFullName') return _findRelativeField(data, 'батько', 1);
@@ -21,7 +22,8 @@ function _computeValue(name, data) {
   if (name === 'currentRank') return _computeCurrentRank(data);
   if (name === 'currentMaxRank') return _computeCurrentMaxRank(data);
   if (name === 'rankAssignmentDate') return _computeRankAssignmentDate(data);
-  if (name === 'currentPosition') return _computeCurrentPosition(data);
+  if (name === 'currentPosition') return _computeCurrentPosition(data, context.militaryUnit);
+  if (name === 'militaryUnit') return (context.militaryUnit || '').trim();
   if (name === 'currentPositionStartDate') return _computeCurrentPositionStartDate(data);
   if (name === 'contractSignDate') return _computeContractSignDate(data);
   if (name === 'relativesWithPhoneNumbers') return _computeRelativesWithPhoneNumbers(data);
@@ -176,15 +178,32 @@ function _getRawCurrentPosition(data) {
 }
 
 /**
+ * Removes mentions of the given military unit ("в/ч 3102", "вч 3102", "в\\ч 3102", "в.ч. 3102",
+ * "військової частини 3102") from a position title. Other unit numbers are left alone.
+ *
+ * @param {string} position
+ * @param {string} [militaryUnit] - Unit number from Handbook; blank leaves the text unchanged.
+ * @returns {string}
+ */
+function _stripMilitaryUnit(position, militaryUnit) {
+  const unit = (militaryUnit || '').trim();
+  if (!unit) return position;
+  const regex = new RegExp(MILITARY_UNIT_PREFIX_PATTERN + '\\s*' + _escapeRegex(unit) + '(?![\\p{L}\\p{N}])', 'giu');
+  return position.replace(regex, ' ');
+}
+
+/**
  * Returns the position title from the last entry in the "Проходження служби"
  * column (the most recent / current position), without any part surrounded by
- * slashes (e.g. "/капітан/") and without trailing whitespace or punctuation.
+ * slashes (e.g. "/капітан/"), without mentions of the given military unit and
+ * without trailing whitespace or punctuation.
  *
  * @param {Object.<string, string>} data - Row data map.
+ * @param {string} [militaryUnit] - The unit's own number to cut out of the position.
  * @returns {string} Cleaned position title, or empty string if not found.
  */
-function _computeCurrentPosition(data) {
-  return _getRawCurrentPosition(data)
+function _computeCurrentPosition(data, militaryUnit) {
+  return _stripMilitaryUnit(_getRawCurrentPosition(data), militaryUnit)
     .replace(SLASHED_RANK_REGEX, ' ')
     .replace(WHITESPACE_RUN_REGEX, ' ')
     .trim()

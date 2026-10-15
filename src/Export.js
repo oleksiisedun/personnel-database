@@ -86,6 +86,7 @@ function _exportDoc(rowEntries, templateCell, docPrefix) {
   const exportFolder = getExportFolderSafely(exportFolderId);
   const mappings = handbookSheet ? _loadCorrespondenceTable(handbookSheet) : [];
   const getSheetData = _makeSheetDataLoader(localSs);
+  const context = { militaryUnit: _readMilitaryUnit(handbookSheet) };
 
   const results = [];
   const skipped = [];
@@ -153,7 +154,7 @@ function _exportDoc(rowEntries, templateCell, docPrefix) {
 
     // Pass 4: correspondence table mappings (source column aliases and computed values).
     mappings.forEach(({ placeholder, sourceCol, computedKey }) => {
-      const value = sourceCol ? data[sourceCol] || '' : _computeValue(computedKey, data);
+      const value = sourceCol ? data[sourceCol] || '' : _computeValue(computedKey, data, context);
       body.replaceText(_escapeRegex('{' + placeholder + '}'), _escapeReplacement(value));
     });
 
@@ -164,6 +165,20 @@ function _exportDoc(rowEntries, templateCell, docPrefix) {
   }
 
   return { results, remaining, skipped };
+}
+
+/**
+ * Reads the unit's own military unit number from Handbook (MILITARY_UNIT_CELL).
+ * @param {GoogleAppsScript.Spreadsheet.Sheet|null} handbookSheet
+ * @returns {string} Trimmed value, or '' if the sheet is missing or the cell unreadable.
+ */
+function _readMilitaryUnit(handbookSheet) {
+  if (!handbookSheet) return '';
+  try {
+    return String(handbookSheet.getRange(MILITARY_UNIT_CELL).getValue()).trim();
+  } catch (e) {
+    return '';
+  }
 }
 
 /**

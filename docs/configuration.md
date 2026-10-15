@@ -9,6 +9,7 @@ All tuneable constants live in `src/Config.js`. Back to the [README](../README.m
 | `SHEET_TRASH` | `'Trash'` | Name of the trash sheet (created automatically on first delete) |
 | `MASTER_MODE_CELL` | `'A2'` | Cell that holds the Master Mode checkbox |
 | `MASTER_MODE_SOURCES_RANGE` | `'B2:B'` | Range of source spreadsheet IDs/URLs for Master Mode |
+| `MILITARY_UNIT_CELL` | `'A4'` | Cell holding the unit's own military unit number |
 | `ACTUAL_PERSONNEL_SPREADSHEET_CELL` | `'A6'` | Cell holding the link/ID of the external spreadsheet with the actual personnel list |
 | `ACTUAL_PERSONNEL_RANGE_CELL` | `'A7'` | Cell holding the range address within that spreadsheet (e.g. `Sheet1!A:A`) |
 | `EXPORT_F1_TEMPLATE_CELL` | `'A9'` | Cell holding the Drive ID or link of the F-1 Docs template |

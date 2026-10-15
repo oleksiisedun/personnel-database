@@ -146,6 +146,21 @@ describe('rank and position computed values', () => {
     assert.equal(_computeValue('currentPosition', { 'Проходження служби': history('водій в/ч 3102') }), 'водій в/ч 3102');
     assert.equal(_computeValue('currentMaxRank', { 'Проходження служби': history('водій в/ч 3102'), 'Військове звання': 'лейтенант' }), 'лейтенант');
   });
+  test('currentPosition cuts out the own military unit in all spellings', () => {
+    const pos = (text, unit = '3102') => _computeValue('currentPosition', { 'Проходження служби': history(text) }, { militaryUnit: unit });
+    const base = 'Командир артилерійського взводу 3-го батальйону оперативного призначення';
+    for (const prefix of ['в/ч', 'вч', 'в\\ч', 'в.ч.', 'військової частини', 'В/Ч']) {
+      assert.equal(pos(`${base} ${prefix} 3102 /старший лейтенант/`), base, prefix);
+    }
+    assert.equal(pos(`${base} в/ч 3102`), base);
+    assert.equal(pos('водій в/ч 3011', '3102'), 'водій в/ч 3011');
+    assert.equal(pos('водій в/ч 31021', '3102'), 'водій в/ч 31021');
+    assert.equal(pos('водій в/ч 3102', ''), 'водій в/ч 3102');
+  });
+  test('militaryUnit returns the Handbook value', () => {
+    assert.equal(_computeValue('militaryUnit', {}, { militaryUnit: ' 3102 ' }), '3102');
+    assert.equal(_computeValue('militaryUnit', {}), '');
+  });
   test('currentRank strips digits and punctuation but keeps in-word hyphens', () => {
     assert.equal(_computeCurrentRank({ 'Військове звання': 'старший лейтенант, 01.02.2023' }), 'старший лейтенант');
     assert.equal(_computeCurrentRank({ 'Військове звання': '12.03.2020 - генерал-майор.' }), 'генерал-майор');

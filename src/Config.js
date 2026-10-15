@@ -19,6 +19,10 @@ const EXPORT_F1_TEMPLATE_CELL = 'A9';
 const EXPORT_WC_TEMPLATE_CELL = 'A11';
 const EXPORT_FOLDER_CELL = 'A13';
 
+// Handbook layout — the unit's own military unit number (e.g. "3102"), exposed to templates as the
+// `militaryUnit` computed value and cut out of `currentPosition`
+const MILITARY_UNIT_CELL = 'A4';
+
 // Handbook layout — placeholder correspondence table (Template Placeholder | Database Column |
 // Computed Value). Open-ended rows — no fixed cap to bump later, same pattern as
 // MASTER_MODE_SOURCES_RANGE.
@@ -192,6 +196,10 @@ const NON_RANK_CHARS_REGEX = /[^\p{L}\s'’-]/gu;
 
 // Leading/trailing non-letters left around a rank once digits and punctuation are removed.
 const RANK_EDGE_REGEX = /^[^\p{L}]+|[^\p{L}]+$/gu;
+
+// Ways a military unit mention is written before its number: "в/ч", "в\\ч", "вч", "в.ч.",
+// "військової частини". The unit number is appended (escaped) by _stripMilitaryUnit().
+const MILITARY_UNIT_PREFIX_PATTERN = '(?:військової\\s+частини|в\\s*[/\\\\.]?\\s*ч\\.?)';
 
 // Whitespace and punctuation trailing a position title once the slashed rank is removed.
 const POSITION_TRAILING_PUNCTUATION_REGEX = /[\s.,;:!?\-–—]+$/;

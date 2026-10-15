@@ -23,6 +23,7 @@ Single-value config lives in column A as a vertical list (a documentation label,
 | Cell | Purpose |
 |------|---------|
 | `A2` (`MASTER_MODE_CELL`) | Master Mode toggle (checkbox) — when checked, the webview aggregates data from all source spreadsheets listed in `B2:B` |
+| `A4` (`MILITARY_UNIT_CELL`) | The unit's own military unit number (e.g. `3102`) — the `militaryUnit` computed value, and cut out of `currentPosition` |
 | `A6` (`ACTUAL_PERSONNEL_SPREADSHEET_CELL`) | Link or bare ID of the spreadsheet that holds the authoritative personnel list |
 | `A7` (`ACTUAL_PERSONNEL_RANGE_CELL`) | Range address within that spreadsheet (e.g. `Sheet1!A:A`) containing full names |
 | `A9` (`EXPORT_F1_TEMPLATE_CELL`) | Google Drive file ID (or shareable link) of the F-1 Docs template |
