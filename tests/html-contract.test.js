@@ -63,6 +63,22 @@ describe('toolbar buttons', () => {
   });
 });
 
+describe('colors', () => {
+  const css = read('WebEditor.css.html');
+  const rootBlock = css.match(/:root\s*\{[^}]*\}/);
+  const hex = /(?<![&\w])#(?:[0-9a-fA-F]{8}|[0-9a-fA-F]{6}|[0-9a-fA-F]{3,4})(?![\w-])/g;
+
+  test('finds the :root token block (guards against the regex silently matching nothing)', () => {
+    assert.ok(rootBlock && rootBlock[0].match(hex).length > 10);
+  });
+  test('no raw hex color outside :root in the stylesheet, markup or client scripts (use a var(--color-*) token)', () => {
+    const sources = { 'WebEditor.css.html': css.replace(rootBlock[0], ''), 'WebEditor.html': html };
+    for (const { file, text } of fragments) sources[file] = text;
+    const found = Object.entries(sources).flatMap(([file, text]) => (text.match(hex) || []).map((h) => `${file}: ${h}`));
+    assert.deepEqual(found, []);
+  });
+});
+
 describe('server functions that serve WebEditor', () => {
   test('each sets template.mode before evaluating (an unset scriptlet variable throws ReferenceError)', () => {
     const bodies = codeJs.split(/^function /m).filter((b) => b.includes("createTemplateFromFile('WebEditor')"));

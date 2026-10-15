@@ -16,10 +16,11 @@ const { clientScripts, SRC_DIR } = require('./client-scripts.js');
  * top-level names (functions or constants) as an object.
  * @param {string[]} files - Filenames under src/, in load order (Config.js first).
  * @param {string[]} names - Top-level identifiers to return.
+ * @param {Object<string, *>} [globals] - Stubs for Apps Script services (e.g. `DriveApp`) the files call.
  * @returns {Object<string, *>}
  */
-function loadServer(files, names) {
-  const context = vm.createContext({});
+function loadServer(files, names, globals = {}) {
+  const context = vm.createContext({ ...globals });
   for (const file of files) {
     vm.runInContext(fs.readFileSync(path.join(SRC_DIR, file), 'utf8'), context, { filename: file });
   }
