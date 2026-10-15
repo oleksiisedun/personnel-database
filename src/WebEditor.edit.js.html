@@ -1,5 +1,5 @@
 <script>
-  // Edit view: form fields and validation, save/add/delete, unsaved-changes guard.
+  // Edit view: form fields and validation, save/add, save-conflict handling, unsaved-changes guard.
   // One of several WebEditor.*.js.html fragments sharing a single global scope; include order is set in WebEditor.html.
 
   let editingRow = null;   // row object open in the edit view
@@ -526,91 +526,5 @@
     document.getElementById('btn-save').disabled = false;
     document.getElementById('save-status').textContent = '';
     alert(`Save failed: ${err.message || err}`);
-  }
-
-  /**
-   * Asks for confirmation then moves the current row to the Trash sheet via the server.
-   */
-  function deletePerson() {
-    if (!confirm('Move this person to Trash?')) return;
-    document.getElementById('btn-delete').disabled = true;
-    document.getElementById('btn-save').disabled = true;
-    google.script.run
-      .withSuccessHandler(onDeleteSuccess)
-      .withFailureHandler(onDeleteError)
-      .deleteRow(editingRow.rowIndex, editingRow.spreadsheetId ?? null, editingRow.values[0]);
-  }
-
-  /**
-   * Success handler for deletePerson(). Removes the row from the in-memory schema,
-   * adjusts rowIndexes for all subsequent rows (the sheet row numbers shifted up by 1),
-   * and returns to the list view.
-   */
-  function onDeleteSuccess(result) {
-    if (result.skippedEntries.length) {
-      onDeleteError(new Error('This person was changed, moved or deleted by another user. Refresh to see the latest data.'));
-      return;
-    }
-    const deletedIndex = editingRow.rowIndex;
-    const deletedSpreadsheetId = editingRow.spreadsheetId ?? null;
-    schema.rows = schema.rows.filter(r => r !== editingRow);
-    adjustRowIndexesAfterDelete(schema.rows, new Map([[deletedSpreadsheetId, [deletedIndex]]]));
-    editingRow = null;
-    applyFilters();
-    showView('list');
-  }
-
-  /**
-   * Failure handler for deletePerson(). Re-enables buttons and alerts the error.
-   * @param {Error} err
-   */
-  function onDeleteError(err) {
-    document.getElementById('btn-delete').disabled = false;
-    document.getElementById('btn-save').disabled = false;
-    alert(`Delete failed: ${err.message || err}`);
-  }
-
-  /**
-   * Asks for confirmation then moves all selected rows to Trash via the server.
-   */
-  function deletePersonnelBulk() {
-    const rowEntries = getSelectedRowEntries();
-    if (!rowEntries.length) return;
-    const count = rowEntries.length;
-    if (!confirm(`Move ${count} person${count !== 1 ? 's' : ''} to Trash?`)) return;
-    document.getElementById('btn-delete-bulk').disabled = true;
-    google.script.run
-      .withSuccessHandler(onBulkDeleteSuccess.bind(null, rowEntries))
-      .withFailureHandler(onBulkDeleteError)
-      .deleteRows(rowEntries);
-  }
-
-  /**
-   * Success handler for deletePersonnelBulk(). Removes deleted rows from schema,
-   * adjusts rowIndexes for remaining rows in the same spreadsheet, and re-renders.
-   * @param {Array<{rowIndex: number, spreadsheetId: string|null}>} sentEntries - Entries sent to the server.
-   * @param {{skippedEntries: Array<{rowIndex: number, spreadsheetId: string|null}>}} result
-   */
-  function onBulkDeleteSuccess(sentEntries, result) {
-    const deletedEntries = excludeSkippedEntries(sentEntries, result.skippedEntries);
-    if (result.skippedEntries.length) {
-      alert(`${result.skippedEntries.length} person(s) were not deleted because another user changed or moved them. Refresh to see the latest data.`);
-    }
-    const deletedKeys = new Set(deletedEntries.map(e => rowKey(e)));
-    schema.rows = schema.rows.filter(r => !deletedKeys.has(rowKey(r)));
-    deletedKeys.forEach(k => selectedKeys.delete(k));
-
-    adjustRowIndexesAfterDelete(schema.rows, groupRowIndexesBySource(deletedEntries));
-
-    applyFilters();
-  }
-
-  /**
-   * Failure handler for deletePersonnelBulk(). Re-enables the button and logs the error.
-   * @param {Error} err
-   */
-  function onBulkDeleteError(err) {
-    document.getElementById('btn-delete-bulk').disabled = false;
-    console.error('Bulk delete failed:', err.message || err);
   }
 </script>

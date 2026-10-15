@@ -6,7 +6,7 @@
 
 ## Decision
 
-Split it into fragments, one `<script>` block per file, by view/responsibility: `WebEditor.js.html` (core: bootstrap, data loading, shared state/helpers), `WebEditor.list.js.html`, `WebEditor.images.js.html`, `WebEditor.tables.js.html`, `WebEditor.edit.js.html`, `WebEditor.export.js.html`, `WebEditor.move.js.html`. They are included consecutively from `WebEditor.html`; that include order is the load order.
+Split it into fragments, one `<script>` block per file, by view/responsibility: `WebEditor.js.html` (core: bootstrap, data loading, shared state/helpers), `WebEditor.list.js.html`, `WebEditor.images.js.html`, `WebEditor.tables.js.html`, `WebEditor.edit.js.html`, `WebEditor.delete.js.html`, `WebEditor.export.js.html`, `WebEditor.move.js.html`. They are included consecutively from `WebEditor.html`; that include order is the load order.
 
 This is deliberately **not** a modularization. Separate classic scripts still share the global lexical scope, and the state is coupled (`schema` is read from every area), so the split changes navigation, not architecture. Rules that keep it safe:
 
