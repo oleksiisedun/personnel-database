@@ -358,6 +358,15 @@
   let refreshGeneration = 0; // bumped on each refresh; lets stale in-flight master-source fetches self-cancel
 
   /**
+   * Disables Refresh and dims the table while a refresh is in flight, or undoes both.
+   * @param {boolean} refreshing
+   */
+  function setRefreshing(refreshing) {
+    document.getElementById('btn-refresh').disabled = refreshing;
+    document.getElementById('data-table').classList.toggle('filtering', refreshing);
+  }
+
+  /**
    * Re-runs the initial data load (local rows + Master Mode sources) without
    * closing the dialog, so the user can pull in changes made by other admins
    * since the dialog was opened. Unlike onDataLoaded(), this does not rebuild
@@ -367,8 +376,7 @@
    * server round-trip, the same as resetListState().
    */
   function refreshAll() {
-    document.getElementById('btn-refresh').disabled = true;
-    document.getElementById('data-table').classList.add('filtering');
+    setRefreshing(true);
     refreshGeneration++;
     setMasterLoading(false); // the superseded fetch run never clears it
     google.script.run
@@ -396,8 +404,7 @@
     document.getElementById('chk-actual').disabled = !schema.actualPersonnelNamesSet;
     updateSchemaWarningIcon();
     applyFilters();
-    document.getElementById('btn-refresh').disabled = false;
-    document.getElementById('data-table').classList.remove('filtering');
+    setRefreshing(false);
     maybeQueueMasterSourceFetch(data);
   }
 
@@ -406,8 +413,7 @@
    * @param {Error} err
    */
   function onRefreshError(err) {
-    document.getElementById('btn-refresh').disabled = false;
-    document.getElementById('data-table').classList.remove('filtering');
+    setRefreshing(false);
     showError('error-msg', 'Error refreshing data', err);
   }
 
