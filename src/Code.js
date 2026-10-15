@@ -137,34 +137,35 @@ function openPhotoExport() {
  * by the client once per source, after the initial local-only render, so
  * remote rows stream in instead of blocking getSchemaAndData(). Falls back to
  * the raw ID as the name and an empty row list if the spreadsheet is
- * inaccessible or has no Database sheet.
+ * inaccessible or has no Database sheet; `loadError` then says why
+ * (`'no-access'`, `'no-database-sheet'` or `'error'`), else it is `null`.
  *
  * @param {string} spreadsheetId
- * @returns {{ id: string, name: string, rows: Array<{rowIndex: number, values: string[], spreadsheetId: string}>, columnMismatches: Array<{colIndex: number, localName: string, localType: string, remoteName: string, remoteType: string}>|null }}
+ * @returns {{ id: string, name: string, rows: Array<{rowIndex: number, values: string[], spreadsheetId: string}>, columnMismatches: Array<{colIndex: number, localName: string, localType: string, remoteName: string, remoteType: string}>|null, loadError: string|null }}
  */
 function getMasterSourceRows(spreadsheetId) {
   const remoteSs = openSpreadsheetSafely(spreadsheetId);
-  if (!remoteSs) return { id: spreadsheetId, name: spreadsheetId, rows: [], columnMismatches: null };
+  if (!remoteSs) return { id: spreadsheetId, name: spreadsheetId, rows: [], columnMismatches: null, loadError: 'no-access' };
   try {
     const name = remoteSs.getName();
     const remoteSheet = remoteSs.getSheetByName(SHEET_DATABASE);
-    if (!remoteSheet) return { id: spreadsheetId, name, rows: [], columnMismatches: null };
+    if (!remoteSheet) return { id: spreadsheetId, name, rows: [], columnMismatches: null, loadError: 'no-database-sheet' };
     const remoteAll = remoteSheet.getDataRange().getValues();
-    if (remoteAll.length < 2) return { id: spreadsheetId, name, rows: [], columnMismatches: null };
+    if (remoteAll.length < 2) return { id: spreadsheetId, name, rows: [], columnMismatches: null, loadError: null };
     const { sheet: localSheet } = getDatabaseSheet(null);
     const localSchema = extractColumnSchema(localSheet.getDataRange().getValues());
     const remoteSchema = extractColumnSchema(remoteAll);
     const columnMismatches = compareColumnSchemas(localSchema, remoteSchema);
-    if (columnMismatches.length > 0) return { id: spreadsheetId, name, rows: [], columnMismatches };
+    if (columnMismatches.length > 0) return { id: spreadsheetId, name, rows: [], columnMismatches, loadError: null };
     const rows = [];
     for (let i = 2; i < remoteAll.length; i++) {
       const values = stringifyRowValues(remoteAll[i]);
       if (values.every((v) => v === '')) continue;
       rows.push({ rowIndex: i + 1, values, spreadsheetId });
     }
-    return { id: spreadsheetId, name, rows, columnMismatches: null };
+    return { id: spreadsheetId, name, rows, columnMismatches: null, loadError: null };
   } catch (e) {
-    return { id: spreadsheetId, name: spreadsheetId, rows: [], columnMismatches: null };
+    return { id: spreadsheetId, name: spreadsheetId, rows: [], columnMismatches: null, loadError: 'error' };
   }
 }
 

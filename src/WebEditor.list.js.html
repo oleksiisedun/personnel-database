@@ -270,23 +270,39 @@
     return letter;
   }
 
+  const SOURCE_LOAD_ERROR_MESSAGES = {
+    'no-access': 'No access to this spreadsheet.',
+    'no-database-sheet': 'The spreadsheet has no Database sheet.',
+    error: 'The spreadsheet could not be read.',
+  };
+
   /**
-   * Shows or hides the schema-warning button based on recorded column mismatches.
+   * Shows or hides the warning button based on recorded column mismatches and
+   * sources that failed to load.
    */
   function updateSchemaWarningIcon() {
     const btn = document.getElementById('btn-schema-warning');
     if (!btn) return;
-    btn.style.display = Object.keys(schema.sourceColumnMismatches).length ? '' : 'none';
+    const hasWarnings = Object.keys(schema.sourceColumnMismatches).length || Object.keys(schema.sourceLoadErrors).length;
+    btn.style.display = hasWarnings ? '' : 'none';
   }
 
   /**
-   * Populates and opens the schema-warning overlay. Rebuilds content each time
-   * so freshly-arrived mismatches are always reflected.
+   * Populates and opens the schema-warning overlay (column mismatches and
+   * sources that failed to load). Rebuilds content each time so
+   * freshly-arrived warnings are always reflected.
    */
   function openSchemaWarningOverlay() {
     const sourceMap = new Map(schema.masterSources.map(s => [s.id, s.name]));
     const content = document.getElementById('schema-warning-content');
     content.textContent = '';
+    for (const [id, reason] of Object.entries(schema.sourceLoadErrors)) {
+      const heading = document.createElement('h3');
+      heading.textContent = sourceMap.get(id) ?? id;
+      const note = document.createElement('p');
+      note.textContent = SOURCE_LOAD_ERROR_MESSAGES[reason] ?? SOURCE_LOAD_ERROR_MESSAGES.error;
+      content.append(heading, note);
+    }
     for (const [id, mismatches] of Object.entries(schema.sourceColumnMismatches)) {
       const heading = document.createElement('h3');
       heading.textContent = sourceMap.get(id) ?? id;

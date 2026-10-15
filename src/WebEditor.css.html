@@ -127,6 +127,8 @@
   #col-toggle-wrap { position: relative; display: inline-block; }
   #regex-label, #actual-label, #all-units-label { font-size: 13px; color: var(--color-text-muted); cursor: pointer; display: flex; align-items: center; gap: 4px; user-select: none; }
   #btn-schema-warning { font-size: 16px; line-height: 1; }
+  .spinner { width: 14px; height: 14px; border: 2px solid var(--color-border-light); border-top-color: var(--color-primary); border-radius: 50%; animation: spin 0.8s linear infinite; flex-shrink: 0; }
+  @keyframes spin { to { transform: rotate(360deg); } }
 
   /* ── Export overlay ── */
   #export-dialog { min-width: 300px; text-align: center; }
@@ -294,6 +296,7 @@
   #schema-warning-dialog { min-width:420px; max-width:640px; max-height:80vh; overflow-y:auto; }
   #schema-warning-actions { margin-top:16px; }
   #schema-warning-content h3 { font-size:13px; font-weight:600; color:var(--color-text); margin:0 0 6px; }
+  #schema-warning-content p { font-size:13px; color:var(--color-text-muted); margin:0 0 16px; }
   #schema-warning-content table { width:100%; border-collapse:collapse; font-size:13px; margin-bottom:16px; }
   #schema-warning-content th { text-align:left; padding:4px 8px; border-bottom:1px solid var(--color-border-light); color:var(--color-text-muted); font-weight:600; }
   #schema-warning-content td { padding:4px 8px; border-bottom: 1px solid var(--color-border-faint); }

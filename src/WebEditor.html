@@ -29,7 +29,8 @@
         <button id="btn-export-xlsx" class="btn-secondary btn-toolbar" disabled>Export XLSX</button>
       </div>
       <div id="toolbar-right">
-        <button id="btn-schema-warning" class="btn-warning btn-toolbar" style="display:none" title="Column schema mismatch in one or more sources">⚠</button>
+        <span id="master-loading-spinner" class="spinner" style="display:none" title="Loading Master Mode sources…"></span>
+        <button id="btn-schema-warning" class="btn-warning btn-toolbar" style="display:none" title="One or more sources could not be loaded or have a column mismatch">⚠</button>
         <button id="btn-reset" class="btn-warning btn-toolbar">Reset</button>
         <button id="btn-refresh" class="btn-success btn-toolbar" style="display:none">Refresh</button>
         <label id="all-units-label" style="display:none"><input type="checkbox" id="chk-all-units" checked> All Units</label>
@@ -45,8 +46,8 @@
     <!-- Schema warning overlay -->
     <div id="schema-warning-overlay" class="overlay" style="display:none">
       <div id="schema-warning-dialog" class="overlay-dialog">
-        <h2>Column Schema Mismatch</h2>
-        <p class="overlay-text">These remote spreadsheets have a column layout that differs from the local Database sheet. Their rows were not loaded.</p>
+        <h2>Sources Not Loaded</h2>
+        <p class="overlay-text">The rows of these remote spreadsheets were not loaded.</p>
         <div id="schema-warning-content"></div>
         <div id="schema-warning-actions" class="dialog-actions">
           <button id="btn-schema-warning-close" class="btn-secondary btn-dialog-action">Close</button>
