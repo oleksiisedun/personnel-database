@@ -231,7 +231,7 @@ function _computeCurrentRank(data) {
  */
 function _computeCurrentMaxRank(data) {
   const slashed = _getRawCurrentPosition(data).match(SLASHED_RANK_REGEX);
-  const rank = slashed ? slashed[0].slice(1, -1).trim() : '';
+  const rank = slashed ? slashed[1] : '';
   return rank || _computeCurrentRank(data);
 }
 

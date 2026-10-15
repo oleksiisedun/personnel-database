@@ -134,7 +134,11 @@ describe('rank and position computed values', () => {
 
   test('currentPosition drops slashed ranks and trailing punctuation', () => {
     assert.equal(_computeValue('currentPosition', { 'Проходження служби': history('командир взводу /капітан/.') }), 'командир взводу');
-    assert.equal(_computeValue('currentPosition', { 'Проходження служби': history('/капітан/ командир роти; ') }), 'командир роти');
+    assert.equal(_computeValue('currentPosition', { 'Проходження служби': history('командир роти /капітан/; ') }), 'командир роти');
+    const noSpace = 'технік штабної роти 3-го батальйону оперативного призначення/головний сержант/';
+    assert.equal(_computeValue('currentPosition', { 'Проходження служби': history(noSpace) }), 'технік штабної роти 3-го батальйону оперативного призначення');
+    assert.equal(_computeValue('currentMaxRank', { 'Проходження служби': history(noSpace) }), 'головний сержант');
+    assert.equal(_computeValue('currentPosition', { 'Проходження служби': history('начальник/заступник служби') }), 'начальник/заступник служби');
     assert.equal(_computeValue('currentPosition', { 'Проходження служби': history('командир «Альфа»') }), 'командир «Альфа»');
     assert.equal(_computeValue('currentPosition', {}), '');
   });

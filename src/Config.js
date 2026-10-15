@@ -185,11 +185,11 @@ const WHITESPACE_RUN_REGEX = /\s+/g;
 // DD.MM.YYYY date pattern (global flag — safe to reuse with String.prototype.match()).
 const DATE_REGEX = /\d{2}\.\d{2}\.\d{4}/g;
 
-// Rank between two slashes in a service-history position, e.g. "/капітан/" — the rank the
-// person holds above their position's own rank. The opening slash must start a word and the
-// closing one must not be followed by a letter/digit, so slashes inside words ("в/ч 3102") never
-// pair up (global flag — safe with match()/replace()).
-const SLASHED_RANK_REGEX = /(?<!\S)\/([^/\s](?:[^/]*[^/\s])?)\/(?![\p{L}\p{N}])/gu;
+// Rank between two slashes at the END of a service-history position, e.g. "/капітан/" or
+// "...призначення/головний сержант/" (no space before the opening slash needed) — the rank the
+// person holds above their position's own rank. Trailing whitespace/punctuation after the closing
+// slash is part of the match. Group 1 is the rank text.
+const SLASHED_RANK_REGEX = /\/([^/\s](?:[^/]*[^/\s])?)\/[\s.,;:!?]*$/u;
 
 // Everything that is not a letter, whitespace, hyphen or apostrophe (kept for "генерал-майор", "м'який").
 const NON_RANK_CHARS_REGEX = /[^\p{L}\s'’-]/gu;
